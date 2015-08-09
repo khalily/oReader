@@ -11,7 +11,7 @@ from ..feedparser import FeedParser
 def test():
     return jsonify({'result': 'test'})
 
-@api.route('/test', methods=['POST'])
+@api.route('/add-subscription', methods=['POST'])
 def add_subscription():
     url = request.json.get('url')
     print url
@@ -28,10 +28,23 @@ def add_subscription():
     print parser.feed
     print parser.items
     print current_app.config['SQLALCHEMY_DATABASE_URI']
-    db.session.add(Feed(**parser.feed))
+    feed = Feed(**parser.feed)
     for item in parser.items:
-        db.session.add(Item(**item))
+        feed.items.append(Item(**item))
+    db.session.add(feed)
 
     return jsonify({'result': 'ok'})
 
-
+@api.route('/get-story/')
+def get_story():
+    data = []
+    for feed in Feed.query.all():
+        print feed.to_json()
+        print feed.items.all()
+        data.append(
+            {
+                "feed": feed.to_json(),
+                "stories": [ item.to_json() for item in feed.items.all()],
+            }
+        )
+    return jsonify({'feeds': data})
