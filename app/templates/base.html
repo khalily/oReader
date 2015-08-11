@@ -4,8 +4,7 @@
       <title>Rss Reader</title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <link href="static/css/bootstrap.min.css" rel="stylesheet">
-      <script src="static/js/jquery-2.1.4.min.js"></script>
-      <script src="static/js/bootstrap.min.js"></script>
+      <link href="static/css/style.css" rel="stylesheet">
    </head>
    <body ng-controller="rssController">
       <nav class="navbar navbar-default" role="navigation">
@@ -67,12 +66,16 @@
                                 </h4>
                              </div>
                              <div class="modal-body">
-                                 <form class="form-horizontal" role="form">
+                                 <form class="form-horizontal" novalidate role="form" name="login_form">
                                    <div class="form-group">
                                       <label for="email" class="col-sm-2 control-label">邮箱</label>
                                       <div class="col-sm-8">
-                                         <input type="text" class="form-control" id="email"
-                                            placeholder="请输入邮箱">
+                                         <input type="email" ng-model="user.email" ng-init="user.email=''" class="form-control"
+                                            name="uEmail" required="" placeholder="test@example" />
+                                         <div ng-show="login_form.$submitted || form.uEmail.$touched">
+                                             <span class="text-danger" ng-show="login_form.uEmail.$error.required">请输入你的Email</span>
+                                             <span class="text-danger" ng-show="login_form.uEmail.$error.email">这不是一个有效的Email</span>
+                                         </div>
                                       </div>
                                    </div>
                                    <div class="form-group">
@@ -86,7 +89,7 @@
                                    </div>
                                    <div class="form-group">
                                       <div class="col-sm-offset-2 col-sm-10">
-                                         <button type="submit" class="btn btn-primary" onclick="">登录</button>
+                                         <button type="submit" class="btn btn-primary" ng-click="login(user)">登录</button>
                                       </div>
                                    </div>
                                  </form>
@@ -105,8 +108,9 @@
       {% endblock %}
       </div>
 
-      <script src="static/js/jquery-2.1.4.min.js"></script>
-      <script src="static/js/bootstrap.min.js"></script>
-      <script src="static/js/angular.min.js"></script>
+      <script src="static/js/jquery-2.1.4.js"></script>
+      <script src="static/js/bootstrap.js"></script>
+      <script src="static/js/angular.js"></script>
+      <script src="static/js/site.js"></script>
    </body>
 </html>
