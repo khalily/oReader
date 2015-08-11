@@ -1,6 +1,8 @@
+#coding: utf-8
+
 from . import auth
 from forms import LoginForm
-from flask import redirect, url_for, render_template
+from flask import redirect, url_for, render_template, jsonify
 from flask.ext.login import login_user, logout_user
 from ..models import User
 
@@ -13,4 +15,4 @@ def login():
         if user is not None:
             login_user(user)
             return redirect(url_for('main.index'))
-    return render_template('index.html')
+    return jsonify({'error': 'Email 不存在'})

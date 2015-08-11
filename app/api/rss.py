@@ -1,15 +1,24 @@
 from . import api
 from .. import db
 from ..models import Feed, Item
-from flask import request, jsonify, abort, current_app
+from flask import request, jsonify, abort, current_app, g
+from authentication import auth
+from errors import unauthorized
 
 from urllib2 import urlopen
 from ..feedparser import FeedParser
 
 
-@api.route('/')
-def test():
-    return jsonify({'result': 'test'})
+@api.before_request
+@auth.login_required
+def before_request():
+    pass
+
+@api.route('/get_token')
+def get_token():
+    if g.token_used:
+        return unauthorized('Invalid credentials')
+    return jsonify({ 'token': g.current_user.generate_auth_token() })
 
 @api.route('/add-subscription', methods=['POST'])
 def add_subscription():
