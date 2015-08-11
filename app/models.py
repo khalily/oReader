@@ -1,9 +1,13 @@
-from app import db
+from app import db, login_manager
+from flask.ext.login import UserMixin
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String, nullable=False)
+
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
 
 
 class Feed(db.Model):
@@ -50,3 +54,8 @@ class Item(db.Model):
             'content': self.content,
             'updated': self.updated,
         }
+
+
+@login_manager.user_loader
+def load_user(id):
+    return User.query.get(id)

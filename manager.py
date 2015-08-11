@@ -10,7 +10,7 @@ manager = Manager(app)
 
 @manager.shell
 def make_context():
-    return dict(db=db, Feed=Feed, Item=Item, User=User)
+    return dict(app=app, db=db, Feed=Feed, Item=Item, User=User)
 
 if __name__ == '__main__':
     manager.run()
