@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html ng-app="rssApp">
+<html ng-app="oReaderApp">
    <head>
       <title>Rss Reader</title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <link href="static/css/bootstrap.min.css" rel="stylesheet">
       <link href="static/css/style.css" rel="stylesheet">
    </head>
-   <body ng-controller="rssController">
+   <body ng-controller="RootCtrl">
       <nav class="navbar navbar-default" role="navigation">
         <div class="navbar-header">
            <button type="button" class="navbar-toggle" data-toggle="collapse"
@@ -38,19 +38,17 @@
                  </ul>
               </li>
            </ul>
-           <ul class="nav navbar-nav navbar-right">
-              {% if current_user.is_authenticated() %}
-              <li class="dropdown">
+           <ul ng-controller="LoginCtrl" class="nav navbar-nav navbar-right">
+              <li class="dropdown" ng-show="hasLogin">
                   <a href="#" class="dropdown-toggle" data-toggle="dropdown">
-                      current_user.email
+                      {{ profile.email }}
                       <b class="caret"></b>
                   </a>
                   <ul class="dropdown-menu">
                       <li><a href="#">add subscription</a></li>
                       <li><a href="#">logout</a></li>
                   </ul>
-              {% else %}
-              <li>
+              <li ng-hide="hasLogin">
                    <a href="#" data-toggle="modal" data-target="#login_dialog">Login</a>
                    <div class="modal fade" id="login_dialog" tabindex="-1" role="dialog"
                        aria-labelledby="login_title" aria-hidden="true">
@@ -66,11 +64,11 @@
                                 </h4>
                              </div>
                              <div class="modal-body">
-                                 <form class="form-horizontal" novalidate role="form" name="login_form">
+                                 <form ng-submit="submit()" class="form-horizontal" novalidate role="form" name="login_form">
                                    <div class="form-group">
                                       <label for="email" class="col-sm-2 control-label">邮箱</label>
                                       <div class="col-sm-8">
-                                         <span class="text-danger" ng-show="login_failed">错误的邮箱或密码</span>
+                                         <span class="text-danger">{{ hitMsg|angular }}</span>
                                          <input type="email" ng-model="user.email" ng-init="user.email='test@example.com'" class="form-control"
                                             name="uEmail" required="" placeholder="test@example" />
                                          <div ng-show="login_form.$submitted || login_form.uEmail.$touched">
@@ -92,7 +90,7 @@
                                    </div>
                                    <div class="form-group">
                                       <div class="col-sm-offset-2 col-sm-10">
-                                         <button type="submit" class="btn btn-primary" ng-click="login(user)">登录</button>
+                                         <button type="submit" class="btn btn-primary">登录</button>
                                       </div>
                                    </div>
                                  </form>
@@ -101,19 +99,23 @@
                        </div>
                    </div>
               </li>
-              {% endif %}
           </ul>
         </div>
       </nav>
       <div class="container">
-      {% block content %}
-          <h1>Hello, world!</h1>
-      {% endblock %}
+          <div ng-view></div>
       </div>
 
-      <script src="static/js/jquery-2.1.4.js"></script>
-      <script src="static/js/bootstrap.js"></script>
-      <script src="static/js/angular.js"></script>
-      <script src="static/js/site.js"></script>
+      <script type="text/javascript" src="static/lib/jquery/jquery-2.1.4.js"></script>
+      <script type="text/javascript" src="static/lib/bootstrap/bootstrap.js"></script>
+      <script type="text/javascript" src="static/lib/angular/angular.js"></script>
+      <script type="text/javascript" src="https://code.angularjs.org/1.4.4/angular-route.min.js"></script>
+      <script type="text/javascript" src="https://cdn.rawgit.com/auth0/angular-storage/master/dist/angular-storage.js"></script>
+      <script type="text/javascript" src="https://code.angularjs.org/1.4.4/angular-cookies.min.js"></script>
+      <script type="text/javascript" src="static/js/app.js"></script>
+      <script type="text/javascript" src="static/js/controllers.js"></script>
+      <script type="text/javascript" src="static/js/directives.js"></script>
+      <script type="text/javascript" src="static/js/filters.js"></script>
+      <script type="text/javascript" src="static/js/services.js"></script>
    </body>
 </html>
