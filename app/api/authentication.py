@@ -1,12 +1,10 @@
 # coding=utf-8
 
 from ..models import User
-from flask import g, make_response
-from errors import unauthorized
+from flask import g, make_response, request
 from flask.ext.httpauth import HTTPBasicAuth
 
 auth = HTTPBasicAuth()
-
 
 @auth.error_handler
 def unauthorized():

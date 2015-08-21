@@ -1,5 +1,13 @@
 from flask import Blueprint
+from flask_restful import Api
+from resource import FeedList, User, Session, TokenSession
 
-api = Blueprint('api', __name__)
+api_bp = Blueprint('api', __name__)
 
-from . import rss, errors, authentication
+api = Api(api_bp)
+
+api.add_resource(Session, '/get_token')
+api.add_resource(TokenSession, '/login')
+api.add_resource(FeedList, '/feeds/', '/feeds/<int:id>')
+
+from . import errors, authentication

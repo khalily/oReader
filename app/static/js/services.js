@@ -21,7 +21,7 @@ oReaderApp.service('auth', ['$http', '$q', '$rootScope', function ($http, $q, $r
     }
 
     self.signin = function (options, successCallback, errorCallback) {
-        var req = request('/api/get_token', options.email, options.password);
+        var req = request('/api/v1/get_token', options.email, options.password);
         $http(req).
         then(function(response) {
                 var token = response.data.token;
@@ -45,7 +45,7 @@ oReaderApp.service('auth', ['$http', '$q', '$rootScope', function ($http, $q, $r
     };
 
     self.authenticate = function () {
-        var req = request('/api/login', '', '');
+        var req = request('/api/v1/login', '', '');
         var deferred = $q.defer();
         $http(req)
             .then(function (response) {
@@ -65,7 +65,7 @@ oReaderApp.factory('tokenInjector', ['store', function (store) {
     return {
         'request': function(config) {
             var token = store.get('token');
-            if (token && config.url != '/api/get_token') {
+            if (token && config.url != '/api/v1/get_token') {
                 config.headers['Authorization'] = 'Basic ' + btoa(token + ':' + '');
             }
             return config;
@@ -102,7 +102,7 @@ oReaderApp.factory('tokenInvalidInterceptor', ['$q', '$location', '$rootScope', 
 }]);
 
 oReaderApp.factory('Feed', ['$resource', function ($resource) {
-    return $resource('/api/feeds/:id', {id: '@id'});
+    return $resource('/api/v1/feeds/:id', {id: '@id'});
 }]);
 
 oReaderApp.factory('feeds', ['Feed', function(Feed) {
@@ -119,7 +119,7 @@ oReaderApp.factory('addFeed', ['feeds', function(feeds) {
 }]);
 
 oReaderApp.factory('Story', ['$resource', function ($resource) {
-    return $resource('/api/feeds/:feed_id/story/:story_id', {feed_id: '@feed_id', story_id: '@story_id'});
+    return $resource('/api/v1/feeds/:feed_id/story/:story_id', {feed_id: '@feed_id', story_id: '@story_id'});
 }]);
 
 oReaderApp.factory('stories', ['Story', function (Story) {
@@ -129,7 +129,7 @@ oReaderApp.factory('stories', ['Story', function (Story) {
 }]);
 
 oReaderApp.factory('User', ['$resource', function ($resource) {
-    return $resource('/api/users/:user_id', {user_id: '@user_id'})
+    return $resource('/api/v1/users/:user_id', {user_id: '@user_id'})
 }]);
 
 oReaderApp.factory('get_user', ['User', function (User) {

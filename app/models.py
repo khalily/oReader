@@ -1,3 +1,5 @@
+#coding: utf-8
+
 from app import db, login_manager
 from flask import current_app
 from flask.ext.login import UserMixin
@@ -48,6 +50,9 @@ class Feed(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     user = db.relationship('User', backref=db.backref('feeds', order_by=id, lazy='dynamic'))
+
+    def __repr__(self):
+        return '<Feed>{id}{link}'.format(id=self.id, link=self.link)
 
     def to_json(self):
         return {

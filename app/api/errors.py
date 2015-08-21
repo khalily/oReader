@@ -1,4 +1,3 @@
-from . import api
 from flask import jsonify
 
 
@@ -11,6 +10,3 @@ def forbidden(msg):
 def unauthorized(msg):
     return jsonify({'error': 'unauthorized', 'message': msg}), 401
 
-@api.errorhandler(405)
-def method_not_allowed():
-    return jsonify({'error': 'method not allowed', 'message': 'This method is not implementation'}), 405
