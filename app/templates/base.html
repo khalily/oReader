@@ -28,7 +28,7 @@
                     <b class="caret"></b>
                  </a>
                  <ul class="dropdown-menu">
-                    <li><a href="#">jmeter</a></li>
+                    <li><a>jmeter</a></li>
                     <li><a href="#">EJB</a></li>
                     <li><a href="#">Jasper Report</a></li>
                     <li class="divider"></li>
@@ -38,19 +38,9 @@
                  </ul>
               </li>
            </ul>
-           <ul ng-controller="LoginCtrl" class="nav navbar-nav navbar-right">
-              <li class="dropdown" ng-show="hasLogin">
-                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">
-                      {{ profile.email }}
-                      <b class="caret"></b>
-                  </a>
-                  <ul class="dropdown-menu">
-                      <li><a href="#">add subscription</a></li>
-                      <li><a href="#">logout</a></li>
-                  </ul>
-              <li ng-hide="hasLogin">
-                   <a href="#" data-toggle="modal" data-target="#login_dialog">Login</a>
-                   <div class="modal fade" id="login_dialog" tabindex="-1" role="dialog"
+           <ul class="nav navbar-nav navbar-right">
+               <li ng-hide="loggedUser"><a href="" data-toggle="modal" data-target="#login_dialog">Login</a></li>
+               <div class="modal fade" id="login_dialog" tabindex="-1" role="dialog"
                        aria-labelledby="login_title" aria-hidden="true">
                        <div class="modal-dialog" style="width: 450px">
                           <div class="modal-content">
@@ -64,11 +54,11 @@
                                 </h4>
                              </div>
                              <div class="modal-body">
-                                 <form ng-submit="submit()" class="form-horizontal" novalidate role="form" name="login_form">
+                                 <form ng-controller="LoginCtrl" ng-submit="submit()" class="form-horizontal" novalidate role="form" name="login_form">
                                    <div class="form-group">
                                       <label for="email" class="col-sm-2 control-label">邮箱</label>
                                       <div class="col-sm-8">
-                                         <span class="text-danger">{{ hitMsg|angular }}</span>
+                                         <span class="text-danger">{{ hitMsg | angular }}</span>
                                          <input type="email" ng-model="user.email" ng-init="user.email='test@example.com'" class="form-control"
                                             name="uEmail" required="" placeholder="test@example" />
                                          <div ng-show="login_form.$submitted || login_form.uEmail.$touched">
@@ -98,7 +88,18 @@
                           </div>
                        </div>
                    </div>
-              </li>
+               <li class="dropdown" ng-show="loggedUser">
+                  <a href="" class="dropdown-toggle" data-toggle="dropdown">
+                      {{ loggedUser.email | angular }}
+                      <b class="caret"></b>
+                  </a>
+                  <ul class="dropdown-menu">
+                      <li><a href="#/addSubscription">Add subscription</a></li>
+                      <li><a href="#/logout">Logout</a></li>
+                  </ul>
+               </li>
+
+
           </ul>
         </div>
       </nav>
@@ -112,6 +113,7 @@
       <script type="text/javascript" src="https://code.angularjs.org/1.4.4/angular-route.min.js"></script>
       <script type="text/javascript" src="https://cdn.rawgit.com/auth0/angular-storage/master/dist/angular-storage.js"></script>
       <script type="text/javascript" src="https://code.angularjs.org/1.4.4/angular-cookies.min.js"></script>
+      <script type="text/javascript" src="https://code.angularjs.org/1.4.4/angular-resource.min.js"></script>
       <script type="text/javascript" src="static/js/app.js"></script>
       <script type="text/javascript" src="static/js/controllers.js"></script>
       <script type="text/javascript" src="static/js/directives.js"></script>

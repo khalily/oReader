@@ -1,12 +1,20 @@
 # coding=utf-8
 
 from ..models import User
-from flask import g
+from flask import g, make_response
 from errors import unauthorized
 from flask.ext.httpauth import HTTPBasicAuth
 
 auth = HTTPBasicAuth()
 
+
+@auth.error_handler
+def unauthorized():
+    response = make_response()
+    response.status_code = 401
+    response.headers['WWW-Authenticate'] = 'xBasic realm="{0}"'.format('Authentication Required')
+    print response
+    return response
 
 @auth.verify_password
 def verify_password(email_or_token, password):

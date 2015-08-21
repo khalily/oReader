@@ -1,10 +1,11 @@
 from . import api
 from .. import db
 from ..models import Feed, Item
-from flask import request, jsonify, abort, current_app, g
+from flask import request, jsonify, abort, current_app, g, Response, make_response
 from authentication import auth
 from errors import unauthorized
 
+import json
 from urllib2 import urlopen
 from ..feedparser import FeedParser
 
@@ -18,9 +19,22 @@ def before_request():
 def get_token():
     if g.token_used:
         return unauthorized('Invalid credentials')
-    return jsonify({ 'token': g.current_user.generate_auth_token() })
+    return jsonify({
+        'token': g.current_user.generate_auth_token().encode('ascii'),
+        'profile': {
+            'email': g.current_user.email
+        }
+    })
 
-@api.route('/add-subscription', methods=['POST'])
+@api.route('/login')
+def login():
+    return jsonify({
+        'profile': {
+            'email': g.current_user.email
+        }
+    })
+
+@api.route('/feeds/', methods=['POST'])
 def add_subscription():
     url = request.json.get('url')
     print url
@@ -44,16 +58,22 @@ def add_subscription():
 
     return jsonify({'result': 'ok'})
 
-@api.route('/get-story/')
-def get_story():
+@api.route('/feeds/')
+def get_feeds():
     data = []
-    for feed in Feed.query.all():
-        print feed.to_json()
-        print feed.items.all()
-        data.append(
-            {
-                "feed": feed.to_json(),
-                "stories": [ item.to_json() for item in feed.items.all()],
-            }
-        )
-    return jsonify({'feeds': data})
+    # for feed in Feed.query.all():
+    #     print feed.to_json()
+    #     print feed.items.all()
+    #     data.append(
+    #         {
+    #             "feed": feed.to_json(),
+    #             "stories": [ item.to_json() for item in feed.items.all()],
+    #         }
+    #     )
+    feeds = Feed.query.all()
+    # return jsonify({'feeds': [feed.to_json() for feed in feeds]})
+    response = make_response()
+    response.mimetype = 'application/json'
+    response.data = json.dumps([feed.to_json() for feed in feeds])
+    response.status_code = 200
+    return response
