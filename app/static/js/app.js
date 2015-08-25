@@ -1,8 +1,10 @@
 'use strict';
 
-var oReaderApp = angular.module('oReaderApp', ['ngResource', 'ngRoute', 'ngCookies', 'angular-storage']);
+var oReaderApp = angular.module('oReaderApp',
+    ['ngResource', 'ngRoute', 'ngCookies', 'angular-storage', 'restangular']);
 
-oReaderApp.config(function ($routeProvider, $locationProvider, $httpProvider, $resourceProvider) {
+oReaderApp.config(function ($routeProvider, $locationProvider, $httpProvider,
+                            $resourceProvider, RestangularProvider) {
     $routeProvider
         .when('/', {
             templateUrl: 'static/partials/welcome.html',
@@ -37,6 +39,8 @@ oReaderApp.config(function ($routeProvider, $locationProvider, $httpProvider, $r
         .otherwise({
             redirectTo: '/'
         });
+
+    RestangularProvider.setBaseUrl('/api/v1');
 
 
 

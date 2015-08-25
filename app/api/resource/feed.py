@@ -6,7 +6,7 @@ from flask_restful import Resource
 from app.api.authentication import auth
 
 from ..common.schema import UserSchema, FeedSchema
-from marshmallow import ValidationError
+from marshmallow import ValidationError, pprint
 
 @UserSchema.error_handler
 def handle_errors(schema, errors, obj):
@@ -27,6 +27,12 @@ class FeedList(Resource):
 
     @auth.login_required
     def post(self):
-        feed = FeedSchema().validate(request.json)
+        feed, errors = FeedSchema().load(request.json)
         res = FeedSchema().dumps(feed)
-        return jsonify(res.data)
+        pprint(res.data, indent=2)
+        # return json.dumps(res.data, indent=2)
+        response = make_response()
+        response.mimetype = 'application/json'
+        response.status_code = 200
+        response.data = json.dumps(res.data, indent=4)
+        return response

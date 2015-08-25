@@ -82,25 +82,22 @@ oReaderApp.controller('AboutCtrl', ['auth', function(auth) {
     console.log('about ', auth.isAuthenticated);
 }]);
 
-oReaderApp.controller('FeedCtrl', ['$scope', 'feeds', function ($scope, feeds) {
-    $scope.feeds = feeds;
+oReaderApp.controller('FeedCtrl', ['$scope', 'Restangular', function ($scope, Restangular) {
+    $scope.feeds = Restangular.one('feeds/').getList().$object;
 }]);
 
-oReaderApp.controller('SubscriptionCtrl', ['$scope', 'Feed', 'addFeed', '$location',
-    function ($scope, Feed, addFeed, $location) {
+oReaderApp.controller('SubscriptionCtrl', ['$scope', 'Restangular', '$location',
+    function ($scope, Restangular, $location) {
     $scope.rss_url = "";
     $scope.submit = function () {
         alert('submit');
         if ($scope.rss_url) {
-            var feed = new Feed();
-            feed['url'] = $scope.rss_url;
-            console.log('feed', feed);
-            addFeed(feed, function () {
-                alert('add success');
-                $location.path('/feeds');
-            }, function () {
-                alert('add error');
+            Restangular.one('feeds/').customPOST({url: $scope.rss_url}).then(function(feed) {
+                $scope.feed = feed;
+                //$location.path('/feeds');
+            }, function (error) {
+                alert(error);
             });
         }
-    }
+    };
 }]);
