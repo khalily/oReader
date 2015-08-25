@@ -106,7 +106,12 @@ oReaderApp.factory('Feed', ['$resource', function ($resource) {
 }]);
 
 oReaderApp.factory('feeds', ['Feed', function(Feed) {
-    return Feed.query();
+    Feed.query({}, function(feeds) {
+        return feeds;
+    }, function(errors) {
+        console.log(errors);
+        return null;
+    });
 }]);
 
 oReaderApp.factory('addFeed', ['feeds', function(feeds) {
