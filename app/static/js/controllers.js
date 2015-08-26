@@ -96,11 +96,26 @@ oReaderApp.controller('FeedCtrl', ['$scope', 'Restangular', '$location', functio
         $scope.currentFeed = feed;
     };
 
-    $scope.toggleCurrentItem = function (item) {
+    function scrollIntoView(element, container) {
+        console.log(element, container);
+        var containerTop = container.scrollTop();
+        var containerBottom = containerTop + container.height();
+        var elemTop = element.offset().top;
+        var elemBottom = elemTop + element.height();
+        console.log(containerTop, containerBottom, elemTop, elemBottom);
+        //if (elemTop < containerTop) {
+        container.scrollTop(elemTop + containerTop - 50);
+        //} else if (elemBottom > containerBottom) {
+        //    container.scrollTop(elemBottom - container.height());
+        //}
+    }
+
+    $scope.updateStates = function (i, item) {
         if ($scope.currentItem == item) {
             $scope.currentItem = null;
         } else {
             $scope.currentItem = item;
+            setTimeout(function() {scrollIntoView($('#storydiv' + i), $('.story-outline'));});
         }
     };
 }]);
