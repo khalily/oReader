@@ -1,5 +1,106 @@
-<ul>
-    <li ng-repeat="feed in feeds">
-        <a href="{{ feed.link }}">{{ feed.title }}</a>
-    </li>
-</ul>
+<style>
+    .feed-outline {
+        position: absolute;
+        top: 50px;
+        bottom: 0;
+        width: 245px;
+        padding-top: 10px;
+        overflow: hidden;
+        left: 30px;
+    }
+
+    .story-outline {
+        overflow-y: auto;
+        position: absolute;
+        top: 50px;
+        bottom: 0;
+        left: 280px;
+        right: 0;
+        padding-top: 10px;
+        font-size: 13px;
+    }
+
+    .story {
+        border-bottom: 1px solid #cccccc;
+        border-left: 1px solid #ffffff;
+    }
+    
+    .story-header {
+        line-height: 35px;
+    }
+    
+    .active-title {
+        padding-right: 30px;
+    }
+    
+    .story-header-title {
+        font-weight: bold;
+    }
+
+    .story-title {
+        font-size: 30px;
+        text-align: center;
+    }
+    
+    .story-content {
+        padding: 30px 20px;
+    }
+    
+    .story-view {
+        width: 850px;
+    }
+
+    .active-name {
+        padding: 10px 0;
+        font-weight: bold;
+    }
+
+    .active-item {
+        background-color: #cccccc;
+    }
+
+    a:link a:visited {
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+    
+    .feed {
+        padding: 2px;
+    }
+
+    #feed-title:hover {
+        background-color: #cccccc;
+    }
+
+    
+</style>
+
+<div class="feed-outline">
+    <button ng-click="subscription()" class="btn btn-primary">Subscription</button>
+    <ul ui-sortable class="list-unstyled">
+        <li ng-repeat="feed in feeds">
+            <div id="feed-title" class="feed" ng-click="setCurrentFeed(feed)">{{ feed.title }}</div>
+        </li>
+    </ul>
+</div>
+
+<div class="story-outline">
+    <a class= "active-name" href="{{ currentFeed.link }}">{{ currentFeed.title}}>></a>
+    <ul class="list-unstyled">
+        <li ng-repeat="item in currentFeed.items" class="story">
+            <div class="story-header" ng-class="{'active-item': item == currentItem}" ng-click="toggleCurrentItem(item)">
+                <span class="active-title">{{ currentFeed.title }}</span>
+                <span class="story-header-title">{{ item.title }} - </span>
+                <span ng-bind-html="item.description"></span>
+            </div>
+            <div class="story-view" ng-show="currentItem == item">
+                <h1 class="story-title"><a href="{{ item.link }}">{{ item.title }}</a></h1>
+                <div style="text-align: right">from <a href="{{ currentFeed.link }}">{{ currentFeed.title }}</a>by {{ item.creator }}</div>
+                <div class="story-content" ng-bind-html="item.content"></div>
+            </div>
+        </li>
+    </ul>
+</div>

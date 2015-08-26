@@ -1,7 +1,8 @@
 'use strict';
 
 var oReaderApp = angular.module('oReaderApp',
-    ['ngResource', 'ngRoute', 'ngCookies', 'angular-storage', 'restangular']);
+    ['ngResource', 'ngRoute', 'ngCookies', 'angular-storage', 'restangular',
+     'ngSanitize', 'ui.sortable']);
 
 oReaderApp.config(function ($routeProvider, $locationProvider, $httpProvider,
                             $resourceProvider, RestangularProvider) {
@@ -31,7 +32,7 @@ oReaderApp.config(function ($routeProvider, $locationProvider, $httpProvider,
             controller: 'FeedCtrl',
             loginRequired: true
         })
-        .when('/addSubscription', {
+        .when('/subscription', {
             templateUrl: 'static/partials/add_subscription.html',
             controller: 'SubscriptionCtrl',
             loginRequired: true

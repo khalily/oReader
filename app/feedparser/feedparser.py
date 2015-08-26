@@ -81,7 +81,7 @@ class FeedParser(object):
                     'description': self._get_text(item.find('description')),
                     'pub_date': self._get_text(item.find('pubDate')),
                     'creator': self._get_text(item.find('creator')),
-                    'content': self._get_text(item.find('content')),
+                    'content': self._get_text(item.find('encoded')),
                 }
             )
         return True

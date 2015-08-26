@@ -1,7 +1,7 @@
 from marshmallow import Schema, fields
 from app.models import Feed, Item
 from app import db
-from flask import g, abort
+from flask import g, abort, Markup
 from urllib2 import urlopen
 from marshmallow import ValidationError
 from app.api.errors import URLOpenError
@@ -9,8 +9,12 @@ from app.feedparser import FeedParser
 
 
 class ItemSchema(Schema):
+    content = fields.Method('safeContent')
     class Meta:
-        fields = ('title', 'link')
+        fields = ('title', 'link', 'description', 'content', 'pub_date', 'creator', 'updated')
+
+    def safeContent(self, obj):
+        return obj.content
 
 
 class FeedSchema(Schema):

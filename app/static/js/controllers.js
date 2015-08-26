@@ -82,8 +82,27 @@ oReaderApp.controller('AboutCtrl', ['auth', function(auth) {
     console.log('about ', auth.isAuthenticated);
 }]);
 
-oReaderApp.controller('FeedCtrl', ['$scope', 'Restangular', function ($scope, Restangular) {
-    $scope.feeds = Restangular.one('feeds/').getList().$object;
+oReaderApp.controller('FeedCtrl', ['$scope', 'Restangular', '$location', function ($scope, Restangular, $location) {
+    Restangular.one('feeds/').getList().then(function (feeds) {
+        $scope.feeds = feeds;
+        $scope.currentFeed = $scope.feeds[0];
+    });
+
+    $scope.subscription = function () {
+        $location.path('/subscription');
+    };
+
+    $scope.setCurrentFeed = function (feed) {
+        $scope.currentFeed = feed;
+    };
+
+    $scope.toggleCurrentItem = function (item) {
+        if ($scope.currentItem == item) {
+            $scope.currentItem = null;
+        } else {
+            $scope.currentItem = item;
+        }
+    };
 }]);
 
 oReaderApp.controller('SubscriptionCtrl', ['$scope', 'Restangular', '$location',
