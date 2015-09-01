@@ -19,10 +19,14 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///' + \
         os.path.join(basedir, 'test-data.sqlite')
 
+class ProductionConfig(Config):
+    DEBUG = False
+    SECRET_KEY = "abcdefg"
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + \
+        os.path.join(basedir, 'product-data.sqlite')
 
 config = {
+    'production': ProductionConfig,
     'devlopment': DevlopmentConfig,
     'testing': TestingConfig,
 }
-
-
