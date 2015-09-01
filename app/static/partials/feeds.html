@@ -9,6 +9,10 @@
         left: 30px;
     }
 
+    .feed-outline ul {
+        margin-top: 30px;
+    }
+
     .story-outline {
         overflow-y: auto;
         position: absolute;
@@ -28,16 +32,16 @@
     .active-border {
         border-left: 1px solid #35D1FF;
     }
-    
+
     .story-header {
         line-height: 35px;
         font-size: 15px;
     }
-    
+
     .active-title {
         padding-right: 30px;
     }
-    
+
     .story-header-title {
         font-weight: bold;
     }
@@ -46,12 +50,12 @@
         font-size: 30px;
         text-align: center;
     }
-    
+
     .story-content {
         padding: 30px 20px;
         font-size: 16px;
     }
-    
+
     .story-view {
         width: 850px;
     }
@@ -63,6 +67,7 @@
 
     .active-item {
         background-color: #cccccc;
+        font-weight: bold;
     }
 
     .read-item {
@@ -76,38 +81,62 @@
     a:hover {
         text-decoration: underline;
     }
-    
+
     .feed {
         padding: 2px;
+    }
+
+    .feed-icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    .feed-active {
+        color: #d14;
+        font-weight: bold;
     }
 
     #feed-title:hover {
         background-color: #cccccc;
     }
 
-    
+
 </style>
 
 <div class="feed-outline">
     <button ng-click="subscription()" class="btn btn-primary">Subscription</button>
     <ul ui-sortable ng-model="feeds" class="list-unstyled">
+        <li ng-click="setCurrentFeed(all)"><span ng-class="{ 'feed-active': all == currentFeed }">all items</span></li>
+        <li ng-click="setCurrentFeed(star)"><span ng-class="{ 'feed-active': star == currentFeed }">starred items</span></li>
+        <hr/>
         <li ng-repeat="feed in feeds">
-            <div id="feed-title" class="feed" ng-click="setCurrentFeed(feed)">{{ feed.title }}</div>
+            <div id="feed-title" class="feed" ng-click="setCurrentFeed(feed)">
+                <img ng-src="{{ feed.img || 'static/favicon.ico'}}" class="feed-icon">
+                <span ng-class="{ 'feed-active': feed == currentFeed }">{{ feed.title }}</span>
+            </div>
         </li>
     </ul>
 </div>
 
 <div class="story-outline">
-    <div class="active-name"><a href="{{ currentFeed.link }}">{{ currentFeed.title}}>></a></div>
+    <div class="active-name">
+        <div ng-show="currentFeed == all || currentFeed == star">
+            <span>{{ currentFeed.title }}</span>
+        </div>
+        <div ng-hide="currentFeed == all || currentFeed == star">
+            <a href="{{ currentFeed.link }}">{{ currentFeed.title}}>></a>
+        </div>
+    </div>
     <div ng-repeat="item in currentFeed.items" ng-class="{'active-border': item == currentItem}" ng-click="updateStates($index, item)" class="story">
         <div class="story-header" ng-class="{'active-item': item == currentItem }" id="storydiv{{$index}}">
-            <span class="active-title">{{ currentFeed.title }}</span>
+            <i ng-class="item.star ? 'fa fa-star' : 'fa fa-star-o'"></i>
+            <span class="active-title">{{ item.feed_title }}</span>
             <span class="story-header-title">{{ item.title }} - </span>
             <span ng-bind-html="item.description"></span>
         </div>
         <div class="story-view" ng-show="currentItem == item">
             <h1 class="story-title"><a href="{{ item.link }}">{{ item.title }}</a></h1>
-            <div style="text-align: right">from <a href="{{ currentFeed.link }}">{{ currentFeed.title }}</a>by {{ item.creator }}</div>
+            <div style="text-align: right">from <a href="{{ currentFeed.link }}">{{ item.feed_title }}</a>by {{ item.creator }}</div>
             <div class="story-content" ng-bind-html="item.content"></div>
         </div>
     </div>

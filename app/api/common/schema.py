@@ -11,7 +11,7 @@ from app.feedparser import FeedParser
 class ItemSchema(Schema):
     content = fields.Method('safeContent')
     class Meta:
-        fields = ('title', 'link', 'description', 'content', 'pub_date', 'creator', 'updated')
+        fields = ('title', 'link', 'description', 'content', 'pub_date', 'creator', 'updated', 'feed_title')
 
     def safeContent(self, obj):
         return obj.content
@@ -21,7 +21,7 @@ class FeedSchema(Schema):
     items = fields.Nested(ItemSchema, many=True)
     url = fields.Url()
     class Meta:
-        additional = ('title', 'link', 'description', 'last_build_date')
+        additional = ('title', 'link', 'description', 'last_build_date', 'img')
 
     def make_object(self, data):
         try:
@@ -32,12 +32,14 @@ class FeedSchema(Schema):
         parser = FeedParser()
         if not parser.parse(u):
             abort(400)
-        print parser.feed
-        print parser.items
+        # print parser.feed
+        # print parser.items
         feed = Feed(**parser.feed)
         feed.user_id = g.current_user.id
         for item in parser.items:
-            feed.items.append(Item(**item))
+            new_item = Item(**item)
+            new_item.feed_title = feed.title
+            feed.items.append(new_item)
         g.current_user.feeds.append(feed)
         db.session.add(g.current_user)
         return feed

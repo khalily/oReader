@@ -86,6 +86,30 @@ oReaderApp.controller('FeedCtrl', ['$scope', 'Restangular', '$location', functio
     Restangular.one('feeds/').getList().then(function (feeds) {
         $scope.feeds = feeds;
         $scope.currentFeed = $scope.feeds[0];
+
+        $scope.all = function (feeds) {
+            var all = {
+                'items': [],
+                'title': 'all items'
+            };
+            for (var index in feeds) {
+                if (feeds.hasOwnProperty(index) && $.isNumeric(index)) {
+                    var items = feeds[index].items;
+                    for (var k in items) {
+                        if (items.hasOwnProperty(k) && $.isNumeric(k)) {
+                            all.items.push(items[k]);
+                        }
+                    }
+                }
+            }
+            console.log(all);
+            return all;
+        }(feeds);
+
+        $scope.star = {
+            'items': [],
+            'title': 'starred items'
+        };
     });
 
     $scope.subscription = function () {

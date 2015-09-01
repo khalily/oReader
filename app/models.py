@@ -47,6 +47,7 @@ class Feed(db.Model):
     link = db.Column(db.String)
     description = db.Column(db.String)
     last_build_date = db.Column(db.String)
+    img = db.Column(db.String)
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     user = db.relationship('User', backref=db.backref('feeds', order_by=id, lazy='dynamic'))
@@ -73,6 +74,8 @@ class Item(db.Model):
     creator = db.Column(db.String)
     content = db.Column(db.String)
     updated = db.Column(db.String)
+    feed_title = db.Column(db.String)
+    star = db.Column(db.Boolean)
 
     feed_id = db.Column(db.Integer, db.ForeignKey('feeds.id'))
     feed = db.relationship('Feed', backref=db.backref('items', order_by=id, lazy='dynamic'))

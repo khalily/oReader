@@ -1,4 +1,5 @@
 from lxml import etree
+from urllib2 import urlopen, urlparse
 from ..models import Feed, Item
 
 
@@ -57,6 +58,17 @@ class FeedParser(object):
             return element.text
         return ""
 
+    def _get_img(self, link):
+        print link
+        url = urlparse.urlparse(link)
+        new_url = url.scheme + '://' + url.netloc + '/favicon.ico'
+        print new_url
+        try:
+            urlopen(new_url)
+        except:
+            return None
+        return new_url
+
     def _parse_rss(self):
         channel = self._root.find('channel')
 
@@ -72,6 +84,7 @@ class FeedParser(object):
             link = link.getnext()
         if link is not None:
             self._feed['link'] = link.text
+            self._feed['img'] = self._get_img(link.text)
 
         for item in channel.findall('item'):
             self._items.append(
@@ -98,7 +111,9 @@ class FeedParser(object):
         while link is not None:
             attrib = link.attrib
             if attrib.get('rel') != 'self':
-                self.feed['link'] = attrib.get('href')
+                link = attrib.get('href')
+                self._feed['link'] = link
+                self._feed['img'] = self._get_img(link)
                 break
             link = link.getnext()
 
@@ -115,10 +130,9 @@ class FeedParser(object):
                 href = link.attrib.get('href')
                 item['link'] = href if href is not None else ""
             author = entry.find('author')
-            if author:
+            if author is not None:
                 name = author.find('name')
                 item['creator'] = name.text if name is not None else ""
 
             self._items.append(item)
         return True
-
