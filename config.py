@@ -21,9 +21,8 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    SECRET_KEY = "abcdefg"
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + \
-        os.path.join(basedir, 'product-data.sqlite')
+    SECRET_KEY = os.getenv('SECRET_KEY' or 'abcdef')
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI' or '')
 
 config = {
     'production': ProductionConfig,

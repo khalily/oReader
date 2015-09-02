@@ -1,10 +1,11 @@
+import os
 from app import create_app, db
 from app.models import Feed, Item, User
 
 from flask.ext.script import Manager
 
 
-app = create_app('devlopment')
+app = create_app(os.getenv('OREADER_CONFIG') or 'devlopment')
 
 manager = Manager(app)
 
