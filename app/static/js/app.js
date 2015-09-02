@@ -71,5 +71,13 @@ oReaderApp.config(function ($routeProvider, $locationProvider, $httpProvider,
         }
     });
 
+    $rootScope.isActive = function (path) {
+        if ($location.path().substr(0, path.length) == path) {
+            if ($location.path() == '/' && path == '/')
+                return true;
+            else
+                return path != '/';
+        }
+    }
 
 }]);

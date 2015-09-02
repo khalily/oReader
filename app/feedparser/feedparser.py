@@ -55,7 +55,8 @@ class FeedParser(object):
 
     def _get_text(self, element):
         if element is not None and hasattr(element, 'text'):
-            return element.text
+            if element.text is not None:
+                return element.text
         return ""
 
     def _get_img(self, link):
