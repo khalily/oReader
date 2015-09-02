@@ -126,12 +126,7 @@ oReaderApp.controller('FeedCtrl', ['$scope', 'Restangular', '$location', functio
         var containerBottom = containerTop + container.height();
         var elemTop = element.offset().top;
         var elemBottom = elemTop + element.height();
-        console.log(containerTop, containerBottom, elemTop, elemBottom);
-        //if (elemTop < containerTop) {
         container.scrollTop(elemTop + containerTop - 50);
-        //} else if (elemBottom > containerBottom) {
-        //    container.scrollTop(elemBottom - container.height());
-        //}
     }
 
     $scope.updateStates = function (i, item) {
@@ -152,7 +147,7 @@ oReaderApp.controller('SubscriptionCtrl', ['$scope', 'Restangular', '$location',
         if ($scope.rss_url) {
             Restangular.one('feeds/').customPOST({url: $scope.rss_url}).then(function(feed) {
                 $scope.feed = feed;
-                //$location.path('/feeds');
+                $location.path('/feeds');
             }, function (error) {
                 alert(error);
             });

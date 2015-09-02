@@ -10,6 +10,4 @@ def page_not_found(e):
         response.status_code = 404
         return response
 
-    print request.headers
     return render_template('404.html', request=request), 404
-

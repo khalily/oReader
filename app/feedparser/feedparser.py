@@ -69,6 +69,24 @@ class FeedParser(object):
             return None
         return new_url
 
+    def _remove_tags(self, tag_text):
+        try:
+            eh = etree.HTML(tag_text)
+        except:
+            print 'error'
+            return ''
+        return ''.join(eh.itertext())
+
+    def _simplify_description(self, description):
+        data = ''
+        if len(description):
+            data = self._remove_tags(description)
+            if len(data) > 50:
+                data = data[0:50]
+            if len(data) > 0 and not data.endswith('.'):
+                data += '...'
+        return data
+
     def _parse_rss(self):
         channel = self._root.find('channel')
 
@@ -76,9 +94,10 @@ class FeedParser(object):
             return False
         self._feed = {
             'title': self._get_text(channel.find('title')),
-            'description': self._get_text(channel.find('description')),
+            'description': self._simplify_description(self._get_text(channel.find('description'))),
             'last_build_date': self._get_text(channel.find('lastBuildDate'))
         }
+
         link = channel.find('link')
         while link is not None and link.text is None:
             link = link.getnext()
@@ -91,7 +110,7 @@ class FeedParser(object):
                 {
                     'title': self._get_text(item.find('title')),
                     'link': self._get_text(item.find('link')),
-                    'description': self._get_text(item.find('description')),
+                    'description': self._simplify_description(self._get_text(item.find('description'))),
                     'pub_date': self._get_text(item.find('pubDate')),
                     'creator': self._get_text(item.find('creator')),
                     'content': self._get_text(item.find('encoded')),
@@ -104,9 +123,10 @@ class FeedParser(object):
         feed = self._root
         self._feed = {
             'title': self._get_text(feed.find('title')),
-            'description': self._get_text(feed.find('subtitle')),
+            'description': self._simplify_description(self._get_text(feed.find('subtitle'))),
             'last_build_date': self._get_text(feed.find('updated')),
         }
+
         link = feed.find('link')
         while link is not None:
             attrib = link.attrib
@@ -120,7 +140,7 @@ class FeedParser(object):
         for entry in feed.findall('entry'):
             item = {
                     'title': self._get_text(entry.find('title')),
-                    'description': self._get_text(entry.find('summary')),
+                    'description': self._simplify_description(self._get_text(entry.find('summary'))),
                     'content': self._get_text(entry.find('content')),
                     'pub_date': self._get_text(entry.find('published')),
                     'updated': self._get_text(entry.find('updated')),

@@ -132,7 +132,7 @@
             <i ng-class="item.star ? 'fa fa-star' : 'fa fa-star-o'"></i>
             <span class="active-title">{{ item.feed_title }}</span>
             <span class="story-header-title">{{ item.title }} - </span>
-            <span ng-bind-html="item.description"></span>
+            <span>{{ item.description }}</span>
         </div>
         <div class="story-view" ng-show="currentItem == item">
             <h1 class="story-title"><a href="{{ item.link }}">{{ item.title }}</a></h1>

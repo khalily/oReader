@@ -25,6 +25,7 @@ class FeedSchema(Schema):
 
     def make_object(self, data):
         try:
+            print data['url']
             u = urlopen(data['url'])
         except:
             raise URLOpenError("Can't access Url")
