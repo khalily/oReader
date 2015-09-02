@@ -9,8 +9,8 @@ from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String, nullable=False)
-    password_hash = db.Column(db.String)
+    email = db.Column(db.String(64), nullable=False)
+    password_hash = db.Column(db.String(128))
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -43,11 +43,11 @@ class User(db.Model, UserMixin):
 class Feed(db.Model):
     __tablename__ = 'feeds'
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String)
-    link = db.Column(db.String)
-    description = db.Column(db.String)
-    last_build_date = db.Column(db.String)
-    img = db.Column(db.String)
+    title = db.Column(db.String(64))
+    link = db.Column(db.String(128))
+    description = db.Column(db.Text)
+    last_build_date = db.Column(db.String(64))
+    img = db.Column(db.String(128))
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     user = db.relationship('User', backref=db.backref('feeds', order_by=id, lazy='dynamic'))
@@ -67,14 +67,14 @@ class Feed(db.Model):
 class Item(db.Model):
     __tablename__ = 'items'
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String)
-    link = db.Column(db.String)
-    description = db.Column(db.String)
-    pub_date = db.Column(db.String)
-    creator = db.Column(db.String)
-    content = db.Column(db.String)
-    updated = db.Column(db.String)
-    feed_title = db.Column(db.String)
+    title = db.Column(db.String(64))
+    link = db.Column(db.String(128))
+    description = db.Column(db.Text)
+    pub_date = db.Column(db.String(64))
+    creator = db.Column(db.String(64))
+    content = db.Column(db.Text)
+    updated = db.Column(db.String(64))
+    feed_title = db.Column(db.String(64))
     star = db.Column(db.Boolean)
 
     feed_id = db.Column(db.Integer, db.ForeignKey('feeds.id'))

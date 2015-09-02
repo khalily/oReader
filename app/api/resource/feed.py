@@ -29,8 +29,6 @@ class FeedList(Resource):
     def post(self):
         feed, errors = FeedSchema().load(request.json)
         res = FeedSchema().dumps(feed)
-        pprint(res.data, indent=2)
-        # return json.dumps(res.data, indent=2)
         response = make_response()
         response.mimetype = 'application/json'
         response.status_code = 200

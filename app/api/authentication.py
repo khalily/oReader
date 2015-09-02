@@ -11,7 +11,6 @@ def unauthorized():
     response = make_response()
     response.status_code = 401
     response.headers['WWW-Authenticate'] = 'xBasic realm="{0}"'.format('Authentication Required')
-    print response
     return response
 
 @auth.verify_password

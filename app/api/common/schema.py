@@ -32,8 +32,6 @@ class FeedSchema(Schema):
         parser = FeedParser()
         if not parser.parse(u):
             abort(400)
-        # print parser.feed
-        # print parser.items
         feed = Feed(**parser.feed)
         feed.user_id = g.current_user.id
         for item in parser.items:
@@ -42,6 +40,7 @@ class FeedSchema(Schema):
             feed.items.append(new_item)
         g.current_user.feeds.append(feed)
         db.session.add(g.current_user)
+        db.session.commit()
         return feed
 
 
