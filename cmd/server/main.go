@@ -118,11 +118,6 @@ func main() {
 		Default: middleware.RouteLimit{Requests: 60, Window: time.Minute},
 	}
 
-	// Initialize services
-	feedService = service.NewFeedService(feedRepo, itemRepo, userFeedRepo, parser)
-	itemService = service.NewItemService(itemRepo, userItemStateRepo, userFeedRepo)
-	importService = service.NewImportService(feedService, importJobRepo, userFeedRepo, feedRepo)
-
 	// Initialize handlers
 	authHandler := handler.NewHandler(cfg, jwtService, userRepo, tokenRepo)
 	feedHandler := handler.NewFeedHandler(feedService)
