@@ -92,34 +92,34 @@ These items were identified as critical/high priority by the architect review an
 ## Phase 3: Authentication System
 
 ### 🔴 Write Tests
-- [ ] 3.1 Write tests for JWT token generation/validation
-- [ ] 3.2 Write tests for refresh token CRUD
-- [ ] 3.3 Write tests for password hashing (bcrypt cost 12)
-- [ ] 3.4 Write tests for CSRF token generation and validation **[C1]**
-- [ ] 3.5 Write tests for auth service (register, login, logout, refresh)
-- [ ] 3.6 Write tests for auth handler endpoints
-- [ ] 3.7 Write tests for auth middleware
-- [ ] 3.8 Write tests for CSRF middleware **[C1]**
+- [x] 3.1 Write tests for JWT token generation/validation
+- [x] 3.2 Write tests for refresh token CRUD
+- [x] 3.3 Write tests for password hashing (bcrypt cost 12)
+- [x] 3.4 Write tests for CSRF token generation and validation **[C1]**
+- [x] 3.5 Write tests for auth service (register, login, logout, refresh)
+- [x] 3.6 Write tests for auth handler endpoints
+- [x] 3.7 Write tests for auth middleware
+- [x] 3.8 Write tests for CSRF middleware **[C1]**
 
 ### 🟢 Implement
-- [ ] 3.9 Implement JWT service (`internal/infra/jwt/`) with HS256 and 256-bit secret
-- [ ] 3.10 Implement refresh token generation and hashing
-- [ ] 3.11 **[C1]** Implement CSRF token generation and validation
-- [ ] 3.12 Implement cookie utilities (`internal/infra/cookie/`) with HttpOnly + SameSite=Strict
-- [ ] 3.13 Implement password hashing with bcrypt (cost 12)
-- [ ] 3.14 Implement User repository (implements interface)
-- [ ] 3.15 Implement RefreshToken repository (implements interface)
-- [ ] 3.16 Implement auth service
-- [ ] 3.17 Implement auth handler (register, login, logout, refresh, me)
-- [ ] 3.18 Implement JWT authentication middleware
-- [ ] 3.19 **[C1]** Implement CSRF middleware for state-changing requests
-- [ ] 3.20 Add authentication event logging (login, logout, refresh)
+- [x] 3.9 Implement JWT service (`internal/infra/jwt/`) with HS256 and 256-bit secret
+- [x] 3.10 Implement refresh token generation and hashing
+- [x] 3.11 **[C1]** Implement CSRF token generation and validation
+- [x] 3.12 Implement cookie utilities (`internal/infra/cookie/`) with HttpOnly + SameSite=Strict
+- [x] 3.13 Implement password hashing with bcrypt (cost 12)
+- [x] 3.14 Implement User repository (implements interface)
+- [x] 3.15 Implement RefreshToken repository (implements interface)
+- [x] 3.16 Implement auth service
+- [x] 3.17 Implement auth handler (register, login, logout, refresh, me)
+- [x] 3.18 Implement JWT authentication middleware
+- [x] 3.19 **[C1]** Implement CSRF middleware for state-changing requests
+- [x] 3.20 Add authentication event logging (login, logout, refresh)
 
 ### 🔵 Verify & Refactor
-- [ ] 3.21 Run all tests: `make test`
-- [ ] 3.22 Ensure >80% coverage on auth package
-- [ ] 3.23 Test authentication flow manually including CSRF
-- [ ] 3.24 Verify TOKEN_EXPIRED error code is returned correctly
+- [x] 3.21 Run all tests: `make test`
+- [x] 3.22 Ensure >80% coverage on auth package
+- [x] 3.23 Test authentication flow manually including CSRF
+- [x] 3.24 Verify TOKEN_EXPIRED error code is returned correctly
 
 **Git Commit**: `git commit -m "feat(auth): dual-token authentication with HttpOnly cookies and CSRF protection"`
 
