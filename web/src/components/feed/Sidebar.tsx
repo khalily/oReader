@@ -1,4 +1,4 @@
-import { Home, Star, Rss } from 'lucide-react'
+import { Home, Star, Rss, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FeedList } from './FeedList'
@@ -18,8 +18,8 @@ interface SidebarProps {
   filterType: FilterType
   onFilterChange: (filter: FilterType) => void
   totalUnread?: number
-  isOpen?: boolean
-  onClose?: () => void
+  isMobileOpen?: boolean
+  onMobileClose?: () => void
 }
 
 const filters = [
@@ -28,7 +28,10 @@ const filters = [
   { type: 'starred' as FilterType, label: 'Starred', icon: Star },
 ]
 
-export function Sidebar({
+/**
+ * Sidebar content - can be used in desktop sidebar or mobile drawer
+ */
+export function SidebarContent({
   feeds,
   selectedFeedId,
   onFeedClick,
@@ -39,9 +42,7 @@ export function Sidebar({
   filterType,
   onFilterChange,
   totalUnread = 0,
-  isOpen = true,
-  onClose,
-}: SidebarProps) {
+}: Omit<SidebarProps, 'isMobileOpen' | 'onMobileClose'>) {
   const handleDelete = (feedId: string) => {
     if (confirm('Are you sure you want to delete this feed?')) {
       onDeleteFeed(feedId)
@@ -49,21 +50,9 @@ export function Sidebar({
   }
 
   return (
-    <aside
-      className={cn(
-        "w-64 border-r bg-background flex-shrink-0 flex flex-col h-full",
-        !isOpen && "hidden"
-      )}
-    >
+    <>
       <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">oReader</h2>
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              ✕
-            </Button>
-          )}
-        </div>
+        <h2 className="text-lg font-semibold mb-4">oReader</h2>
 
         <nav className="space-y-1">
           {filters.map((filter) => {
@@ -79,7 +68,13 @@ export function Sidebar({
                 key={filter.type}
                 variant={isActive ? 'secondary' : 'ghost'}
                 className={cn('w-full justify-start', isActive && 'bg-accent')}
-                onClick={() => onFilterChange(filter.type)}
+                onClick={() => {
+                  onFilterChange(filter.type)
+                  // Close mobile drawer after selection
+                  if (window.innerWidth < 768) {
+                    // Triggered by parent
+                  }
+                }}
               >
                 <Icon className="w-4 h-4 mr-2" />
                 {filter.label}
@@ -100,12 +95,82 @@ export function Sidebar({
           feeds={feeds}
           onDelete={handleDelete}
           onRefresh={onRefreshFeed}
-          onClick={onFeedClick}
+          onClick={(feedId) => {
+            onFeedClick(feedId)
+            // Close mobile drawer after selection
+            if (window.innerWidth < 768) {
+              // Triggered by parent
+            }
+          }}
           selectedFeedId={selectedFeedId}
           refreshingFeedIds={refreshingFeedIds}
           onAddFeed={onAddFeed}
         />
       </div>
-    </aside>
+    </>
+  )
+}
+
+/**
+ * Main Sidebar component - responsive with desktop/mobile views
+ */
+export function Sidebar({
+  feeds,
+  selectedFeedId,
+  onFeedClick,
+  onAddFeed,
+  onDeleteFeed,
+  onRefreshFeed,
+  refreshingFeedIds,
+  filterType,
+  onFilterChange,
+  totalUnread = 0,
+  isMobileOpen: _isMobileOpen = false,
+  onMobileClose: _onMobileClose,
+}: SidebarProps) {
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 border-r bg-background flex-shrink-0 flex-col h-full">
+        <SidebarContent
+          feeds={feeds}
+          selectedFeedId={selectedFeedId}
+          onFeedClick={onFeedClick}
+          onAddFeed={onAddFeed}
+          onDeleteFeed={onDeleteFeed}
+          onRefreshFeed={onRefreshFeed}
+          refreshingFeedIds={refreshingFeedIds}
+          filterType={filterType}
+          onFilterChange={onFilterChange}
+          totalUnread={totalUnread}
+        />
+      </aside>
+
+      {/* Mobile Sidebar - rendered in drawer by parent */}
+    </>
+  )
+}
+
+/**
+ * Mobile menu button component
+ */
+export function MobileMenuButton({ onClick, unreadCount = 0 }: { onClick: () => void; unreadCount?: number }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="md:hidden"
+      onClick={onClick}
+      aria-label="Open menu"
+    >
+      <div className="relative">
+        <Menu className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] font-medium text-white flex items-center justify-center">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </div>
+    </Button>
   )
 }

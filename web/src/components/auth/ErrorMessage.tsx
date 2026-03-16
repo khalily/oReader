@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 type ErrorMessageProps = {
-  message: string | { response?: { data?: { error?: { message?: string } } } } | null
+  message: string | Error | { response?: { data?: { error?: { message?: string } } } } | null
   onDismiss?: () => void
   className?: string
 }

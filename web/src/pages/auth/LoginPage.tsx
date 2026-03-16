@@ -1,7 +1,6 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { loginSchema, type LoginFormValues } from '@/components/auth/validation'
 import { Button } from '@/components/ui/button'

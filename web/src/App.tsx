@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
+import { AppErrorBoundary } from '@/components/ErrorBoundary'
+import { ToastProvider } from '@/components/ui/toast'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
@@ -100,11 +103,22 @@ function AppRoutes() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <AppErrorBoundary
+      onError={(error, errorInfo) => {
+        // In production, you might send this to an error tracking service
+        console.error('Application error:', error, errorInfo)
+      }}
+    >
+      <ThemeProvider defaultTheme="system">
+        <ToastProvider>
+          <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </QueryClientProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </AppErrorBoundary>
   )
 }
 

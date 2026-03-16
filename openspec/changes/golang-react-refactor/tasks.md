@@ -261,18 +261,18 @@ These items were identified as critical/high priority by the architect review an
 ## Phase 9: OAuth Integration (Reserved)
 
 ### 🔴 Write Tests
-- [ ] 9.1 Write tests for OAuth state generation/validation
-- [ ] 9.2 Write tests for GitHub OAuth flow (mocked)
+- [x] 9.1 Write tests for OAuth state generation/validation
+- [x] 9.2 Write tests for GitHub OAuth flow (mocked)
 
 ### 🟢 Implement
-- [ ] 9.3 Implement OAuth handler skeleton
-- [ ] 9.4 Implement GitHub OAuth endpoints (initiate, callback)
-- [ ] 9.5 Implement user creation/linking for OAuth
-- [ ] 9.6 Add reserved endpoints for other providers (501)
-- [ ] 9.7 Store OAuth state in database for validation
+- [x] 9.3 Implement OAuth handler skeleton
+- [x] 9.4 Implement GitHub OAuth endpoints (initiate, callback)
+- [x] 9.5 Implement user creation/linking for OAuth
+- [x] 9.6 Add reserved endpoints for other providers (501)
+- [x] 9.7 Store OAuth state in database for validation
 
 ### 🔵 Verify & Refactor
-- [ ] 9.8 Run all tests: `make test`
+- [x] 9.8 Run all tests: `make test`
 
 **Git Commit**: `git commit -m "feat(oauth): GitHub OAuth integration (reserved)"`
 
@@ -280,17 +280,17 @@ These items were identified as critical/high priority by the architect review an
 
 ## Phase 10: Frontend Core Setup
 
-- [ ] 10.1 Create Axios instance with `withCredentials`
-- [ ] 10.2 **[C1]** Configure CSRF token handling in Axios interceptor
-- [ ] 10.3 Create API response types (`web/src/types/`)
-- [ ] 10.4 Create typed API client (`web/src/lib/api/`)
-- [ ] 10.5 Create auth store with Zustand (isAuthenticated, user, csrfToken)
-- [ ] 10.6 Implement axios response interceptor for auto-refresh with request queuing
-- [ ] 10.7 Handle TOKEN_EXPIRED error code to trigger refresh
-- [ ] 10.8 Set up React Query provider
-- [ ] 10.9 Create React Router configuration
-- [ ] 10.10 Create Layout component (Header + Sidebar)
-- [ ] 10.11 Implement protected route wrapper
+- [x] 10.1 Create Axios instance with `withCredentials`
+- [x] 10.2 **[C1]** Configure CSRF token handling in Axios interceptor
+- [x] 10.3 Create API response types (`web/src/types/`)
+- [x] 10.4 Create typed API client (`web/src/lib/api/`)
+- [x] 10.5 Create auth store with Zustand (isAuthenticated, user, csrfToken)
+- [x] 10.6 Implement axios response interceptor for auto-refresh with request queuing
+- [x] 10.7 Handle TOKEN_EXPIRED error code to trigger refresh
+- [x] 10.8 Set up React Query provider
+- [x] 10.9 Create React Router configuration
+- [x] 10.10 Create Layout component (Header + Sidebar)
+- [x] 10.11 Implement protected route wrapper
 
 **Git Commit**: `git commit -m "feat(frontend): core setup with routing, state, and CSRF handling"`
 
@@ -298,13 +298,13 @@ These items were identified as critical/high priority by the architect review an
 
 ## Phase 11: Frontend Authentication
 
-- [ ] 11.1 Create auth API hooks with React Query
-- [ ] 11.2 Create Login page component
-- [ ] 11.3 Create Register page component
-- [ ] 11.4 Implement forms with React Hook Form + Zod validation
-- [ ] 11.5 Implement logout functionality
-- [ ] 11.6 Add form error handling and loading states
-- [ ] 11.7 Display API error messages using standard error format
+- [x] 11.1 Create auth API hooks with React Query
+- [x] 11.2 Create Login page component
+- [x] 11.3 Create Register page component
+- [x] 11.4 Implement forms with React Hook Form + Zod validation
+- [x] 11.5 Implement logout functionality
+- [x] 11.6 Add form error handling and loading states
+- [x] 11.7 Display API error messages using standard error format
 
 **Git Commit**: `git commit -m "feat(frontend): authentication pages"`
 
@@ -324,13 +324,13 @@ These items were identified as critical/high priority by the architect review an
 
 ## Phase 13: Frontend Article Display
 
-- [ ] 13.1 Create item API hooks with React Query
-- [ ] 13.2 Create ItemList component
-- [ ] 13.3 Create ItemView page for article reading
-- [ ] 13.4 Implement star/unstar toggle
-- [ ] 13.5 Implement mark as read functionality
-- [ ] 13.6 Create StarredItems page
-- [ ] 13.7 Implement cursor-based pagination/infinite scroll
+- [x] 13.1 Create item API hooks with React Query
+- [x] 13.2 Create ItemList component
+- [x] 13.3 Create ItemView page for article reading
+- [x] 13.4 Implement star/unstar toggle
+- [x] 13.5 Implement mark as read functionality
+- [x] 13.6 Create StarredItems page
+- [x] 13.7 Implement cursor-based pagination/infinite scroll
 
 **Git Commit**: `git commit -m "feat(frontend): article display and reading"`
 
@@ -338,12 +338,12 @@ These items were identified as critical/high priority by the architect review an
 
 ## Phase 14: Frontend Polish
 
-- [ ] 14.1 Create loading skeletons
-- [ ] 14.2 Implement error boundary components (App-level + Feature-level)
-- [ ] 14.3 Add toast notifications
-- [ ] 14.4 Implement responsive design
-- [ ] 14.5 Add keyboard shortcuts
-- [ ] 14.6 Implement dark mode toggle (optional)
+- [x] 14.1 Create loading skeletons
+- [x] 14.2 Implement error boundary components (App-level + Feature-level)
+- [x] 14.3 Add toast notifications
+- [x] 14.4 Implement responsive design
+- [x] 14.5 Add keyboard shortcuts
+- [x] 14.6 Implement dark mode toggle (optional)
 
 **Git Commit**: `git commit -m "feat(frontend): polish with loading, errors, responsive"`
 

@@ -2,11 +2,16 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useItems } from '@/hooks/useItems'
 import { useFeeds } from '@/hooks/useFeeds'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useToast } from '@/components/ui/toast'
+import { MobileDrawer } from '@/components/ui/mobile-drawer'
+import { KeyboardShortcutsModal } from '@/components/ui/keyboard-shortcuts-modal'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { ItemList } from '@/components/items/ItemList'
-import { Sidebar, type FilterType } from '@/components/feed/Sidebar'
+import { Sidebar, SidebarContent, MobileMenuButton, type FilterType } from '@/components/feed/Sidebar'
 import { AddFeedDialog } from '@/components/feed/AddFeedDialog'
 import { useItemsStore } from '@/stores/itemsStore'
-import type { Article, ListItemsOptions } from '@/types/feed'
+import type { ListItemsOptions } from '@/types/feed'
 
 interface ItemsPageProps {
   filterType?: FilterType
@@ -15,14 +20,18 @@ interface ItemsPageProps {
 
 export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [, setSearchParams] = useSearchParams()
   const [isAddFeedOpen, setIsAddFeedOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false)
   const [refreshingFeedIds, setRefreshingFeedIds] = useState<Set<string>>(new Set())
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(0)
   const observerTarget = useRef<HTMLDivElement>(null)
+  const toast = useToast()
 
-  const { useListFeeds, useRefreshFeed, useDeleteFeed, useMarkAllRead } = useFeeds()
-  const { useListItems, useToggleStar, useToggleRead } = useItems()
+  const { useListFeeds, useRefreshFeed, useDeleteFeed } = useFeeds()
+  const { useListItems, useToggleStar, useToggleRead, useMarkAllRead } = useItems()
 
   // Query items based on filter and feed
   const listOptions: ListItemsOptions = {}
@@ -75,6 +84,7 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           onSuccess: () => {
             updateItemState(itemId, { is_starred: starred })
             refetch()
+            // Optional: toast.showSuccess(starred ? 'Article starred' : 'Article unstarred')
           },
         }
       )
@@ -104,6 +114,12 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
     (feedId: string) => {
       setRefreshingFeedIds((prev) => new Set(prev).add(feedId))
       refreshFeed.mutate(feedId, {
+        onSuccess: () => {
+          toast.showSuccess('Feed refreshed successfully')
+        },
+        onError: () => {
+          toast.showError('Failed to refresh feed')
+        },
         onSettled: () => {
           setRefreshingFeedIds((prev) => {
             const next = new Set(prev)
@@ -115,7 +131,7 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         },
       })
     },
-    [refreshFeed, refetch, refetchFeeds]
+    [refreshFeed, refetch, refetchFeeds, toast]
   )
 
   // Handle feed delete
@@ -125,10 +141,14 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         onSuccess: () => {
           refetch()
           refetchFeeds()
+          toast.showSuccess('Feed deleted successfully')
+        },
+        onError: () => {
+          toast.showError('Failed to delete feed')
         },
       })
     },
-    [deleteFeed, refetch, refetchFeeds]
+    [deleteFeed, refetch, refetchFeeds, toast]
   )
 
   // Handle mark all read
@@ -138,16 +158,18 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         onSuccess: () => {
           refetch()
           refetchFeeds()
+          toast.showSuccess('All articles marked as read')
         },
       })
     },
-    [markAllRead, refetch, refetchFeeds]
+    [markAllRead, refetch, refetchFeeds, toast]
   )
 
   // Handle feed click
   const handleFeedClick = useCallback(
     (id: string) => {
       setSearchParams({ feed: id })
+      setIsMobileMenuOpen(false)
     },
     [setSearchParams]
   )
@@ -160,6 +182,7 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
       } else {
         setSearchParams({ filter: newFilter })
       }
+      setIsMobileMenuOpen(false)
     },
     [setSearchParams]
   )
@@ -196,8 +219,96 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
   // Get selected feed ID from URL or state
   const selectedFeedId = feedId ?? null
 
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    enabled: true,
+    shortcuts: [
+      {
+        key: 'j',
+        description: 'Next article',
+        action: () => {
+          if (items.length > 0 && selectedIndex < items.length - 1) {
+            const nextIndex = selectedIndex + 1
+            setSelectedIndex(nextIndex)
+            // Scroll the item into view
+            const itemElement = document.querySelector(`[data-item-id="${items[nextIndex].id}"]`)
+            itemElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          }
+        },
+      },
+      {
+        key: 'k',
+        description: 'Previous article',
+        action: () => {
+          if (selectedIndex > 0) {
+            const prevIndex = selectedIndex - 1
+            setSelectedIndex(prevIndex)
+            // Scroll the item into view
+            const itemElement = document.querySelector(`[data-item-id="${items[prevIndex].id}"]`)
+            itemElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          }
+        },
+      },
+      {
+        key: 'Enter',
+        description: 'Open article',
+        action: () => {
+          if (items[selectedIndex]) {
+            handleItemClick(items[selectedIndex].id)
+          }
+        },
+      },
+      {
+        key: 's',
+        description: 'Star/unstar article',
+        action: () => {
+          if (items[selectedIndex]) {
+            const item = items[selectedIndex]
+            const isStarred = item.user_state?.is_starred ?? false
+            handleToggleStar(item.id, !isStarred)
+          }
+        },
+      },
+      {
+        key: 'r',
+        description: 'Mark as read/unread',
+        action: () => {
+          if (items[selectedIndex]) {
+            const item = items[selectedIndex]
+            const isRead = item.user_state?.is_read ?? false
+            handleToggleRead(item.id, !isRead)
+          }
+        },
+      },
+      {
+        key: 'n',
+        description: 'Mark all as read',
+        action: () => {
+          if (feedId) {
+            handleMarkAllRead(feedId)
+          }
+        },
+      },
+      {
+        key: '?',
+        description: 'Show keyboard shortcuts',
+        action: () => setIsShortcutsModalOpen(true),
+      },
+      {
+        key: 'Escape',
+        description: 'Close modals',
+        action: () => {
+          if (isShortcutsModalOpen) setIsShortcutsModalOpen(false)
+          if (isMobileMenuOpen) setIsMobileMenuOpen(false)
+          if (isAddFeedOpen) setIsAddFeedOpen(false)
+        },
+      },
+    ],
+  })
+
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Desktop Sidebar */}
       <Sidebar
         feeds={feeds}
         selectedFeedId={selectedFeedId}
@@ -211,24 +322,52 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         totalUnread={totalUnread}
       />
 
+      {/* Mobile Drawer */}
+      <MobileDrawer isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)}>
+        <SidebarContent
+          feeds={feeds}
+          selectedFeedId={selectedFeedId}
+          onFeedClick={handleFeedClick}
+          onAddFeed={() => {
+            setIsAddFeedOpen(true)
+            setIsMobileMenuOpen(false)
+          }}
+          onDeleteFeed={handleDeleteFeed}
+          onRefreshFeed={handleRefreshFeed}
+          refreshingFeedIds={refreshingFeedIds}
+          filterType={filterType}
+          onFilterChange={handleFilterChange}
+          totalUnread={totalUnread}
+        />
+      </MobileDrawer>
+
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto py-6 px-4">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">
-              {filterType === 'starred' && 'Starred Articles'}
-              {filterType === 'unread' && 'Unread Articles'}
-              {filterType === 'all' && !feedId && 'All Articles'}
-              {feedId && feeds.find((f) => f.id === feedId)?.title}
-            </h1>
+            <div className="flex items-center gap-3">
+              <MobileMenuButton
+                onClick={() => setIsMobileMenuOpen(true)}
+                unreadCount={filterType === 'unread' ? totalUnread : 0}
+              />
+              <h1 className="text-xl sm:text-2xl font-bold">
+                {filterType === 'starred' && 'Starred Articles'}
+                {filterType === 'unread' && 'Unread Articles'}
+                {filterType === 'all' && !feedId && 'All Articles'}
+                {feedId && feeds.find((f) => f.id === feedId)?.title}
+              </h1>
+            </div>
 
-            {feedId && (
-              <button
-                onClick={() => handleMarkAllRead(feedId)}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Mark all as read
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {feedId && (
+                <button
+                  onClick={() => handleMarkAllRead(feedId)}
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Mark all as read
+                </button>
+              )}
+            </div>
           </div>
 
           <ItemList
@@ -256,6 +395,11 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           setIsAddFeedOpen(false)
           refetchFeeds()
         }}
+      />
+
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
       />
     </div>
   )

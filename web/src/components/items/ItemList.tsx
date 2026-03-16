@@ -1,6 +1,7 @@
-import { Star, StarOff, Eye, EyeOff, ExternalLink, Loader2 } from 'lucide-react'
+import { Star, StarOff, Eye, EyeOff, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { ItemListSkeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import type { Article } from '@/types/feed'
 
@@ -18,7 +19,6 @@ function formatDate(dateString: string | null): string {
   const now = new Date()
   const diffInMs = now.getTime() - date.getTime()
   const diffInHours = diffInMs / (1000 * 60 * 60)
-  const diffInDays = diffInMs / (1000 * 60 * 60 * 24)
 
   // For articles less than 24 hours old, show relative time
   if (diffInHours < 1) {
@@ -64,11 +64,7 @@ export function ItemList({
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <ItemListSkeleton count={5} />
   }
 
   if (articles.length === 0) {
