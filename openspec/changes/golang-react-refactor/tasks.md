@@ -54,30 +54,30 @@ These items were identified as critical/high priority by the architect review an
 ## Phase 2: Backend Core Infrastructure
 
 ### 🔴 Write Tests
-- [ ] 2.1 Write tests for configuration loading
-- [ ] 2.2 Write tests for database connection
-- [ ] 2.3 Write tests for data models validation
+- [x] 2.1 Write tests for configuration loading
+- [x] 2.2 Write tests for database connection
+- [x] 2.3 Write tests for data models validation
 
 ### 🟢 Implement
-- [ ] 2.4 Implement configuration loading with viper
-- [ ] 2.5 Define configuration struct with all required fields
-- [ ] 2.6 Create database connection with GORM
-- [ ] 2.7 Define data models with multi-tenant support:
+- [x] 2.4 Implement configuration loading with viper
+- [x] 2.5 Define configuration struct with all required fields
+- [x] 2.6 Create database connection with GORM
+- [x] 2.7 Define data models with multi-tenant support:
   - **User**: id (UUID v7), email, password_hash, nickname, avatar_url, auth_provider, github_id, created_at, updated_at
   - **Feed**: id (UUID v7), feed_url (unique), title, description, image_url, last_fetched_at, last_fetch_status, consecutive_failures
   - **UserFeed**: id (UUID v7), user_id, feed_id, position, created_at (subscription relationship)
   - **Item**: id (UUID v7), feed_id, guid (unique per feed), title, link, description, content, pub_date, creator
   - **UserItemState**: id (UUID v7), user_id, item_id, is_starred, is_read, read_at, created_at
   - **RefreshToken**: id (UUID v7), user_id, token_hash, expires_at, revoked, created_at
-- [ ] 2.8 **[H1]** Create golang-migrate migration files (not AutoMigrate)
-- [ ] 2.9 **[C2]** Define repository interfaces in `internal/service/interfaces.go`
-- [ ] 2.10 **[H3]** Initialize zerolog with environment-based formatting
-- [ ] 2.11 **[H4]** Implement security headers middleware
-- [ ] 2.12 **[H5]** Implement error response helpers with standard format
-- [ ] 2.13 Create Gin router with route groups
-- [ ] 2.14 Implement CORS middleware
-- [ ] 2.15 Implement request logging middleware with request_id
-- [ ] 2.16 Create main.go entry point
+- [x] 2.8 **[H1]** Create golang-migrate migration files (not AutoMigrate)
+- [x] 2.9 **[C2]** Define repository interfaces in `internal/service/interfaces.go`
+- [x] 2.10 **[H3]** Initialize zerolog with environment-based formatting
+- [x] 2.11 **[H4]** Implement security headers middleware
+- [x] 2.12 **[H5]** Implement error response helpers with standard format
+- [x] 2.13 Create Gin router with route groups
+- [x] 2.14 Implement CORS middleware
+- [x] 2.15 Implement request logging middleware with request_id
+- [x] 2.16 Create main.go entry point
 
 ### 🔵 Verify & Refactor
 - [ ] 2.17 Run all tests: `make test`
