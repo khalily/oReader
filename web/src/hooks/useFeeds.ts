@@ -3,11 +3,9 @@ import apiClient from '@/lib/api/axios'
 import type {
   CreateFeedRequest,
   CreateFeedResponse,
-  Feed,
   GetFeedResponse,
   ListFeedsResponse,
   RefreshFeedResponse,
-  UserFeed,
 } from '@/types/feed'
 
 // API functions

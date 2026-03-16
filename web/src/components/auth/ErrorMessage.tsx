@@ -1,4 +1,3 @@
-import { type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -16,8 +15,8 @@ export function getErrorMessage(message: ErrorMessageProps['message']): string |
     return message
   }
 
-  // Handle axios error object
-  if (typeof message === 'object' && message.response?.data?.error?.message) {
+  // Handle axios error object with proper type narrowing
+  if ('response' in message && message.response?.data?.error?.message) {
     return message.response.data.error.message as string
   }
 

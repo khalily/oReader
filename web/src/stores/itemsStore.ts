@@ -19,11 +19,19 @@ export const useItemsStore = create<ItemsState>((set, get) => ({
         if (item.id === itemId) {
           return {
             ...item,
-            user_state: {
-              ...item.user_state,
-              ...state,
-            },
-          }
+            user_state: item.user_state
+              ? {
+                  ...item.user_state,
+                  item_id: item.user_state.item_id ?? item.id,
+                  ...state,
+                }
+              : {
+                  item_id: item.id,
+                  is_read: state.is_read ?? false,
+                  is_starred: state.is_starred ?? false,
+                  read_at: null,
+                },
+          } as Article
         }
         return item
       }),

@@ -5,8 +5,6 @@ import type {
   ListItemsOptions,
   ListItemsResponse,
   MarkAllReadResponse,
-  ToggleReadRequest,
-  ToggleStarRequest,
 } from '@/types/feed'
 
 // API functions

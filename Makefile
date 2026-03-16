@@ -43,10 +43,19 @@ test-short:
 test-coverage:
 	$(GOTEST) -cover ./...
 
-## build: Build the binary
-build:
+## build-prepare: Copy frontend dist for embedding
+build-prepare:
+	@echo "Preparing frontend for embedding..."
+	@rm -rf $(MAIN_PACKAGE)/dist
+	@mkdir -p $(MAIN_PACKAGE)/dist
+	@cp -r web/dist/* $(MAIN_PACKAGE)/dist/
+	@echo "Frontend copied for embedding"
+
+## build: Build the binary with embedded frontend
+build: build-prepare
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
+	@echo "Binary built at $(BUILD_DIR)/$(BINARY_NAME)"
 
 ## run: Run the application
 run:
@@ -75,6 +84,7 @@ migrate-version:
 clean:
 	@rm -rf $(BUILD_DIR)
 	@rm -rf $(COVERAGE_DIR)
+	@rm -rf $(MAIN_PACKAGE)/dist
 	$(GOCLEAN)
 
 ## deps: Download dependencies

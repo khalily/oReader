@@ -351,11 +351,11 @@ These items were identified as critical/high priority by the architect review an
 
 ## Phase 15: Static File Embedding
 
-- [ ] 15.1 Configure Vite build output to `web/dist`
-- [ ] 15.2 Create `embed.go` for static files
-- [ ] 15.3 Implement static file serving in Gin
-- [ ] 15.4 Configure SPA fallback routing
-- [ ] 15.5 Test production build locally
+- [x] 15.1 Configure Vite build output to `web/dist`
+- [x] 15.2 Create `embed.go` for static files
+- [x] 15.3 Implement static file serving in Gin
+- [x] 15.4 Configure SPA fallback routing
+- [x] 15.5 Test production build locally
 
 **Git Commit**: `git commit -m "feat(build): frontend embedding for single binary"`
 
