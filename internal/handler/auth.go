@@ -129,12 +129,66 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
+	// Generate tokens for the new user
+	accessToken, csrfToken, err := h.jwtService.GenerateAccessToken(user.ID)
+	if err != nil {
+		errors.SendInternal(c, errors.Error{
+			Code:    errors.ErrInternal,
+			Message: "Failed to generate access token",
+		})
+		return
+	}
+
+	refreshToken, tokenHash, err := h.jwtService.GenerateRefreshToken(user.ID)
+	if err != nil {
+		errors.SendInternal(c, errors.Error{
+			Code:    errors.ErrInternal,
+			Message: "Failed to generate refresh token",
+		})
+		return
+	}
+
+	refreshTTL, err := h.cfg.GetRefreshTTL()
+	if err != nil {
+		errors.SendInternal(c, errors.Error{
+			Code:    errors.ErrInternal,
+			Message: "Failed to parse refresh token TTL",
+		})
+		return
+	}
+
+	refreshModel := &model.RefreshToken{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(refreshTTL),
+	}
+	if err := refreshModel.GenerateID(); err != nil {
+		errors.SendInternal(c, errors.Error{
+			Code:    errors.ErrInternal,
+			Message: "Failed to generate refresh token ID",
+		})
+		return
+	}
+
+	if err := h.tokenRepo.Create(c.Request.Context(), refreshModel); err != nil {
+		errors.SendInternal(c, errors.Error{
+			Code:    errors.ErrInternal,
+			Message: "Failed to store refresh token",
+		})
+		return
+	}
+
+	cookieCfg := cookie.DefaultConfig(h.cfg.IsProduction())
+	cookie.SetAccessToken(c.Writer, accessToken, csrfToken, cookieCfg)
+	cookie.SetRefreshToken(c.Writer, refreshToken, cookieCfg)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"user": gin.H{
 			"id":       user.ID,
 			"email":    user.Email,
 			"nickname": user.Nickname,
 		},
+		"csrf_token": csrfToken,
 	})
 }
 
@@ -258,6 +312,16 @@ func (h *Handler) setAuthCookies(c *gin.Context, user *model.User) {
 	cookieCfg := cookie.DefaultConfig(h.cfg.IsProduction())
 	cookie.SetAccessToken(c.Writer, accessToken, csrfToken, cookieCfg)
 	cookie.SetRefreshToken(c.Writer, refreshToken, cookieCfg)
+
+	// Return user info and CSRF token in response body
+	c.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"id":       user.ID,
+			"email":    user.Email,
+			"nickname": user.Nickname,
+		},
+		"csrf_token": csrfToken,
+	})
 }
 
 // Refresh handles token refresh
