@@ -17,6 +17,7 @@ import (
 	"oreader/internal/infra/database"
 	"oreader/internal/infra/jwt"
 	"oreader/internal/infra/logger"
+	"oreader/internal/infra/ratelimit"
 	"oreader/internal/middleware"
 	"oreader/internal/model"
 	"oreader/internal/repository"
@@ -79,6 +80,21 @@ func main() {
 	}
 	jwtService := jwt.NewService(cfg.Auth.SecretKey, accessTTL, refreshTTL)
 
+	// Initialize rate limiter
+	rateLimiter := ratelimit.NewMemoryLimiter()
+
+	// Configure rate limits per endpoint type
+	rateLimits := middleware.RouteLimits{
+		Routes: map[string]middleware.RouteLimit{
+			// Auth endpoints - stricter limits to prevent brute force
+			"/api/v1/auth/register": {Requests: 5, Window: time.Minute},
+			"/api/v1/auth/login":    {Requests: 10, Window: time.Minute},
+			// Refresh endpoint - moderate limit
+			"/api/v1/auth/refresh": {Requests: 20, Window: time.Minute},
+		},
+		Default: middleware.RouteLimit{Requests: 60, Window: time.Minute},
+	}
+
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewRefreshTokenRepository(db)
@@ -99,6 +115,7 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(middleware.SecurityHeadersMiddleware())
 	router.Use(middleware.RequestLoggerMiddleware())
+	router.Use(middleware.RateLimitMiddleware(rateLimiter, rateLimits))
 
 	// CORS configuration
 	allowOrigins := []string{"*"}
