@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,9 +16,12 @@ import (
 	"oreader/internal/infra/jwt"
 	"oreader/internal/infra/logger"
 	"oreader/internal/infra/ratelimit"
+	"oreader/internal/infra/rss"
 	"oreader/internal/middleware"
 	"oreader/internal/model"
 	"oreader/internal/repository"
+	"oreader/internal/service"
+	"oreader/internal/worker"
 )
 
 func main() {
@@ -67,6 +68,13 @@ func main() {
 	}
 	log.Info().Msg("Database migrations completed")
 
+	// Initialize repositories
+	userRepo := repository.NewUserRepository(db)
+	feedRepo := repository.NewFeedRepository(db)
+	itemRepo := repository.NewItemRepository(db)
+	userFeedRepo := repository.NewUserFeedRepository(db)
+	tokenRepo := repository.NewRefreshTokenRepository(db)
+
 	// Initialize services
 	accessTTL, err := cfg.GetAccessTTL()
 	if err != nil {
@@ -79,6 +87,16 @@ func main() {
 		os.Exit(1)
 	}
 	jwtService := jwt.NewService(cfg.Auth.SecretKey, accessTTL, refreshTTL)
+
+	// Initialize RSS parser
+	fetcher := rss.NewHTTPFetcher(30 * time.Second)
+	parser := rss.NewParser(fetcher)
+
+	// Initialize feed service (will be used when feed handlers are added)
+	_ = service.NewFeedService(feedRepo, itemRepo, userFeedRepo, parser)
+
+	// Initialize refresh worker service
+	refreshWorkerService := service.NewRefreshWorkerService(feedRepo, itemRepo, userFeedRepo)
 
 	// Initialize rate limiter
 	rateLimiter := ratelimit.NewMemoryLimiter()
@@ -94,10 +112,6 @@ func main() {
 		},
 		Default: middleware.RouteLimit{Requests: 60, Window: time.Minute},
 	}
-
-	// Initialize repositories
-	userRepo := repository.NewUserRepository(db)
-	tokenRepo := repository.NewRefreshTokenRepository(db)
 
 	// Initialize handlers
 	authHandler := handler.NewHandler(cfg, jwtService, userRepo, tokenRepo)
@@ -183,6 +197,15 @@ func main() {
 		}
 	}
 
+	// Start background refresh worker
+	backgroundWorker := worker.NewRefreshWorker(cfg, refreshWorkerService)
+	ctx := context.Background()
+	if err := backgroundWorker.Start(ctx); err != nil {
+		log.Fatal().Err(err).Msg("Failed to start background worker")
+		os.Exit(1)
+	}
+	log.Info().Msg("Background refresh worker started")
+
 	// Start server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	srv := &http.Server{
@@ -190,27 +213,29 @@ func main() {
 		Handler: router,
 	}
 
-	// Graceful shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
+	// Start server in a goroutine
 	go func() {
-		<-quit
-		log.Info().Msg("Shutting down server...")
-
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Error().Err(err).Msg("Server shutdown error")
+		log.Info().Str("addr", addr).Msg("Server listening")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error().Err(err).Msg("Server error")
 		}
-
-		log.Info().Msg("Server stopped")
 	}()
 
-	log.Info().Str("addr", addr).Msg("Server listening")
+	// Graceful shutdown - wait for SIGINT or SIGTERM
+	backgroundWorker.WaitForShutdown()
 
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal().Err(err).Msg("Server error")
+	// Stop the background worker
+	log.Info().Msg("Shutting down background refresh worker...")
+	backgroundWorker.Stop()
+
+	// Shutdown the HTTP server
+	log.Info().Msg("Shutting down HTTP server...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("HTTP server shutdown error")
 	}
+
+	log.Info().Msg("Server stopped")
 }

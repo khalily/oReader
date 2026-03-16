@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"oreader/internal/model"
 )
@@ -83,6 +85,14 @@ type ItemService interface {
 	MarkAllRead(ctx context.Context, userID, feedID string) (int, error)
 }
 
+// RefreshWorkerService defines the interface for background feed refresh
+type RefreshWorkerService interface {
+	// RefreshAllFeeds refreshes all feeds concurrently
+	RefreshAllFeeds(ctx context.Context) (*RefreshAllResult, error)
+	// RefreshSingleFeed refreshes a single feed
+	RefreshSingleFeed(ctx context.Context, feed *model.Feed) (SingleFeedResult, error)
+}
+
 // SubscribeResult contains the result of subscribing to a feed
 type SubscribeResult struct {
 	Feed         *model.Feed
@@ -98,6 +108,53 @@ type FeedWithItemCount struct {
 // RefreshResult contains the result of refreshing a feed
 type RefreshResult struct {
 	NewItemCount int `json:"new_item_count"`
+}
+
+// RefreshAllResult contains the result of refreshing all feeds
+type RefreshAllResult struct {
+	TotalFeeds    int               `json:"total_feeds"`
+	SuccessCount  int               `json:"success_count"`
+	FailureCount  int               `json:"failure_count"`
+	TotalItems    int               `json:"total_items"`
+	NewItems      int               `json:"new_items"`
+	Duration      time.Duration     `json:"duration"`
+	FailedFeedIDs []string          `json:"failed_feed_ids,omitempty"`
+	Results       []SingleFeedResult `json:"results,omitempty"`
+}
+
+// String returns a string representation of the refresh result
+func (r *RefreshAllResult) String() string {
+	duration := r.Duration.String()
+	if r.Duration.Seconds() >= 1 {
+		duration = fmt.Sprintf("%.0fs", r.Duration.Seconds())
+	} else if r.Duration.Milliseconds() >= 1 {
+		duration = fmt.Sprintf("%dms", r.Duration.Milliseconds())
+	}
+	return fmt.Sprintf("%d feeds, %d success, %d failures, %d total items, %d new items, %s duration",
+		r.TotalFeeds, r.SuccessCount, r.FailureCount, r.TotalItems, r.NewItems, duration)
+}
+
+// SingleFeedResult contains the result of refreshing a single feed
+type SingleFeedResult struct {
+	FeedID    string        `json:"feed_id"`
+	Success   bool          `json:"success"`
+	NewItems  int           `json:"new_items"`
+	Duration  time.Duration `json:"duration"`
+	Error     string        `json:"error,omitempty"`
+}
+
+// String returns a string representation of the single feed result
+func (r *SingleFeedResult) String() string {
+	duration := r.Duration.String()
+	if r.Duration.Seconds() >= 1 {
+		duration = fmt.Sprintf("%.0fs", r.Duration.Seconds())
+	} else if r.Duration.Milliseconds() >= 1 {
+		duration = fmt.Sprintf("%dms", r.Duration.Milliseconds())
+	}
+	if r.Success {
+		return fmt.Sprintf("%s: success (%d items, %s)", r.FeedID, r.NewItems, duration)
+	}
+	return fmt.Sprintf("%s: failed (%s, %s)", r.FeedID, r.Error, duration)
 }
 
 // UserRepository defines the interface for user data access
