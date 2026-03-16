@@ -59,7 +59,7 @@ build: build-prepare
 
 ## run: Run the application
 run:
-	$(GOCMD) run $(MAIN_PACKAGE)/main.go
+	$(GOCMD) run $(MAIN_PACKAGE)
 
 ## migrate-up: Run database migrations up
 migrate-up:

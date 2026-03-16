@@ -84,10 +84,29 @@ make frontend-build
 
 7. **Run the application**:
 ```bash
+# Option 1: Using the run script (recommended)
+chmod +x run.sh
+./run.sh
+
+# Option 2: Setting environment variables manually
+DATABASE_URL=oreader.db JWT_SECRET_KEY=dev-secret-key-min-32-chars make run
+
+# Option 3: Export and run
+export DATABASE_URL=oreader.db
+export JWT_SECRET_KEY=dev-secret-key-min-32-chars
 make run
 ```
 
 The application will be available at `http://localhost:8080`
+
+**Required Environment Variables**:
+- `DATABASE_URL`: Database connection string (e.g., `oreader.db` for SQLite)
+- `JWT_SECRET_KEY`: Secret key for JWT signing (minimum 32 characters)
+
+**Optional Environment Variables**:
+- `ENV`: Environment mode (`development` or `production`, default: `development`)
+- `PORT`: Server port (default: `8080`)
+- `LOG_LEVEL`: Logging level (`debug`, `info`, `warn`, `error`, default: `info`)
 
 ## Development
 
