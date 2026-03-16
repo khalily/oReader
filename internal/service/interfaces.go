@@ -93,6 +93,25 @@ type RefreshWorkerService interface {
 	RefreshSingleFeed(ctx context.Context, feed *model.Feed) (SingleFeedResult, error)
 }
 
+// ImportService defines the interface for OPML import operations
+type ImportService interface {
+	// ParseOPML parses an OPML file and returns feed information
+	ParseOPML(ctx context.Context, content string) ([]*FeedInfo, error)
+	// StartImport starts an async import job for the user
+	StartImport(ctx context.Context, userID string, feeds []*FeedInfo) (*model.ImportJob, error)
+	// GetJobStatus retrieves the status of an import job
+	GetJobStatus(ctx context.Context, jobID string) (*model.ImportJob, error)
+	// ProcessImport processes an import job (called by worker)
+	ProcessImport(ctx context.Context, jobID string) error
+}
+
+// FeedInfo contains information about a feed from OPML
+type FeedInfo struct {
+	Title   string
+	FeedURL string
+	SiteURL string
+}
+
 // SubscribeResult contains the result of subscribing to a feed
 type SubscribeResult struct {
 	Feed         *model.Feed

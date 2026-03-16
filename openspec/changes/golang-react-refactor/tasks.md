@@ -236,23 +236,23 @@ These items were identified as critical/high priority by the architect review an
 ## Phase 8: Feed Import/Export (OPML)
 
 ### 🔴 Write Tests
-- [ ] 8.1 Write tests for OPML export generation
-- [ ] 8.2 Write tests for OPML import parsing
-- [ ] 8.3 Write tests for bulk import handling
-- [ ] 8.4 Write tests for import handler endpoints
+- [x] 8.1 Write tests for OPML export generation
+- [x] 8.2 Write tests for OPML import parsing
+- [x] 8.3 Write tests for bulk import handling
+- [x] 8.4 Write tests for import handler endpoints
 
 ### 🟢 Implement
-- [ ] 8.5 Implement OPML export generator (`internal/infra/opml/`)
-- [ ] 8.6 Implement OPML import parser
-- [ ] 8.7 Implement bulk import with async processing
-- [ ] 8.8 Store import job state in database (not memory)
-- [ ] 8.9 Implement import/export handlers
-- [ ] 8.10 Add import progress tracking
+- [x] 8.5 Implement OPML export generator (`internal/infra/opml/`)
+- [x] 8.6 Implement OPML import parser
+- [x] 8.7 Implement bulk import with async processing
+- [x] 8.8 Store import job state in database (not memory)
+- [x] 8.9 Implement import/export handlers
+- [x] 8.10 Add import progress tracking
 
 ### 🔵 Verify & Refactor
-- [ ] 8.11 Run all tests: `make test`
-- [ ] 8.12 Test OPML import/export with real files
-- [ ] 8.13 Verify job state persists across restarts
+- [x] 8.11 Run all tests: `make test`
+- [x] 8.12 Test OPML import/export with real files
+- [x] 8.13 Verify job state persists across restarts
 
 **Git Commit**: `git commit -m "feat(feeds): OPML import/export with persistent job tracking"`
 
