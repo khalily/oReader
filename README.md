@@ -66,35 +66,14 @@ cd web
 npm install
 ```
 
-4. **Configure environment variables**:
+4. **Run the application**:
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+# Quick start with environment variables
+DATABASE_URL=oreader.db JWT_SECRET_KEY=dev-secret-key-change-in-production-min-32-chars make run
 
-5. **Run database migrations**:
-```bash
-make migrate-up
-```
-
-6. **Build the frontend**:
-```bash
-make frontend-build
-```
-
-7. **Run the application**:
-```bash
-# Option 1: Using the run script (recommended)
+# Or use the convenience script
 chmod +x run.sh
 ./run.sh
-
-# Option 2: Setting environment variables manually
-DATABASE_URL=oreader.db JWT_SECRET_KEY=dev-secret-key-min-32-chars make run
-
-# Option 3: Export and run
-export DATABASE_URL=oreader.db
-export JWT_SECRET_KEY=dev-secret-key-min-32-chars
-make run
 ```
 
 The application will be available at `http://localhost:8080`
@@ -102,6 +81,8 @@ The application will be available at `http://localhost:8080`
 **Required Environment Variables**:
 - `DATABASE_URL`: Database connection string (e.g., `oreader.db` for SQLite)
 - `JWT_SECRET_KEY`: Secret key for JWT signing (minimum 32 characters)
+
+**Note**: The application automatically runs database migrations on startup.
 
 **Optional Environment Variables**:
 - `ENV`: Environment mode (`development` or `production`, default: `development`)
@@ -116,7 +97,11 @@ For development with hot-reload:
 
 1. **Start backend** (in one terminal):
 ```bash
-make run
+# Option 1: Use the convenience script
+./run.sh
+
+# Option 2: Set environment variables and run
+DATABASE_URL=oreader.db JWT_SECRET_KEY=dev-secret-key-min-32-chars make run
 ```
 
 2. **Start frontend** (in another terminal):
@@ -125,7 +110,11 @@ cd web
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:5173` and proxy API requests to the backend.
+The frontend will be available at `http://localhost:5173` and proxy API requests to the backend at `http://localhost:8080`.
+
+**Required Environment Variables**:
+- `DATABASE_URL`: Database file path (e.g., `oreader.db`)
+- `JWT_SECRET_KEY`: Secret key for JWT signing (minimum 32 characters)
 
 ### Running Tests
 
@@ -172,15 +161,15 @@ make migrate-create name=add_new_field
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `OREADER_CONFIG` | Config mode (devlopment/testing/production) | `devlopment` | Yes |
 | `DATABASE_URL` | Database connection string | `oreader.db` | Yes |
 | `JWT_SECRET_KEY` | JWT signing secret (min 32 chars) | - | Yes |
-| `REFRESH_TOKEN_DAYS` | Refresh token expiry in days | `7` | No |
-| `REFRESH_INTERVAL` | Feed refresh interval | `1h` | No |
-| `MAX_CONCURRENT_REFRESH` | Max concurrent feed refreshes | `10` | No |
-| `SERVER_PORT` | Server port | `8080` | No |
-| `SERVER_HOST` | Server host | `0.0.0.0` | No |
+| `ENV` | Environment mode (development/production) | `development` | No |
+| `PORT` | Server port | `8080` | No |
 | `LOG_LEVEL` | Log level (debug/info/warn/error) | `info` | No |
+| `JWT_ACCESS_TTL` | Access token lifetime | `15m` | No |
+| `JWT_REFRESH_TTL` | Refresh token lifetime | `168h` (7 days) | No |
+| `REFRESH_INTERVAL` | Feed refresh interval | `15m` | No |
+| `RATE_LIMIT_ENABLED` | Enable rate limiting | `true` | No |
 | `GITHUB_CLIENT_ID` | GitHub OAuth client ID | - | No |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret | - | No |
 
