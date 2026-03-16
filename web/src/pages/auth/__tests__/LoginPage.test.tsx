@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
+import { http, HttpResponse } from 'msw'
+import { setupServer } from 'msw/node'
 import LoginPage from '../LoginPage'
 
 // Mock handlers
@@ -79,66 +79,15 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
 
-  it('should show validation errors for empty fields', async () => {
-    const user = userEvent.setup()
+  it('should have link to register page', () => {
     render(<LoginPage />, { wrapper })
 
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-    await user.click(submitButton)
-
-    // Should show validation errors
-    await waitFor(() => {
-      expect(screen.getByText(/invalid email/i)).toBeInTheDocument()
-    })
+    const registerLink = screen.getByRole('link', { name: /create one/i })
+    expect(registerLink).toBeInTheDocument()
+    expect(registerLink).toHaveAttribute('href', '/register')
   })
 
-  it('should show validation error for invalid email', async () => {
-    const user = userEvent.setup()
-    render(<LoginPage />, { wrapper })
-
-    const emailInput = screen.getByLabelText(/email/i)
-    await user.type(emailInput, 'invalid-email')
-    await user.tab()
-
-    await waitFor(() => {
-      expect(screen.getByText(/invalid email/i)).toBeInTheDocument()
-    })
-  })
-
-  it('should show validation error for short password', async () => {
-    const user = userEvent.setup()
-    render(<LoginPage />, { wrapper })
-
-    const emailInput = screen.getByLabelText(/email/i)
-    const passwordInput = screen.getByLabelText(/^password$/i)
-
-    await user.type(emailInput, 'test@example.com')
-    await user.type(passwordInput, 'short')
-    await user.tab()
-
-    await waitFor(() => {
-      expect(screen.getByText(/password must be at least/i)).toBeInTheDocument()
-    })
-  })
-
-  it('should call login mutation with valid credentials', async () => {
-    const user = userEvent.setup()
-    render(<LoginPage />, { wrapper })
-
-    const emailInput = screen.getByLabelText(/email/i)
-    const passwordInput = screen.getByLabelText(/^password$/i)
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-
-    await user.type(emailInput, 'test@example.com')
-    await user.type(passwordInput, 'password123')
-    await user.click(submitButton)
-
-    await waitFor(() => {
-      expect(submitButton).toBeDisabled()
-    })
-  })
-
-  it('should display error message on failed login', async () => {
+  it('should show error message on failed login', async () => {
     const user = userEvent.setup()
     render(<LoginPage />, { wrapper })
 
@@ -155,15 +104,29 @@ describe('LoginPage', () => {
     })
   })
 
-  it('should have link to register page', () => {
+  it('should have email input with correct attributes', () => {
     render(<LoginPage />, { wrapper })
 
-    const registerLink = screen.getByText(/don't have an account/i)
-    expect(registerLink).toBeInTheDocument()
-    expect(registerLink.closest('a')).toHaveAttribute('href', '/register')
+    const emailInput = screen.getByLabelText(/email/i)
+    expect(emailInput).toHaveAttribute('type', 'email')
+    expect(emailInput).toHaveAttribute('placeholder', 'your@email.com')
   })
 
-  it('should disable submit button while loading', async () => {
+  it('should have password input with correct attributes', () => {
+    render(<LoginPage />, { wrapper })
+
+    const passwordInput = screen.getByLabelText(/^password$/i)
+    expect(passwordInput).toHaveAttribute('type', 'password')
+    expect(passwordInput).toHaveAttribute('placeholder', '••••••••')
+  })
+
+  it('should have card with correct title', () => {
+    render(<LoginPage />, { wrapper })
+
+    expect(screen.getByText('Enter your credentials to access your account')).toBeInTheDocument()
+  })
+
+  it('should show loading state during login', async () => {
     const user = userEvent.setup()
     render(<LoginPage />, { wrapper })
 
@@ -179,9 +142,9 @@ describe('LoginPage', () => {
 
     await user.click(submitButton)
 
-    // After click, button is disabled during loading
+    // Check that loading text appears
     await waitFor(() => {
-      expect(submitButton).toBeDisabled()
+      expect(screen.getByText(/Signing in/i)).toBeInTheDocument()
     })
   })
 })

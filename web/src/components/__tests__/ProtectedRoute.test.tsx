@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import ProtectedRoute from '../ProtectedRoute'
 
-// Mock authStore
+// Mock zustand store
 const mockAuthStoreState = {
   isAuthenticated: false,
   user: null,
@@ -15,6 +15,7 @@ const mockAuthStoreState = {
 }
 
 vi.mock('../../stores/authStore', () => ({
+  useAuthStore: ((selector: typeof mockAuthStoreState) => selector(mockAuthStoreState)),
   authStore: {
     getState: vi.fn(() => mockAuthStoreState),
   },

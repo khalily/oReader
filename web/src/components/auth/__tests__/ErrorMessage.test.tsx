@@ -25,9 +25,9 @@ describe('ErrorMessage', () => {
   })
 
   it('should display correct styling for error', () => {
-    render(<ErrorMessage message="Error occurred" />)
-    const errorElement = screen.getByText('Error occurred')
-    expect(errorElement).toHaveClass('text-destructive')
+    const { container } = render(<ErrorMessage message="Error occurred" />)
+    const errorDiv = container.querySelector('.text-destructive')
+    expect(errorDiv).toBeInTheDocument()
   })
 
   it('should handle API error object', () => {
@@ -72,10 +72,9 @@ describe('ErrorMessage', () => {
   })
 
   it('should handle unknown error format gracefully', () => {
-    render(<ErrorMessage message={{ unknown: 'format' } as any} />)
-    // Should show a generic error or nothing
-    const container = screen.queryByText(/error/i)
-    expect(container).toBeTruthy()
+    const { container } = render(<ErrorMessage message={{ unknown: 'format' } as any} />)
+    // Should not render for unknown error format
+    expect(container.firstChild).toBeNull()
   })
 
   it('should be dismissible with close button', async () => {
@@ -124,8 +123,8 @@ describe('ErrorMessage', () => {
   })
 
   it('should apply custom className when provided', () => {
-    render(<ErrorMessage message="Error" className="custom-class" />)
-    const errorElement = screen.getByText('Error')
-    expect(errorElement).toHaveClass('custom-class')
+    const { container } = render(<ErrorMessage message="Error" className="custom-class" />)
+    const errorDiv = container.querySelector('.custom-class')
+    expect(errorDiv).toBeInTheDocument()
   })
 })

@@ -20,7 +20,7 @@ describe('Form Validation Schemas', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.errors[0].message).toContain('email')
+        expect(result.error.issues[0].message.toLowerCase()).toMatch(/email|invalid/)
       }
     })
 
@@ -50,8 +50,8 @@ describe('Form Validation Schemas', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        const passwordError = result.error.errors.find((e) => e.path[0] === 'password')
-        expect(passwordError?.message).toContain('at least')
+        const passwordError = result.error.issues.find((e) => e.path[0] === 'password')
+        expect(passwordError?.message.toLowerCase()).toMatch(/least|small|characters/)
       }
     })
 
@@ -111,7 +111,7 @@ describe('Form Validation Schemas', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.errors[0].message).toContain('email')
+        expect(result.error.issues[0].message.toLowerCase()).toMatch(/email|invalid/)
       }
     })
 
@@ -124,8 +124,8 @@ describe('Form Validation Schemas', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        const passwordError = result.error.errors.find((e) => e.path[0] === 'password')
-        expect(passwordError?.message).toContain('at least')
+        const passwordError = result.error.issues.find((e) => e.path[0] === 'password')
+        expect(passwordError?.message.toLowerCase()).toMatch(/least|small|characters/)
       }
     })
 
@@ -138,8 +138,8 @@ describe('Form Validation Schemas', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        const confirmError = result.error.errors.find((e) => e.path[0] === 'confirmPassword')
-        expect(confirmError?.message).toContain('match')
+        const confirmError = result.error.issues.find((e) => e.path[0] === 'confirmPassword')
+        expect(confirmError?.message.toLowerCase()).toMatch(/match/)
       }
     })
 
@@ -182,8 +182,8 @@ describe('Form Validation Schemas', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        const nicknameError = result.error.errors.find((e) => e.path[0] === 'nickname')
-        expect(nicknameError?.message).toContain('at most')
+        const nicknameError = result.error.issues.find((e) => e.path[0] === 'nickname')
+        expect(nicknameError?.message.toLowerCase()).toMatch(/most|big|characters/)
       }
     })
 

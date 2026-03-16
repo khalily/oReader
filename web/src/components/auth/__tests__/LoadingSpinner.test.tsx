@@ -31,21 +31,28 @@ describe('LoadingSpinner', () => {
   })
 
   it('should apply custom className when provided', () => {
-    render(<LoadingSpinner className="custom-spinner-class" />)
-    const spinner = screen.getByRole('status')
-    expect(spinner).toHaveClass('custom-spinner-class')
+    const { container } = render(<LoadingSpinner className="custom-spinner-class" />)
+    const wrapper = container.querySelector('.custom-spinner-class')
+    expect(wrapper).toBeInTheDocument()
   })
 
-  it('should apply custom size', () => {
-    render(<LoadingSpinner size="lg" />)
-    const spinner = screen.getByRole('status')
+  it('should apply default size (md)', () => {
+    const { container } = render(<LoadingSpinner />)
+    const spinner = container.querySelector('.animate-spin')
+    expect(spinner).toHaveClass('h-6')
+    expect(spinner).toHaveClass('w-6')
+  })
+
+  it('should apply large size', () => {
+    const { container } = render(<LoadingSpinner size="lg" />)
+    const spinner = container.querySelector('.animate-spin')
     expect(spinner).toHaveClass('h-8')
     expect(spinner).toHaveClass('w-8')
   })
 
   it('should apply small size', () => {
-    render(<LoadingSpinner size="sm" />)
-    const spinner = screen.getByRole('status')
+    const { container } = render(<LoadingSpinner size="sm" />)
+    const spinner = container.querySelector('.animate-spin')
     expect(spinner).toHaveClass('h-4')
     expect(spinner).toHaveClass('w-4')
   })
