@@ -2,9 +2,55 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"oreader/internal/model"
 )
+
+// Errors
+var (
+	// ErrFeedNotFound is returned when a feed is not found
+	ErrFeedNotFound = errors.New("feed not found")
+	// ErrInvalidFeedURL is returned when the feed URL is invalid
+	ErrInvalidFeedURL = errors.New("invalid feed URL")
+	// ErrFeedFetchFailed is returned when fetching the feed fails
+	ErrFeedFetchFailed = errors.New("failed to fetch feed")
+	// ErrFeedParseFailed is returned when parsing the feed fails
+	ErrFeedParseFailed = errors.New("failed to parse feed")
+	// ErrFeedAlreadySubscribed is returned when user is already subscribed to the feed
+	ErrFeedAlreadySubscribed = errors.New("already subscribed to this feed")
+)
+
+// FeedService defines the interface for feed business logic
+type FeedService interface {
+	// Subscribe subscribes a user to a feed
+	Subscribe(ctx context.Context, userID, feedURL string) (*SubscribeResult, error)
+	// GetUserFeeds retrieves all feeds for a user with item counts
+	GetUserFeeds(ctx context.Context, userID string, opts ListOptions) ([]*FeedWithItemCount, int64, error)
+	// GetFeed retrieves a specific feed for a user
+	GetFeed(ctx context.Context, userID, feedID string) (*model.Feed, int, error)
+	// DeleteFeed deletes a feed subscription for a user
+	DeleteFeed(ctx context.Context, userID, feedID string) error
+	// RefreshFeed manually refreshes a feed
+	RefreshFeed(ctx context.Context, userID, feedID string) (*RefreshResult, error)
+}
+
+// SubscribeResult contains the result of subscribing to a feed
+type SubscribeResult struct {
+	Feed         *model.Feed
+	NewItemCount int
+}
+
+// FeedWithItemCount contains a feed with its item count
+type FeedWithItemCount struct {
+	*model.Feed
+	ItemCount int `json:"item_count"`
+}
+
+// RefreshResult contains the result of refreshing a feed
+type RefreshResult struct {
+	NewItemCount int `json:"new_item_count"`
+}
 
 // UserRepository defines the interface for user data access
 type UserRepository interface {

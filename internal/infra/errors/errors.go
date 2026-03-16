@@ -96,3 +96,12 @@ func SendInternal(c *gin.Context, err Error) {
 func SendRateLimited(c *gin.Context, err Error) {
 	Send(c, http.StatusTooManyRequests, err)
 }
+
+// SendError sends an error response with code, message, and optional details
+func SendError(c *gin.Context, status int, code, message string, details map[string]interface{}) {
+	Send(c, status, Error{
+		Code:    code,
+		Message: message,
+		Details: details,
+	})
+}
