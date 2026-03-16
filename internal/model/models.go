@@ -29,7 +29,7 @@ func (b *Base) GenerateID() error {
 type User struct {
 	Base
 	Email        string `gorm:"uniqueIndex;type:varchar(255);not null" json:"email"`
-	PasswordHash string `gorm:"type:varchar(255);not null" json:"-"`
+	PasswordHash string `gorm:"type:varchar(255)" json:"-"` // Nullable for OAuth users
 	Nickname     string `gorm:"type:varchar(100)" json:"nickname"`
 	AvatarURL    string `gorm:"type:varchar(500)" json:"avatar_url"`
 	AuthProvider string `gorm:"type:varchar(50);default:'email'" json:"auth_provider"`
