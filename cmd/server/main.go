@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -196,6 +199,46 @@ func main() {
 			// Public routes that benefit from auth context will be added here
 		}
 	}
+
+	// Static file serving - use embedded files in production, local files in development
+	var staticFS fs.FS
+	if cfg.IsDevelopment() {
+		// In development, serve from local web/dist directory
+		staticFS = os.DirFS("web/dist")
+		log.Info().Str("path", "web/dist").Msg("Serving static files from local directory")
+	} else {
+		// In production, use embedded files
+		staticFS = StaticFS()
+		log.Info().Msg("Serving static files from embedded filesystem")
+	}
+
+	// Create a file server for static assets
+	fileServer := http.FileServer(http.FS(staticFS))
+
+	// Serve static assets directly (JS, CSS, images, etc.)
+	router.GET("/assets/*filepath", func(c *gin.Context) {
+		c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/assets")
+		fileServer.ServeHTTP(c.Writer, c.Request)
+	})
+
+	// SPA fallback routing - serve index.html for all non-API routes
+	// This allows React Router to handle client-side routing
+	router.NoRoute(func(c *gin.Context) {
+		// Skip if it's an API route that wasn't matched
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":    "NOT_FOUND",
+					"message": "The requested resource was not found",
+				},
+			})
+			return
+		}
+
+		// For all other routes, serve index.html (SPA fallback)
+		c.Request.URL.Path = "/"
+		fileServer.ServeHTTP(c.Writer, c.Request)
+	})
 
 	// Start background refresh worker
 	backgroundWorker := worker.NewRefreshWorker(cfg, refreshWorkerService)
