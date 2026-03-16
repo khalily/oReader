@@ -35,17 +35,17 @@ These items were identified as critical/high priority by the architect review an
 
 ## Phase 1: Project Setup
 
-- [ ] 1.1 Initialize Go module (`go mod init oreader`)
-- [ ] 1.2 Create project directory structure (`cmd/`, `internal/`, `web/`, `migrations/`)
-- [ ] 1.3 Create Makefile with `test`, `build`, `run`, `migrate` commands
-- [ ] 1.4 Add Go test dependencies (`testify`, `mockery`)
-- [ ] 1.5 Configure test coverage reporting
-- [ ] 1.6 Initialize React frontend with Vite + TypeScript
-- [ ] 1.7 Add frontend dependencies
-- [ ] 1.8 Configure Tailwind CSS and shadcn/ui
-- [ ] 1.9 Create `.env.example` with all documented environment variables **[C5]**
-- [ ] 1.10 Add `govulncheck` to CI configuration
-- [ ] 1.11 Add `npm audit` to CI configuration
+- [x] 1.1 Initialize Go module (`go mod init oreader`)
+- [x] 1.2 Create project directory structure (`cmd/`, `internal/`, `web/`, `migrations/`)
+- [x] 1.3 Create Makefile with `test`, `build`, `run`, `migrate` commands
+- [x] 1.4 Add Go test dependencies (`testify`, `mockery`)
+- [x] 1.5 Configure test coverage reporting
+- [x] 1.6 Initialize React frontend with Vite + TypeScript
+- [x] 1.7 Add frontend dependencies
+- [x] 1.8 Configure Tailwind CSS and shadcn/ui
+- [x] 1.9 Create `.env.example` with all documented environment variables **[C5]**
+- [x] 1.10 Add `govulncheck` to CI configuration
+- [x] 1.11 Add `npm audit` to CI configuration
 
 **Git Commit**: `git commit -m "feat: project setup with Go + React structure"`
 

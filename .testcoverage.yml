@@ -1,0 +1,19 @@
+# Coverage configuration
+coverage:
+  # Minimum coverage threshold (percentage)
+  minimum: 80
+
+  # Files to include
+  include:
+    - "internal/**/*.go"
+
+  # Files to exclude
+  exclude:
+    - "internal/infra/**/*_test.go"
+    - "**/mock_*.go"
+    - "**/interfaces.go"
+
+  # Output format
+  format:
+    - text
+    - html
