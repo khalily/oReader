@@ -13,9 +13,13 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"oreader/internal/config"
+	"oreader/internal/handler"
 	"oreader/internal/infra/database"
+	"oreader/internal/infra/jwt"
 	"oreader/internal/infra/logger"
 	"oreader/internal/middleware"
+	"oreader/internal/model"
+	"oreader/internal/repository"
 )
 
 func main() {
@@ -46,6 +50,42 @@ func main() {
 
 	log.Info().Str("database", cfg.Database.URL).Msg("Connected to database")
 
+	// Auto-migrate database schemas
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.Feed{},
+		&model.UserFeed{},
+		&model.Item{},
+		&model.UserItemState{},
+		&model.RefreshToken{},
+		&model.ImportJob{},
+		&model.OAuthState{},
+	); err != nil {
+		log.Fatal().Err(err).Msg("Failed to auto-migrate database")
+		os.Exit(1)
+	}
+	log.Info().Msg("Database migrations completed")
+
+	// Initialize services
+	accessTTL, err := cfg.GetAccessTTL()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to parse access token TTL")
+		os.Exit(1)
+	}
+	refreshTTL, err := cfg.GetRefreshTTL()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to parse refresh token TTL")
+		os.Exit(1)
+	}
+	jwtService := jwt.NewService(cfg.Auth.SecretKey, accessTTL, refreshTTL)
+
+	// Initialize repositories
+	userRepo := repository.NewUserRepository(db)
+	tokenRepo := repository.NewRefreshTokenRepository(db)
+
+	// Initialize handlers
+	authHandler := handler.NewHandler(cfg, jwtService, userRepo, tokenRepo)
+
 	// Setup Gin
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
@@ -75,8 +115,56 @@ func main() {
 		})
 	})
 
-	// API routes will be added here
-	// TODO: Add route groups for auth, feeds, items, etc.
+	// API v1 routes
+	v1 := router.Group("/api/v1")
+	{
+		// Auth routes (public)
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/refresh", authHandler.Refresh)
+			auth.POST("/logout", authHandler.Logout)
+
+			// Protected auth routes
+			authProtected := auth.Group("")
+			authProtected.Use(middleware.AuthMiddleware(jwtService))
+			{
+				authProtected.GET("/me", authHandler.Me)
+			}
+		}
+
+		// Protected API routes (require authentication + CSRF)
+		protected := v1.Group("")
+		protected.Use(middleware.AuthMiddleware(jwtService))
+		protected.Use(middleware.CSRFMiddleware())
+		{
+			// Feed routes will be added here
+			// feeds := protected.Group("/feeds")
+			// {
+			//     feeds.GET("", feedHandler.List)
+			//     feeds.POST("", feedHandler.Create)
+			//     feeds.GET("/:id", feedHandler.Get)
+			//     feeds.DELETE("/:id", feedHandler.Delete)
+			// }
+
+			// Item routes will be added here
+			// items := protected.Group("/items")
+			// {
+			//     items.GET("", itemHandler.List)
+			//     items.GET("/:id", itemHandler.Get)
+			//     items.POST("/:id/star", itemHandler.Star)
+			//     items.POST("/:id/read", itemHandler.MarkRead)
+			// }
+		}
+
+		// Optional auth routes (public but can use auth if present)
+		optional := v1.Group("")
+		optional.Use(middleware.OptionalAuthMiddleware(jwtService))
+		{
+			// Public routes that benefit from auth context will be added here
+		}
+	}
 
 	// Start server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
@@ -97,7 +185,7 @@ func main() {
 		defer cancel()
 
 		if err := srv.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Server shutdown error")
+			log.Error().Err(err).Msg("Server shutdown error")
 		}
 
 		log.Info().Msg("Server stopped")

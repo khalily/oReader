@@ -13,6 +13,11 @@ type Error struct {
 	Details map[string]interface{} `json:"details,omitempty"`
 }
 
+// Error implements the error interface
+func (e Error) Error() string {
+	return e.Message
+}
+
 // Standard error codes
 const (
 	ErrValidation    = "VALIDATION_ERROR"
