@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 // mockRefreshService is a mock implementation of RefreshWorkerService
 type mockRefreshService struct {
+	mu           sync.Mutex
 	refreshCount int
 	lastResult   *service.RefreshAllResult
 	refreshError error
@@ -20,7 +22,9 @@ type mockRefreshService struct {
 }
 
 func (m *mockRefreshService) RefreshAllFeeds(ctx context.Context) (*service.RefreshAllResult, error) {
+	m.mu.Lock()
 	m.refreshCount++
+	m.mu.Unlock()
 	if m.delay > 0 {
 		select {
 		case <-time.After(m.delay):
@@ -78,7 +82,10 @@ func TestRefreshWorker_StartStop(t *testing.T) {
 	}
 
 	// Verify at least the initial refresh was called
-	if mockService.refreshCount == 0 {
+	mockService.mu.Lock()
+	count := mockService.refreshCount
+	mockService.mu.Unlock()
+	if count == 0 {
 		t.Error("Expected at least one refresh call")
 	}
 }
@@ -140,8 +147,11 @@ func TestRefreshWorker_InitialRefresh(t *testing.T) {
 	time.Sleep(700 * time.Millisecond)
 
 	// Verify initial refresh was called
-	if mockService.refreshCount != 1 {
-		t.Errorf("Expected 1 refresh (initial), got %d", mockService.refreshCount)
+	mockService.mu.Lock()
+	count := mockService.refreshCount
+	mockService.mu.Unlock()
+	if count != 1 {
+		t.Errorf("Expected 1 refresh (initial), got %d", count)
 	}
 }
 
@@ -168,8 +178,11 @@ func TestRefreshWorker_PeriodicRefresh(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Should have at least 3 refreshes (initial + 2+ periodic)
-	if mockService.refreshCount < 3 {
-		t.Errorf("Expected at least 3 refreshes, got %d", mockService.refreshCount)
+	mockService.mu.Lock()
+	count := mockService.refreshCount
+	mockService.mu.Unlock()
+	if count < 3 {
+		t.Errorf("Expected at least 3 refreshes, got %d", count)
 	}
 }
 
@@ -241,8 +254,11 @@ func TestRefreshWorker_TriggerRefresh(t *testing.T) {
 		t.Errorf("Expected 3 total feeds, got %d", result.TotalFeeds)
 	}
 
-	if mockService.refreshCount != 1 {
-		t.Errorf("Expected 1 refresh call, got %d", mockService.refreshCount)
+	mockService.mu.Lock()
+	count := mockService.refreshCount
+	mockService.mu.Unlock()
+	if count != 1 {
+		t.Errorf("Expected 1 refresh call, got %d", count)
 	}
 }
 

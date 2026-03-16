@@ -75,7 +75,10 @@ func main() {
 	feedRepo := repository.NewFeedRepository(db)
 	itemRepo := repository.NewItemRepository(db)
 	userFeedRepo := repository.NewUserFeedRepository(db)
+	userItemStateRepo := repository.NewUserItemStateRepository(db)
 	tokenRepo := repository.NewRefreshTokenRepository(db)
+	importJobRepo := repository.NewImportJobRepository(db)
+	oauthStateRepo := repository.NewOAuthStateRepository(db)
 
 	// Initialize services
 	accessTTL, err := cfg.GetAccessTTL()
@@ -94,10 +97,10 @@ func main() {
 	fetcher := rss.NewHTTPFetcher(30 * time.Second)
 	parser := rss.NewParser(fetcher)
 
-	// Initialize feed service (will be used when feed handlers are added)
-	_ = service.NewFeedService(feedRepo, itemRepo, userFeedRepo, parser)
-
-	// Initialize refresh worker service
+	// Initialize services
+	feedService := service.NewFeedService(feedRepo, itemRepo, userFeedRepo, parser)
+	itemService := service.NewItemService(itemRepo, userItemStateRepo, userFeedRepo)
+	importService := service.NewImportService(feedService, importJobRepo, userFeedRepo, feedRepo)
 	refreshWorkerService := service.NewRefreshWorkerService(feedRepo, itemRepo, userFeedRepo)
 
 	// Initialize rate limiter
@@ -115,8 +118,17 @@ func main() {
 		Default: middleware.RouteLimit{Requests: 60, Window: time.Minute},
 	}
 
+	// Initialize services
+	feedService = service.NewFeedService(feedRepo, itemRepo, userFeedRepo, parser)
+	itemService = service.NewItemService(itemRepo, userItemStateRepo, userFeedRepo)
+	importService = service.NewImportService(feedService, importJobRepo, userFeedRepo, feedRepo)
+
 	// Initialize handlers
 	authHandler := handler.NewHandler(cfg, jwtService, userRepo, tokenRepo)
+	feedHandler := handler.NewFeedHandler(feedService)
+	itemHandler := handler.NewItemHandler(itemService)
+	importHandler := handler.NewImportHandler(feedService, importService, feedRepo)
+	oauthHandler := handler.NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, oauthStateRepo, "")
 
 	// Setup Gin
 	if cfg.IsProduction() {
@@ -143,59 +155,72 @@ func main() {
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-			"time":   time.Now().Format(time.RFC3339),
+			"status":  "ok",
+			"version": "2.0.0",
+			"time":    time.Now().Format(time.RFC3339),
 		})
 	})
+
+	// Auth routes (public)
+	auth := router.Group("/auth")
+	{
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/login", authHandler.Login)
+		auth.POST("/refresh", authHandler.Refresh)
+		auth.POST("/logout", authHandler.Logout)
+		auth.GET("/github", oauthHandler.GitHubInitiate)
+		auth.GET("/github/callback", oauthHandler.GitHubCallback)
+
+		// Protected auth routes
+		authProtected := auth.Group("")
+		authProtected.Use(middleware.AuthMiddleware(jwtService))
+		{
+			authProtected.GET("/me", authHandler.Me)
+		}
+	}
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
-		// Auth routes (public)
-		auth := v1.Group("/auth")
-		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
-			auth.POST("/refresh", authHandler.Refresh)
-			auth.POST("/logout", authHandler.Logout)
-
-			// Protected auth routes
-			authProtected := auth.Group("")
-			authProtected.Use(middleware.AuthMiddleware(jwtService))
-			{
-				authProtected.GET("/me", authHandler.Me)
-			}
-		}
-
 		// Protected API routes (require authentication + CSRF)
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(jwtService))
 		protected.Use(middleware.CSRFMiddleware())
 		{
-			// Feed routes will be added here
-			// feeds := protected.Group("/feeds")
-			// {
-			//     feeds.GET("", feedHandler.List)
-			//     feeds.POST("", feedHandler.Create)
-			//     feeds.GET("/:id", feedHandler.Get)
-			//     feeds.DELETE("/:id", feedHandler.Delete)
-			// }
+			// Feed routes
+			feeds := protected.Group("/feeds")
+			{
+				feeds.GET("", feedHandler.ListFeeds)
+				feeds.POST("", feedHandler.CreateFeed)
+				feeds.GET("/:id", feedHandler.GetFeed)
+				feeds.DELETE("/:id", feedHandler.DeleteFeed)
+				feeds.POST("/:id/refresh", feedHandler.RefreshFeed)
+				feeds.POST("/:id/mark-all-read", itemHandler.MarkAllRead)
+			}
 
-			// Item routes will be added here
-			// items := protected.Group("/items")
-			// {
-			//     items.GET("", itemHandler.List)
-			//     items.GET("/:id", itemHandler.Get)
-			//     items.POST("/:id/star", itemHandler.Star)
-			//     items.POST("/:id/read", itemHandler.MarkRead)
-			// }
+			// Item routes
+			items := protected.Group("/items")
+			{
+				items.GET("", itemHandler.ListItems)
+				items.GET("/:id", itemHandler.GetItem)
+				items.POST("/:id/star", itemHandler.ToggleStar)
+				items.POST("/:id/read", itemHandler.ToggleRead)
+			}
+
+			// OPML import
+			opml := protected.Group("/opml")
+			{
+				opml.POST("/import", importHandler.ImportFeeds)
+			}
 		}
 
 		// Optional auth routes (public but can use auth if present)
 		optional := v1.Group("")
 		optional.Use(middleware.OptionalAuthMiddleware(jwtService))
 		{
-			// Public routes that benefit from auth context will be added here
+			// OPML export (works with or without auth)
+			optional.GET("/opml/export", importHandler.ExportFeeds)
+			optional.GET("/opml/import/:job_id", importHandler.GetImportStatus)
 		}
 	}
 
