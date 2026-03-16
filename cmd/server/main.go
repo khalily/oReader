@@ -156,27 +156,27 @@ func main() {
 		})
 	})
 
-	// Auth routes (public)
-	auth := router.Group("/auth")
-	{
-		auth.POST("/register", authHandler.Register)
-		auth.POST("/login", authHandler.Login)
-		auth.POST("/refresh", authHandler.Refresh)
-		auth.POST("/logout", authHandler.Logout)
-		auth.GET("/github", oauthHandler.GitHubInitiate)
-		auth.GET("/github/callback", oauthHandler.GitHubCallback)
-
-		// Protected auth routes
-		authProtected := auth.Group("")
-		authProtected.Use(middleware.AuthMiddleware(jwtService))
-		{
-			authProtected.GET("/me", authHandler.Me)
-		}
-	}
-
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
+		// Auth routes (public)
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/refresh", authHandler.Refresh)
+			auth.POST("/logout", authHandler.Logout)
+			auth.GET("/github", oauthHandler.GitHubInitiate)
+			auth.GET("/github/callback", oauthHandler.GitHubCallback)
+
+			// Protected auth routes
+			authProtected := auth.Group("")
+			authProtected.Use(middleware.AuthMiddleware(jwtService))
+			{
+				authProtected.GET("/me", authHandler.Me)
+			}
+		}
+
 		// Protected API routes (require authentication + CSRF)
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(jwtService))
