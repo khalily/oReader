@@ -19,7 +19,41 @@ var (
 	ErrFeedParseFailed = errors.New("failed to parse feed")
 	// ErrFeedAlreadySubscribed is returned when user is already subscribed to the feed
 	ErrFeedAlreadySubscribed = errors.New("already subscribed to this feed")
+	// ErrItemNotFound is returned when an item is not found
+	ErrItemNotFound = errors.New("item not found")
 )
+
+// ItemWithState represents an item with user-specific state
+type ItemWithState struct {
+	*model.Item
+	IsStarred bool    `json:"is_starred"`
+	IsRead    bool    `json:"is_read"`
+	ReadAt    *string `json:"read_at,omitempty"`
+}
+
+// ListOptions defines pagination and filtering options for feeds
+type ListOptions struct {
+	Limit  int    `json:"limit"`
+	Offset int    `json:"offset"`
+	Cursor string `json:"cursor,omitempty"`
+}
+
+// ListItemOptions defines options for listing items
+type ListItemOptions struct {
+	Limit   int    `json:"limit"`
+	Cursor  string `json:"cursor,omitempty"`
+	FeedID  string `json:"feed_id,omitempty"`
+	Starred *bool  `json:"starred,omitempty"`
+	Read    *bool  `json:"read,omitempty"`
+}
+
+// ItemListResult contains the result of listing items with pagination metadata
+type ItemListResult struct {
+	Items      []*ItemWithState `json:"items"`
+	Total      int64            `json:"total"`
+	HasMore    bool             `json:"has_more"`
+	NextCursor string           `json:"next_cursor,omitempty"`
+}
 
 // FeedService defines the interface for feed business logic
 type FeedService interface {
@@ -33,6 +67,20 @@ type FeedService interface {
 	DeleteFeed(ctx context.Context, userID, feedID string) error
 	// RefreshFeed manually refreshes a feed
 	RefreshFeed(ctx context.Context, userID, feedID string) (*RefreshResult, error)
+}
+
+// ItemService defines the interface for item business logic
+type ItemService interface {
+	// ListItems retrieves items for a user with filtering and pagination
+	ListItems(ctx context.Context, userID string, opts ListItemOptions) (*ItemListResult, error)
+	// GetItem retrieves a single item by ID with user state
+	GetItem(ctx context.Context, userID, itemID string) (*ItemWithState, error)
+	// ToggleStar toggles the star status for an item
+	ToggleStar(ctx context.Context, userID, itemID string) (*ItemWithState, error)
+	// ToggleRead toggles the read status for an item
+	ToggleRead(ctx context.Context, userID, itemID string) (*ItemWithState, error)
+	// MarkAllRead marks all items in a feed as read for a user
+	MarkAllRead(ctx context.Context, userID, feedID string) (int, error)
 }
 
 // SubscribeResult contains the result of subscribing to a feed
@@ -127,19 +175,4 @@ type OAuthStateRepository interface {
 	GetByState(ctx context.Context, state string) (*model.OAuthState, error)
 	Delete(ctx context.Context, state string) error
 	DeleteExpired(ctx context.Context) error
-}
-
-// ListOptions defines pagination and filtering options
-type ListOptions struct {
-	Limit  int    `json:"limit"`
-	Offset int    `json:"offset"`
-	Cursor string `json:"cursor,omitempty"`
-}
-
-// ItemWithState represents an item with user-specific state
-type ItemWithState struct {
-	*model.Item
-	IsStarred bool       `json:"is_starred"`
-	IsRead    bool       `json:"is_read"`
-	ReadAt    *string    `json:"read_at,omitempty"`
 }

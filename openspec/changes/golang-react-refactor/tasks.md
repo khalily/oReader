@@ -187,22 +187,22 @@ These items were identified as critical/high priority by the architect review an
 ## Phase 6: Article Management
 
 ### 🔴 Write Tests
-- [ ] 6.1 Write tests for item service
-- [ ] 6.2 Write tests for item handler endpoints
-- [ ] 6.3 Write tests for star/read operations
+- [x] 6.1 Write tests for item service
+- [x] 6.2 Write tests for item handler endpoints
+- [x] 6.3 Write tests for star/read operations
 
 ### 🟢 Implement
-- [ ] 6.4 Implement item service
-- [ ] 6.5 Implement item handler (list, get, star, read, mark-all-read)
-- [ ] 6.6 Implement filtering and pagination with cursor-based approach
-- [ ] 6.7 Implement bulk operations (bulk mark-as-read)
+- [x] 6.4 Implement item service
+- [x] 6.5 Implement item handler (list, get, star, read, mark-all-read)
+- [x] 6.6 Implement filtering and pagination with cursor-based approach
+- [x] 6.7 Implement bulk operations (bulk mark-as-read)
 
 ### 🔵 Verify & Refactor
-- [ ] 6.8 Run all tests: `make test`
-- [ ] 6.9 Verify article operations work correctly
-- [ ] 6.10 Verify pagination returns correct metadata
+- [x] 6.8 Run all tests: `make test`
+- [x] 6.9 Verify article operations work correctly
+- [x] 6.10 Verify pagination returns correct metadata
 
-**Git Commit**: `git commit -m "feat(items): article management with star/read"`
+**Git Commit**: `git commit -m "feat(items): article management with cursor pagination"`
 
 ---
 
