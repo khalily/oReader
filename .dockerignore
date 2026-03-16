@@ -1,0 +1,70 @@
+# Git files
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+README.md
+LICENSE
+CHANGELOG
+.claude
+
+# Build artifacts (will be created inside container)
+build
+dist
+coverage
+*.db
+*.db-*
+
+# Node modules (recreated in container)
+web/node_modules
+
+# Frontend build cache
+web/.vite
+web/dist
+
+# Go files
+vendor
+# Don't exclude go.sum - it's needed for Docker build
+# *.sum
+*.test
+*.out
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test files
+*.test
+coverage
+.testcoverage.yml
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+
+# Docker files (don't include docker files in docker build)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Environment files (use proper secrets management instead)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Claude files
+.claude

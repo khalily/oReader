@@ -1,0 +1,80 @@
+# Docker Compose for Development
+# Usage: docker-compose up --build
+#
+# This configuration:
+# - Builds the Go backend with hot-reload support using air
+# - Runs the frontend dev server separately (use: make frontend-dev)
+# - Uses SQLite for local development
+# - Mounts source code for live reloading
+
+services:
+  oreader:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: oreader-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=development
+      - DATABASE_URL=/data/oreader.db
+      - JWT_SECRET_KEY=dev-secret-key-change-in-production-32chars
+      - LOG_LEVEL=debug
+      - PORT=8080
+    volumes:
+      # Mount source code for hot-reload
+      - .:/src
+      # Persist database
+      - oreader-data:/data
+    working_dir: /src
+    command: air -c .air.toml --build.cmd "go build -o /tmp/oreader ./cmd/server" --build.bin "/tmp/oreader" --build.delay "1000"
+    depends_on:
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  db:
+    image: mysql:9.0
+    container_name: oreader-mysql-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: oreader
+      MYSQL_USER: oreader
+      MYSQL_PASSWORD: oreader
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: phpMyAdmin for database management
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: oreader-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: rootpassword
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+    profiles:
+      - tools
+
+volumes:
+  oreader-data:
+  mysql-data:

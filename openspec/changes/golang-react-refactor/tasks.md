@@ -363,14 +363,14 @@ These items were identified as critical/high priority by the architect review an
 
 ## Phase 16: Docker & Deployment
 
-- [ ] 16.1 Create multi-stage Dockerfile (Go build + Node build + final image)
-- [ ] 16.2 Create `docker-compose.yml` for development
-- [ ] 16.3 Create `docker-compose.prod.yml` for production
-- [ ] 16.4 Configure MySQL service
-- [ ] 16.5 Create health check endpoint
-- [ ] 16.6 Add `.dockerignore`
-- [ ] 16.7 Test Docker build and run
-- [ ] 16.8 Add graceful shutdown in Docker (SIGTERM handling)
+- [x] 16.1 Create multi-stage Dockerfile (Go build + Node build + final image)
+- [x] 16.2 Create `docker-compose.yml` for development
+- [x] 16.3 Create `docker-compose.prod.yml` for production
+- [x] 16.4 Configure MySQL service
+- [x] 16.5 Create health check endpoint (already exists at /health)
+- [x] 16.6 Add `.dockerignore`
+- [x] 16.7 Test Docker build and run
+- [x] 16.8 Add graceful shutdown in Docker (SIGTERM handling) (already exists in main.go)
 
 **Git Commit**: `git commit -m "feat(deploy): Docker configuration with multi-stage build"`
 
