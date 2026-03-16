@@ -311,13 +311,12 @@ These items were identified as critical/high priority by the architect review an
 ---
 
 ## Phase 12: Frontend Feed Management
-
-- [ ] 12.1 Create feed API hooks with React Query
-- [ ] 12.2 Create Sidebar component with feed list
-- [ ] 12.3 Create AddFeed dialog component
-- [ ] 12.4 Implement feed subscription form
-- [ ] 12.5 Implement feed deletion with confirmation
-- [ ] 12.6 Create OPML import/export UI components
+- [x] 12.1 Create feed API hooks with React Query
+- [x] 12.2 Create Sidebar component with feed list
+- [x] 12.3 Create AddFeed dialog component
+- [x] 12.4 Implement feed subscription form
+- [x] 12.5 Implement feed deletion with confirmation
+- [x] 12.6 Create OPML import/export UI components
 
 **Git Commit**: `git commit -m "feat(frontend): feed management UI"`
 
