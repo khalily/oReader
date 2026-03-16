@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ErrorDetail represents a detailed error information
-type ErrorDetail struct {
+// Error represents a standardized error response
+type Error struct {
 	Code    string                 `json:"code"`
 	Message string                 `json:"message"`
 	Details map[string]interface{} `json:"details,omitempty"`
@@ -15,67 +15,79 @@ type ErrorDetail struct {
 
 // Standard error codes
 const (
-	ErrValidation     = "VALIDATION_ERROR"
-	ErrUnauthorized   = "UNAUTHORIZED"
-	ErrTokenExpired   = "TOKEN_EXPIRED"
-	ErrTokenInvalid   = "TOKEN_INVALID"
-	ErrCSRFMissing     = "CSRF_MISSING"
-	ErrCSRFMismatch    = "CSRF_MISMATCH"
-	ErrForbidden       = "FORBIDDEN"
-	ErrNotFound         = "NOT_FOUND"
-	ErrConflict         = "CONFLICT"
-	ErrRateLimit       = "RATE_LIMIT_EXCEEDED"
-	ErrInternal         = "INTERNAL_ERROR"
-	ErrBadRequest       = "BAD_REQUEST"
+	ErrValidation    = "VALIDATION_ERROR"
+	ErrUnauthorized  = "UNAUTHORIZED"
+	ErrTokenExpired  = "TOKEN_EXPIRED"
+	ErrTokenInvalid  = "TOKEN_INVALID"
+	ErrForbidden     = "FORBIDDEN"
+	ErrNotFound      = "NOT_FOUND"
+	ErrConflict      = "CONFLICT"
+	ErrRateLimit     = "RATE_LIMIT_EXCEEDED"
+	ErrInternal      = "INTERNAL_ERROR"
+	ErrCSRFMissing   = "CSRF_MISSING"
+	ErrCSRFMismatch  = "CSRF_MISMATCH"
 )
 
-// New creates a standardized error response
-func New(code string, message string, details map[string]interface{}) ErrorDetail {
-	return ErrorDetail{
+// Send sends an error response
+func Send(c *gin.Context, status int, err Error) {
+	c.JSON(status, gin.H{
+		"error": err,
+	})
+}
+
+// New creates a new Error
+func New(code string, message string, details map[string]interface{}) Error {
+	return Error{
 		Code:    code,
 		Message: message,
 		Details: details,
 	}
 }
 
-// Send sends a standardized error response
-func Send(c *gin.Context, status int, err ErrorDetail) {
-	c.JSON(status, gin.H{
-		"error": err,
-	})
+// NewSimple creates a new Error without details
+func NewSimple(code string, message string) Error {
+	return Error{
+		Code:    code,
+		Message: message,
+	}
 }
 
-// BadRequest sends a 400 Bad Request error
-func BadRequest(c *gin.Context, message string, details map[string]interface{}) {
-	Send(c, http.StatusBadRequest, New(ErrBadRequest, message, details))
+// Is checks if err is of a specific type
+func Is(err Error, target string) bool {
+	return err.Code == target
 }
 
-// Unauthorized sends a 401 Unauthorized error
-func Unauthorized(c *gin.Context, message string, details map[string]interface{}) {
-	Send(c, http.StatusUnauthorized, New(ErrUnauthorized, message, details))
+// SendBadRequest sends a 400 Bad Request error
+func SendBadRequest(c *gin.Context, err Error) {
+	Send(c, http.StatusBadRequest, err)
 }
 
-// Forbidden sends a 403 Forbidden error
-func Forbidden(c *gin.Context, message string, details map[string]interface{}) {
-	Send(c, http.StatusForbidden, New(ErrForbidden, message, details))
+// SendUnauthorized sends a 401 Unauthorized error
+func SendUnauthorized(c *gin.Context, err Error) {
+	Send(c, http.StatusUnauthorized, err)
 }
 
-// NotFound sends a 404 Not Found error
-func NotFound(c *gin.Context, resource string) {
-	Send(c, http.StatusNotFound, New(ErrNotFound, resource+" not found", nil))
+// SendForbidden sends a 403 Forbidden error
+func SendForbidden(c *gin.Context, err Error) {
+	Send(c, http.StatusForbidden, err)
 }
 
-// Conflict sends a 409 Conflict error
-func Conflict(c *gin.Context, message string, details map[string]interface{}) {
-	Send(c, http.StatusConflict, New(ErrConflict, message, details))
+// SendNotFound sends a 404 Not Found error
+func SendNotFound(c *gin.Context, err Error) {
+	Send(c, http.StatusNotFound, err)
 }
 
-// Internal sends a 500 Internal Server Error
-func Internal(c *gin.Context, message string, details map[string]interface{}) {
-	Send(c, http.StatusInternalServerError, New(ErrInternal, message, details))
+// SendConflict sends a 409 Conflict error
+func SendConflict(c *gin.Context, err Error) {
+	Send(c, http.StatusConflict, err)
 }
 
-// RateLimit sends a 429 Too Many Requests error
-func RateLimit(c *gin.Context, details map[string]interface{}) {
-	Send(c, http.StatusTooManyRequests, New(ErrRateLimit, "Rate limit exceeded", details))
+// SendInternal sends a 500 Internal Server Error
+func SendInternal(c *gin.Context, err Error) {
+	Send(c, http.StatusInternalServerError, err)
+}
+
+// SendRateLimited sends a 429 Too Many Requests error
+func SendRateLimited(c *gin.Context, err Error) {
+	Send(c, http.StatusTooManyRequests, err)
 }

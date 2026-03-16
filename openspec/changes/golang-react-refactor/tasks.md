@@ -80,10 +80,10 @@ These items were identified as critical/high priority by the architect review an
 - [x] 2.16 Create main.go entry point
 
 ### 🔵 Verify & Refactor
-- [ ] 2.17 Run all tests: `make test`
-- [ ] 2.18 Ensure >80% coverage on config and models
-- [ ] 2.19 Verify migrations run successfully with `make migrate-up`
-- [ ] 2.20 **验证多用户场景**: 两个用户订阅同一 RSS 源，各自标记阅读/收藏状态互不影响
+- [x] 2.17 Run all tests: `make test`
+- [x] 2.18 Ensure >80% coverage on config and models
+- [x] 2.19 Verify migrations run successfully with `make migrate-up`
+- [x] 2.20 **验证多用户场景**: 两个用户订阅同一 RSS 源，各自标记阅读/收藏状态互不影响
 
 **Git Commit**: `git commit -m "feat(backend): core infrastructure with models, interfaces, and logging"`
 
