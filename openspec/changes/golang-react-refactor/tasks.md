@@ -128,24 +128,24 @@ These items were identified as critical/high priority by the architect review an
 ## Phase 4: Rate Limiting
 
 ### 🔴 Write Tests
-- [ ] 4.1 Write tests for token bucket limiter
-- [ ] 4.2 Write tests for rate limit middleware
-- [ ] 4.3 Write tests for rate limit headers
-- [ ] 4.4 **[H2]** Write tests for rate limiter interface
+- [x] 4.1 Write tests for token bucket limiter
+- [x] 4.2 Write tests for rate limit middleware
+- [x] 4.3 Write tests for rate limit headers
+- [x] 4.4 **[H2]** Write tests for rate limiter interface
 
 ### 🟢 Implement
-- [ ] 4.5 **[H2]** Define RateLimiter interface in `internal/infra/ratelimit/`
-- [ ] 4.6 **[H2]** Implement in-memory token bucket rate limiter
-- [ ] 4.7 **[H2]** Add Redis rate limiter skeleton (configurable)
-- [ ] 4.8 Implement rate limit middleware
-- [ ] 4.9 Configure rate limits per endpoint type
-- [ ] 4.10 Add rate limit headers to responses (X-RateLimit-*)
-- [ ] 4.11 Use IP + user_id combination for authenticated rate limiting
+- [x] 4.5 **[H2]** Define RateLimiter interface in `internal/infra/ratelimit/`
+- [x] 4.6 **[H2]** Implement in-memory token bucket rate limiter
+- [x] 4.7 **[H2]** Add Redis rate limiter skeleton (configurable)
+- [x] 4.8 Implement rate limit middleware
+- [x] 4.9 Configure rate limits per endpoint type
+- [x] 4.10 Add rate limit headers to responses (X-RateLimit-*)
+- [x] 4.11 Use IP + user_id combination for authenticated rate limiting
 
 ### 🔵 Verify & Refactor
-- [ ] 4.12 Run all tests: `make test`
-- [ ] 4.13 Verify rate limiting works under load
-- [ ] 4.14 Verify RATE_LIMIT_EXCEEDED error format
+- [x] 4.12 Run all tests: `make test`
+- [x] 4.13 Verify rate limiting works under load
+- [x] 4.14 Verify RATE_LIMIT_EXCEEDED error format
 
 **Git Commit**: `git commit -m "feat(middleware): API rate limiting with interface-based design"`
 
