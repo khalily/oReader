@@ -378,31 +378,48 @@ These items were identified as critical/high priority by the architect review an
 
 ## Phase 17: Final Testing & Documentation
 
-- [ ] 17.1 Run full test suite: `make test`
-- [ ] 17.2 Verify test coverage >80%
-- [ ] 17.3 Run integration tests (HTTP endpoint tests)
-- [ ] 17.4 Run `govulncheck` and `npm audit`
-- [ ] 17.5 Security review (cookies, JWT, validation, CSRF, SSRF)
-- [ ] 17.6 Create README.md with setup instructions
-- [ ] 17.7 Create API documentation (OpenAPI/Swagger)
-- [ ] 17.8 Document deployment guide with environment variables
+   381
+- [x] 17.1 Run full test suite: `make test`
+   382
+- [x] 17.2 Verify test coverage >80%
+   383
+- [x] 17.3 Run integration tests (HTTP endpoint tests)
+   384
+- [x] 17.4 Run `govulncheck` and `npm audit`
+   385
+- [x] 17.5 Security review (cookies, JWT, validation, CSRF, SSRF)
+   386
+- [x] 17.6 Create README.md with setup instructions
+   387
+- [x] 17.7 Create API documentation (OpenAPI/Swagger)
+   388
+- [x] 17.8 Document deployment guide with environment variables
 
 **Git Commit**: `git commit -m "docs: README, API documentation, and deployment guide"`
 
 ---
 
 ## Phase 18: Final Verification
-
-- [ ] 18.1 Verify all API endpoints work correctly
-- [ ] 18.2 Verify authentication flow end-to-end (including CSRF)
-- [ ] 18.3 Verify RSS subscription and parsing
-- [ ] 18.4 Verify background refresh
-- [ ] 18.5 Verify OPML import/export
-- [ ] 18.6 Verify rate limiting (in-memory)
-- [ ] 18.7 Verify Docker deployment
-- [ ] 18.8 Verify security headers on all responses
-- [ ] 18.9 Verify content sanitization (XSS test)
-- [ ] 18.10 Verify SSRF protection (blocked IPs)
+   396
+- [x] 18.1 Verify all API endpoints work correctly
+   397
+- [x] 18.2 Verify authentication flow end-to-end (including CSRF)
+   398
+- [x] 18.3 Verify RSS subscription and parsing
+   399
+- [x] 18.4 Verify background refresh
+   400
+- [x] 18.5 Verify OPML import/export
+   401
+- [x] 18.6 Verify rate limiting (in-memory)
+   402
+- [x] 18.7 Verify Docker deployment
+   403
+- [x] 18.8 Verify security headers on all responses
+   404
+- [x] 18.9 Verify content sanitization (XSS test)
+   405
+- [x] 18.10 Verify SSRF protection (blocked IPs)
 
 **Git Commit**: `git commit -m "release: oReader v2.0.0"`
 
