@@ -154,31 +154,31 @@ These items were identified as critical/high priority by the architect review an
 ## Phase 5: RSS Parsing & Subscription
 
 ### 🔴 Write Tests
-- [ ] 5.1 Write tests for RSS parser wrapper
-- [ ] 5.2 **[C4]** Write tests for URL validation (SSRF protection)
-- [ ] 5.3 **[C3]** Write tests for content sanitization
-- [ ] 5.4 Write tests for feed repository
-- [ ] 5.5 Write tests for item repository
-- [ ] 5.6 Write tests for feed service
-- [ ] 5.7 Write tests for feed handler endpoints
+- [x] 5.1 Write tests for RSS parser wrapper
+- [x] 5.2 **[C4]** Write tests for URL validation (SSRF protection)
+- [x] 5.3 **[C3]** Write tests for content sanitization
+- [x] 5.4 Write tests for feed repository
+- [x] 5.5 Write tests for item repository
+- [x] 5.6 Write tests for feed service
+- [x] 5.7 Write tests for feed handler endpoints
 
 ### 🟢 Implement
-- [ ] 5.8 Implement RSS parser wrapper using gofeed (`internal/infra/rss/`)
-- [ ] 5.9 **[C4]** Implement URL validation with private IP blocking
-- [ ] 5.10 **[C4]** Implement URL scheme validation (http/https only)
-- [ ] 5.11 **[C3]** Implement HTML sanitization with bluemonday (`internal/infra/sanitize/`)
-- [ ] 5.12 Implement favicon extraction
-- [ ] 5.13 Implement Feed repository (implements interface)
-- [ ] 5.14 Implement Item repository (implements interface)
-- [ ] 5.15 Implement feed service with sanitization
-- [ ] 5.16 Implement feed handler (CRUD + manual refresh)
-- [ ] 5.17 Add feed size limits (1000 items, 1MB content, 30s timeout)
+- [x] 5.8 Implement RSS parser wrapper using gofeed (`internal/infra/rss/`)
+- [x] 5.9 **[C4]** Implement URL validation with private IP blocking
+- [x] 5.10 **[C4]** Implement URL scheme validation (http/https only)
+- [x] 5.11 **[C3]** Implement HTML sanitization with bluemonday (`internal/infra/sanitize/`)
+- [x] 5.12 Implement favicon extraction
+- [x] 5.13 Implement Feed repository (implements interface)
+- [x] 5.14 Implement Item repository (implements interface)
+- [x] 5.15 Implement feed service with sanitization
+- [x] 5.16 Implement feed handler (CRUD + manual refresh)
+- [x] 5.17 Add feed size limits (1000 items, 1MB content, 30s timeout)
 
 ### 🔵 Verify & Refactor
-- [ ] 5.18 Run all tests: `make test`
-- [ ] 5.19 Test with real RSS feeds
-- [ ] 5.20 Test SSRF protection with blocked IPs
-- [ ] 5.21 Test XSS payloads are sanitized
+- [x] 5.18 Run all tests: `make test`
+- [x] 5.19 Test with real RSS feeds
+- [x] 5.20 Test SSRF protection with blocked IPs
+- [x] 5.21 Test XSS payloads are sanitized
 
 **Git Commit**: `git commit -m "feat(feeds): RSS subscription management with SSRF protection and content sanitization"`
 
