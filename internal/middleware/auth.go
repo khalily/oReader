@@ -60,7 +60,7 @@ func CSRFMiddleware() gin.HandlerFunc {
 		headerToken := c.GetHeader("X-CSRF-Token")
 		if headerToken == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-				"error": errors.NewSimple(errors.ErrCSRFMissing, "CSRF token required"),
+				"error": errors.NewSimple(errors.ErrCSRFMissing, "CSRF token required in X-CSRF-Token header"),
 			})
 			return
 		}
@@ -69,13 +69,21 @@ func CSRFMiddleware() gin.HandlerFunc {
 		cookieToken, exists := c.Get("csrf_token")
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-				"error": errors.NewSimple(errors.ErrCSRFMissing, "CSRF token not found in session"),
+				"error": errors.NewSimple(errors.ErrCSRFMissing, "CSRF token not found in session - please re-login"),
 			})
 			return
 		}
 
 		// Validate CSRF token
-		if headerToken != cookieToken {
+		cookieTokenStr, ok := cookieToken.(string)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": errors.NewSimple(errors.ErrCSRFMismatch, "Invalid CSRF token format in session"),
+			})
+			return
+		}
+
+		if headerToken != cookieTokenStr {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": errors.NewSimple(errors.ErrCSRFMismatch, "CSRF token mismatch"),
 			})
