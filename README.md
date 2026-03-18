@@ -132,6 +132,28 @@ go test ./internal/service
 make test-short
 ```
 
+### Running E2E Tests
+
+End-to-end API tests use Playwright to validate the full request/response cycle:
+
+```bash
+# Install Playwright browsers (first time only)
+cd web
+npx playwright install chromium
+
+# Run all E2E tests
+npm run test:e2e
+
+# Run tests with UI mode
+npm run test:e2e:ui
+
+# Run specific test file
+npx playwright test --config=tests/e2e/playwright.config.ts tests/e2e/auth.spec.ts
+```
+
+See [web/tests/e2e/README.md](web/tests/e2e/README.md) for detailed E2E testing documentation.
+
+
 ### Building for Production
 
 ```bash

@@ -36,7 +36,7 @@ func (r *itemRepository) CreateBatch(ctx context.Context, items []*model.Item) e
 // GetByID retrieves an item by ID
 func (r *itemRepository) GetByID(ctx context.Context, id string) (*model.Item, error) {
 	var item model.Item
-	err := r.db.WithContext(ctx).Where("id = ?", id).First(&item).Error
+	err := r.db.WithContext(ctx).Preload("Feed").Where("id = ?", id).First(&item).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("item not found")
@@ -76,8 +76,9 @@ func (r *itemRepository) ListByFeedID(ctx context.Context, feedID, userID string
 		return nil, 0, err
 	}
 
-	// Get items with pagination
+	// Get items with pagination (preload Feed for frontend display)
 	offsetQuery := baseQuery.
+		Preload("Feed").
 		Order("created_at DESC").
 		Offset(opts.Offset)
 
@@ -163,7 +164,7 @@ func (r *itemRepository) ListStarred(ctx context.Context, userID string, opts se
 	}
 
 	var states []model.UserItemState
-	if err := query.Preload("Item").Find(&states).Error; err != nil {
+	if err := query.Preload("Item.Feed").Find(&states).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -223,7 +224,7 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 	}
 
 	var states []model.UserItemState
-	if err := query.Preload("Item").Find(&states).Error; err != nil {
+	if err := query.Preload("Item.Feed").Find(&states).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -242,6 +243,7 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 	if opts.Limit > 0 && remaining > 0 {
 		var items []*model.Item
 		itemQuery := r.db.WithContext(ctx).
+			Preload("Feed").
 			Where("id NOT IN (?)",
 				r.db.WithContext(ctx).
 					Model(&model.UserItemState{}).

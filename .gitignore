@@ -38,6 +38,9 @@ coverage/
 .env.local
 .env.*.local
 
+# Keep test environment template
+!.env.test
+
 # Node
 node_modules/
 npm-debug.log*

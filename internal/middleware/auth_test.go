@@ -11,16 +11,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"oreader/internal/infra/jwt"
+	"oreader/internal/testutil"
 )
 
 func init() {
 	gin.SetMode(gin.TestMode)
 }
 
-const testSecretKey = "test-secret-key-must-be-at-least-32-characters"
-
 func setupTestJWTService(t *testing.T) *jwt.Service {
-	return jwt.NewService(testSecretKey, 15*time.Minute, 7*24*time.Hour)
+	secretKey := testutil.GetTestJWTSecret()
+	return jwt.NewService(secretKey, 15*time.Minute, 7*24*time.Hour)
 }
 
 func TestAuthMiddleware(t *testing.T) {
@@ -78,7 +78,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	t.Run("rejects request with expired token", func(t *testing.T) {
 		// Create a service with very short TTL
-		shortService := jwt.NewService(testSecretKey, 10*time.Millisecond, 7*24*time.Hour)
+		shortService := jwt.NewService(testutil.GetTestJWTSecret(), 10*time.Millisecond, 7*24*time.Hour)
 		router := gin.New()
 		router.Use(AuthMiddleware(shortService))
 		router.GET("/protected", func(c *gin.Context) {
@@ -339,7 +339,7 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("ignores expired token and continues", func(t *testing.T) {
-		shortService := jwt.NewService(testSecretKey, 10*time.Millisecond, 7*24*time.Hour)
+		shortService := jwt.NewService(testutil.GetTestJWTSecret(), 10*time.Millisecond, 7*24*time.Hour)
 		router := gin.New()
 		var userExists bool
 		router.Use(OptionalAuthMiddleware(shortService))

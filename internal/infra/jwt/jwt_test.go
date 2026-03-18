@@ -6,10 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"oreader/internal/testutil"
 )
 
 func TestGenerateAndValidateToken(t *testing.T) {
-	secretKey := "test-secret-key-must-be-at-least-32-characters"
+	secretKey := testutil.GetTestJWTSecret()
 	service := NewService(secretKey, 15*time.Minute, 7*24*time.Hour)
 
 	userID := "user-123"
@@ -49,7 +51,7 @@ func TestGenerateAndValidateToken(t *testing.T) {
 }
 
 func TestGenerateAndValidateRefreshToken(t *testing.T) {
-	secretKey := "test-secret-key-must-be-at-least-32-characters"
+	secretKey := testutil.GetTestJWTSecret()
 	service := NewService(secretKey, 15*time.Minute, 7*24*time.Hour)
 
 	userID := "user-123"

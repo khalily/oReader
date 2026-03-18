@@ -249,14 +249,6 @@ func (h *Handler) Login(c *gin.Context) {
 
 	// Generate tokens
 	h.setAuthCookies(c, user)
-
-	c.JSON(http.StatusOK, gin.H{
-		"user": gin.H{
-			"id":       user.ID,
-			"email":    user.Email,
-			"nickname": user.Nickname,
-		},
-	})
 }
 
 // setAuthCookies generates tokens and sets auth cookies
@@ -384,14 +376,6 @@ func (h *Handler) Refresh(c *gin.Context) {
 
 	// Generate new tokens
 	h.setAuthCookies(c, user)
-
-	c.JSON(http.StatusOK, gin.H{
-		"user": gin.H{
-			"id":       user.ID,
-			"email":    user.Email,
-			"nickname": user.Nickname,
-		},
-	})
 }
 
 // Logout handles user logout
