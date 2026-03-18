@@ -13,6 +13,8 @@ import (
 var (
 	// ErrFeedNotFound is returned when a feed is not found
 	ErrFeedNotFound = errors.New("feed not found")
+	// ErrFeedAlreadyUnsubscribed is returned when trying to delete an already unsubscribed feed
+	ErrFeedAlreadyUnsubscribed = errors.New("already unsubscribed from this feed")
 	// ErrInvalidFeedURL is returned when the feed URL is invalid
 	ErrInvalidFeedURL = errors.New("invalid feed URL")
 	// ErrFeedFetchFailed is returned when fetching the feed fails
@@ -213,6 +215,7 @@ type ItemRepository interface {
 type UserFeedRepository interface {
 	Create(ctx context.Context, userFeed *model.UserFeed) error
 	GetByUserAndFeed(ctx context.Context, userID, feedID string) (*model.UserFeed, error)
+	GetByUserAndFeedIncludingDeleted(ctx context.Context, userID, feedID string) (*model.UserFeed, error)
 	ListByUserID(ctx context.Context, userID string) ([]*model.UserFeed, error)
 	Delete(ctx context.Context, userID, feedID string) error
 	GetMaxPosition(ctx context.Context, userID string) (int, error)

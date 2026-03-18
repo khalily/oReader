@@ -82,6 +82,10 @@ func (h *ItemHandler) ListItems(c *gin.Context) {
 
 	result, err := h.itemService.ListItems(c.Request.Context(), userID.(string), opts)
 	if err != nil {
+		if errors.Is(err, service.ErrFeedNotFound) {
+			apperrors.SendError(c, http.StatusNotFound, apperrors.ErrNotFound, "Feed not found", nil)
+			return
+		}
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to retrieve items", nil)
 		return
 	}

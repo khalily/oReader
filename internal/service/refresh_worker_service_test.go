@@ -137,6 +137,10 @@ func (m *refreshMockUserFeedRepository) GetByUserAndFeed(ctx context.Context, us
 	return nil, errors.New("not found")
 }
 
+func (m *refreshMockUserFeedRepository) GetByUserAndFeedIncludingDeleted(ctx context.Context, userID, feedID string) (*model.UserFeed, error) {
+	return nil, errors.New("not found")
+}
+
 func (m *refreshMockUserFeedRepository) ListByUserID(ctx context.Context, userID string) ([]*model.UserFeed, error) {
 	return nil, nil
 }

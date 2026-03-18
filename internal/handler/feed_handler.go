@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -68,6 +69,7 @@ func (h *FeedHandler) ListFeeds(c *gin.Context) {
 		apperrors.SendError(c, http.StatusUnauthorized, apperrors.ErrUnauthorized, "User not authenticated", nil)
 		return
 	}
+	log.Printf("DEBUG ListFeeds handler: userID from context=%v", userID)
 
 	// Parse pagination parameters
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
@@ -132,11 +134,16 @@ func (h *FeedHandler) DeleteFeed(c *gin.Context) {
 	}
 
 	feedID := c.Param("id")
+	log.Printf("DEBUG DeleteFeed handler: userID from context=%v, feedID from URL=%s", userID, feedID)
 
 	err := h.feedService.DeleteFeed(c.Request.Context(), userID.(string), feedID)
 	if err != nil {
 		if errors.Is(err, service.ErrFeedNotFound) {
 			apperrors.SendError(c, http.StatusNotFound, apperrors.ErrNotFound, "Feed not found", nil)
+			return
+		}
+		if errors.Is(err, service.ErrFeedAlreadyUnsubscribed) {
+			apperrors.SendError(c, http.StatusConflict, apperrors.ErrConflict, "Already unsubscribed from this feed", nil)
 			return
 		}
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to delete feed", nil)

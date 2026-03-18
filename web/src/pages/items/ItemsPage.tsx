@@ -143,8 +143,22 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           refetchFeeds()
           toast.showSuccess('Feed deleted successfully')
         },
-        onError: () => {
-          toast.showError('Failed to delete feed')
+        onError: (error: any) => {
+          // Always refresh feeds on error - the feed may already be deleted
+          // This ensures the UI is in sync with the backend
+          refetchFeeds()
+
+          // Check if it's an "already unsubscribed" error (409 Conflict)
+          const errorCode = error?.response?.data?.error?.code
+          const errorMessage = error?.response?.data?.error?.message
+
+          if (error?.response?.status === 409 || errorCode === 'CONFLICT') {
+            toast.showWarning(errorMessage || 'Already unsubscribed from this feed')
+          } else if (error?.response?.status === 404 || errorCode === 'NOT_FOUND') {
+            toast.showWarning('Feed not found - it may have been already deleted')
+          } else {
+            toast.showError('Failed to delete feed')
+          }
         },
       })
     },

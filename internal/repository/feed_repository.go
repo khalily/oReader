@@ -57,7 +57,7 @@ func (r *feedRepository) ListByUserID(ctx context.Context, userID string, opts s
 
 	query := r.db.WithContext(ctx).
 		Model(&model.Feed{}).
-		Joins("JOIN user_feeds ON user_feeds.feed_id = feeds.id").
+		Joins("JOIN user_feeds ON user_feeds.feed_id = feeds.id AND user_feeds.deleted_at IS NULL").
 		Where("user_feeds.user_id = ?", userID)
 
 	// Count total

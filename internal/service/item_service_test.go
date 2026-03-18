@@ -252,6 +252,11 @@ func (m *mockUserFeedRepository) GetByUserAndFeed(ctx context.Context, userID, f
 	return nil, errors.New("user feed not found")
 }
 
+func (m *mockUserFeedRepository) GetByUserAndFeedIncludingDeleted(ctx context.Context, userID, feedID string) (*model.UserFeed, error) {
+	// For testing, this behaves the same as GetByUserAndFeed
+	return m.GetByUserAndFeed(ctx, userID, feedID)
+}
+
 func (m *mockUserFeedRepository) ListByUserID(ctx context.Context, userID string) ([]*model.UserFeed, error) {
 	var result []*model.UserFeed
 	for _, uf := range m.userFeeds {

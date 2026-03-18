@@ -44,7 +44,9 @@ export function useFeeds() {
     useQuery({
       queryKey: ['feeds', 'list', params],
       queryFn: () => listFeeds(params),
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 60 * 1000, // 1 minute (reduced from 5 minutes)
+      refetchOnMount: 'always', // Always refetch when component mounts to ensure fresh data
+      refetchOnWindowFocus: true, // Refetch when user returns to the tab
     })
 
   const useGetFeed = (feedId: string | null) =>
@@ -52,7 +54,7 @@ export function useFeeds() {
       queryKey: ['feeds', feedId],
       queryFn: () => getFeed(feedId!),
       enabled: !!feedId,
-      staleTime: 5 * 60 * 1000,
+      staleTime: 60 * 1000, // 1 minute
     })
 
   const useCreateFeed = () =>

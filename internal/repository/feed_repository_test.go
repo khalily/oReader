@@ -244,6 +244,99 @@ func TestFeedRepository_ListByUserID(t *testing.T) {
 	}
 }
 
+// TestFeedRepository_ListByUserID_ExcludesSoftDeleted is a regression test that verifies
+// soft-deleted user_feeds are excluded from the list. This test was added after a bug
+// was discovered where the JOIN clause didn't filter out soft-deleted subscriptions.
+func TestFeedRepository_ListByUserID_ExcludesSoftDeleted(t *testing.T) {
+	db := setupFeedDB(t)
+	repo := NewFeedRepository(db)
+	userRepo := NewUserRepository(db)
+	userFeedRepo := NewUserFeedRepository(db)
+
+	ctx := context.Background()
+
+	// Create user
+	user := &model.User{Email: "user@example.com", PasswordHash: "hash"}
+	if err := user.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	// Create feeds
+	feed1 := &model.Feed{FeedURL: "https://example.com/feed1.xml", Title: "Active Feed"}
+	feed2 := &model.Feed{FeedURL: "https://example.com/feed2.xml", Title: "Deleted Feed"}
+	feed3 := &model.Feed{FeedURL: "https://example.com/feed3.xml", Title: "Another Active Feed"}
+	if err := feed1.GenerateID(); err != nil {
+		t.Fatal(err)
+	}
+	if err := feed2.GenerateID(); err != nil {
+		t.Fatal(err)
+	}
+	if err := feed3.GenerateID(); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(ctx, feed1); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(ctx, feed2); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(ctx, feed3); err != nil {
+		t.Fatal(err)
+	}
+
+	// Subscribe user to all feeds
+	userFeed1 := &model.UserFeed{UserID: user.ID, FeedID: feed1.ID, Position: 0}
+	userFeed2 := &model.UserFeed{UserID: user.ID, FeedID: feed2.ID, Position: 1}
+	userFeed3 := &model.UserFeed{UserID: user.ID, FeedID: feed3.ID, Position: 2}
+	if err := userFeed1.GenerateID(); err != nil {
+		t.Fatal(err)
+	}
+	if err := userFeed2.GenerateID(); err != nil {
+		t.Fatal(err)
+	}
+	if err := userFeed3.GenerateID(); err != nil {
+		t.Fatal(err)
+	}
+	if err := userFeedRepo.Create(ctx, userFeed1); err != nil {
+		t.Fatal(err)
+	}
+	if err := userFeedRepo.Create(ctx, userFeed2); err != nil {
+		t.Fatal(err)
+	}
+	if err := userFeedRepo.Create(ctx, userFeed3); err != nil {
+		t.Fatal(err)
+	}
+
+	// Soft-delete userFeed2 (unsubscribe from feed2)
+	if err := userFeedRepo.Delete(ctx, user.ID, feed2.ID); err != nil {
+		t.Fatalf("Failed to soft-delete userFeed: %v", err)
+	}
+
+	// List user's feeds
+	feeds, total, err := repo.ListByUserID(ctx, user.ID, service.ListOptions{Limit: 10, Offset: 0})
+	if err != nil {
+		t.Fatalf("ListByUserID() returned error: %v", err)
+	}
+
+	// Should only see 2 feeds (feed1 and feed3), not the soft-deleted feed2
+	if total != 2 {
+		t.Errorf("Total = %d, want 2 (soft-deleted feed should be excluded)", total)
+	}
+	if len(feeds) != 2 {
+		t.Fatalf("Feeds count = %d, want 2", len(feeds))
+	}
+
+	// Verify feed2 is not in the results
+	for _, f := range feeds {
+		if f.ID == feed2.ID {
+			t.Error("Soft-deleted feed should not appear in results")
+		}
+	}
+}
+
 func TestFeedRepository_Update(t *testing.T) {
 	db := setupFeedDB(t)
 	repo := NewFeedRepository(db)

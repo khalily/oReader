@@ -82,6 +82,14 @@ func (m *MockUserFeedRepository) GetByUserAndFeed(ctx context.Context, userID, f
 	return args.Get(0).(*model.UserFeed), args.Error(1)
 }
 
+func (m *MockUserFeedRepository) GetByUserAndFeedIncludingDeleted(ctx context.Context, userID, feedID string) (*model.UserFeed, error) {
+	args := m.Called(ctx, userID, feedID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.UserFeed), args.Error(1)
+}
+
 func (m *MockUserFeedRepository) ListByUserID(ctx context.Context, userID string) ([]*model.UserFeed, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
@@ -565,6 +573,8 @@ func TestFeedService_DeleteFeed_NotSubscribed(t *testing.T) {
 
 	// User is NOT subscribed
 	mockUserFeedRepo.On("GetByUserAndFeed", ctx, userID, feedID).Return(nil, errors.New("not found"))
+	// Check for soft-deleted record - also not found
+	mockUserFeedRepo.On("GetByUserAndFeedIncludingDeleted", ctx, userID, feedID).Return(nil, errors.New("not found"))
 
 	service := NewFeedService(nil, nil, mockUserFeedRepo, nil)
 	err := service.DeleteFeed(ctx, userID, feedID)
@@ -661,6 +671,8 @@ func TestFeedService_DeleteFeed_VerifiesUserOwnership(t *testing.T) {
 
 	// User is NOT subscribed to this feed
 	mockUserFeedRepo.On("GetByUserAndFeed", ctx, userID, feedID).Return(nil, errors.New("not subscribed"))
+	// Check for soft-deleted record - also not found
+	mockUserFeedRepo.On("GetByUserAndFeedIncludingDeleted", ctx, userID, feedID).Return(nil, errors.New("not found"))
 
 	service := NewFeedService(nil, nil, mockUserFeedRepo, nil)
 	err := service.DeleteFeed(ctx, userID, feedID)

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"oreader/internal/infra/rss"
@@ -205,9 +206,20 @@ func (s *feedService) GetFeed(ctx context.Context, userID, feedID string) (*mode
 
 // DeleteFeed deletes a feed subscription for a user
 func (s *feedService) DeleteFeed(ctx context.Context, userID, feedID string) error {
+	log.Printf("DEBUG DeleteFeed: userID=%s, feedID=%s", userID, feedID)
+
 	// Check if user is subscribed to this feed
 	userFeed, err := s.userFeedRepo.GetByUserAndFeed(ctx, userID, feedID)
 	if err != nil {
+		log.Printf("DEBUG DeleteFeed: GetByUserAndFeed error: %v", err)
+
+		// Check if the record exists but is soft-deleted
+		deletedUserFeed, deletedErr := s.userFeedRepo.GetByUserAndFeedIncludingDeleted(ctx, userID, feedID)
+		if deletedErr == nil && deletedUserFeed != nil && deletedUserFeed.DeletedAt.Valid {
+			log.Printf("DEBUG DeleteFeed: found soft-deleted record, returning ErrFeedAlreadyUnsubscribed")
+			return ErrFeedAlreadyUnsubscribed
+		}
+
 		return ErrFeedNotFound
 	}
 

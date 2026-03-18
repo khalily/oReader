@@ -24,6 +24,7 @@ go.work.sum
 # Build
 build/
 dist/
+server
 
 # Coverage
 coverage/
