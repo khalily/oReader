@@ -20,6 +20,33 @@ func NewItemRepository(db *gorm.DB) service.ItemRepository {
 	return &itemRepository{db: db}
 }
 
+// getFeedTitle extracts the feed title from an item's preloaded Feed relationship
+func getFeedTitle(item *model.Item) string {
+	if item.Feed != nil {
+		return item.Feed.Title
+	}
+	return ""
+}
+
+// buildItemWithState creates an ItemWithState from an item and optional state
+func buildItemWithState(item *model.Item, state *model.UserItemState) *service.ItemWithState {
+	result := &service.ItemWithState{
+		Item:      item,
+		FeedTitle: getFeedTitle(item),
+	}
+
+	if state != nil {
+		result.IsStarred = state.IsStarred
+		result.IsRead = state.IsRead
+		if state.ReadAt != nil {
+			readAt := state.ReadAt.Format(time.RFC3339)
+			result.ReadAt = &readAt
+		}
+	}
+
+	return result
+}
+
 // Create creates a new item
 func (r *itemRepository) Create(ctx context.Context, item *model.Item) error {
 	return r.db.WithContext(ctx).Create(item).Error
@@ -77,9 +104,10 @@ func (r *itemRepository) ListByFeedID(ctx context.Context, feedID, userID string
 	}
 
 	// Get items with pagination (preload Feed for frontend display)
+	// Sort by pub_date DESC NULLS LAST (spec-compliant sorting)
 	offsetQuery := baseQuery.
 		Preload("Feed").
-		Order("created_at DESC").
+		Order("pub_date DESC NULLS LAST").
 		Offset(opts.Offset)
 
 	if opts.Limit > 0 {
@@ -113,17 +141,8 @@ func (r *itemRepository) ListByFeedID(ctx context.Context, feedID, userID string
 		// Build result with state
 		result := make([]*service.ItemWithState, len(items))
 		for i, item := range items {
-			result[i] = &service.ItemWithState{
-				Item: item,
-			}
-			if state, ok := stateMap[item.ID]; ok {
-				result[i].IsStarred = state.IsStarred
-				result[i].IsRead = state.IsRead
-				if state.ReadAt != nil {
-					readAt := state.ReadAt.Format(time.RFC3339)
-					result[i].ReadAt = &readAt
-				}
-			}
+			state := stateMap[item.ID]
+			result[i] = buildItemWithState(item, state)
 		}
 
 		return result, total, nil
@@ -132,9 +151,7 @@ func (r *itemRepository) ListByFeedID(ctx context.Context, feedID, userID string
 	// No user ID - return items without state
 	result := make([]*service.ItemWithState, len(items))
 	for i, item := range items {
-		result[i] = &service.ItemWithState{
-			Item: item,
-		}
+		result[i] = buildItemWithState(item, nil)
 	}
 
 	return result, total, nil
@@ -152,11 +169,11 @@ func (r *itemRepository) ListStarred(ctx context.Context, userID string, opts se
 		return nil, 0, err
 	}
 
-	// Get states with items
+	// Get states with items, sorted by pub_date DESC NULLS LAST
 	query := r.db.WithContext(ctx).
 		Joins("JOIN items ON items.id = user_item_states.item_id").
 		Where("user_item_states.user_id = ? AND user_item_states.is_starred = ?", userID, true).
-		Order("user_item_states.created_at DESC").
+		Order("items.pub_date DESC NULLS LAST").
 		Offset(opts.Offset)
 
 	if opts.Limit > 0 {
@@ -171,15 +188,7 @@ func (r *itemRepository) ListStarred(ctx context.Context, userID string, opts se
 	// Build result
 	result := make([]*service.ItemWithState, len(states))
 	for i, state := range states {
-		result[i] = &service.ItemWithState{
-			Item:      state.Item,
-			IsStarred: true,
-			IsRead:    state.IsRead,
-		}
-		if state.ReadAt != nil {
-			readAt := state.ReadAt.Format(time.RFC3339)
-			result[i].ReadAt = &readAt
-		}
+		result[i] = buildItemWithState(state.Item, &state)
 	}
 
 	return result, total, nil
@@ -212,11 +221,11 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 
 	total += itemsWithoutState
 
-	// Get unread items with states first
+	// Get unread items with states first (sorted by pub_date DESC NULLS LAST)
 	query := r.db.WithContext(ctx).
 		Joins("JOIN items ON items.id = user_item_states.item_id").
 		Where("user_item_states.user_id = ? AND user_item_states.is_read = ?", userID, false).
-		Order("items.created_at DESC").
+		Order("items.pub_date DESC NULLS LAST").
 		Offset(opts.Offset)
 
 	if opts.Limit > 0 {
@@ -231,11 +240,7 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 	// Build result from states
 	result := make([]*service.ItemWithState, 0, len(states))
 	for _, state := range states {
-		result = append(result, &service.ItemWithState{
-			Item:      state.Item,
-			IsStarred: state.IsStarred,
-			IsRead:    false,
-		})
+		result = append(result, buildItemWithState(state.Item, &state))
 	}
 
 	// If we need more items, get items without state
@@ -249,7 +254,7 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 					Model(&model.UserItemState{}).
 					Select("item_id").
 					Where("user_id = ?", userID)).
-			Order("created_at DESC").
+			Order("pub_date DESC NULLS LAST").
 			Limit(remaining)
 
 		if err := itemQuery.Find(&items).Error; err != nil {
@@ -257,10 +262,7 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 		}
 
 		for _, item := range items {
-			result = append(result, &service.ItemWithState{
-				Item:   item,
-				IsRead: false,
-			})
+			result = append(result, buildItemWithState(item, nil))
 		}
 	}
 

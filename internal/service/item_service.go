@@ -27,6 +27,42 @@ func NewItemService(
 	}
 }
 
+// getFeedTitle extracts the feed title from an item's preloaded Feed relationship
+func getFeedTitle(item *model.Item) string {
+	if item.Feed != nil {
+		return item.Feed.Title
+	}
+	return ""
+}
+
+// buildItemWithState creates an ItemWithState from an item and its user state
+func buildItemWithState(item *model.Item, state *model.UserItemState) *ItemWithState {
+	result := &ItemWithState{
+		Item:      item,
+		FeedTitle: getFeedTitle(item),
+	}
+
+	if state != nil {
+		result.IsStarred = state.IsStarred
+		result.IsRead = state.IsRead
+		if state.ReadAt != nil {
+			readAt := state.ReadAt.Format(time.RFC3339)
+			result.ReadAt = &readAt
+		}
+	}
+
+	return result
+}
+
+// verifyUserHasAccessToItem checks if a user has access to an item's feed
+func (s *itemService) verifyUserHasAccessToItem(ctx context.Context, userID string, item *model.Item) error {
+	_, err := s.userFeedRepo.GetByUserAndFeed(ctx, userID, item.FeedID)
+	if err != nil {
+		return ErrItemNotFound
+	}
+	return nil
+}
+
 // ListItems retrieves items for a user with filtering and pagination
 func (s *itemService) ListItems(ctx context.Context, userID string, opts ListItemOptions) (*ItemListResult, error) {
 	var items []*ItemWithState
@@ -116,28 +152,50 @@ func (s *itemService) GetItem(ctx context.Context, userID, itemID string) (*Item
 	}
 
 	// Verify user has access to the feed
-	_, err = s.userFeedRepo.GetByUserAndFeed(ctx, userID, item.FeedID)
-	if err != nil {
-		return nil, ErrItemNotFound
+	if err := s.verifyUserHasAccessToItem(ctx, userID, item); err != nil {
+		return nil, err
 	}
 
 	// Get user state
 	state, err := s.stateRepo.GetByUserAndItem(ctx, userID, itemID)
-	result := &ItemWithState{Item: item}
-	if err == nil {
-		result.IsStarred = state.IsStarred
-		result.IsRead = state.IsRead
-		if state.ReadAt != nil {
-			readAt := state.ReadAt.Format(time.RFC3339)
-			result.ReadAt = &readAt
-		}
+	if err != nil {
+		// No state exists, return item without state
+		return buildItemWithState(item, nil), nil
 	}
 
-	return result, nil
+	return buildItemWithState(item, state), nil
 }
 
 // ToggleStar toggles the star status for an item
+// Deprecated: Use SetStar instead for spec-compliant behavior
 func (s *itemService) ToggleStar(ctx context.Context, userID, itemID string) (*ItemWithState, error) {
+	// Get current state to determine toggle value
+	state, err := s.stateRepo.GetByUserAndItem(ctx, userID, itemID)
+	if err != nil {
+		// No state exists, toggle from false to true
+		return s.SetStar(ctx, userID, itemID, true)
+	}
+
+	// Toggle the current value
+	return s.SetStar(ctx, userID, itemID, !state.IsStarred)
+}
+
+// ToggleRead toggles the read status for an item
+// Deprecated: Use SetRead instead for spec-compliant behavior
+func (s *itemService) ToggleRead(ctx context.Context, userID, itemID string) (*ItemWithState, error) {
+	// Get current state to determine toggle value
+	state, err := s.stateRepo.GetByUserAndItem(ctx, userID, itemID)
+	if err != nil {
+		// No state exists, toggle from false to true
+		return s.SetRead(ctx, userID, itemID, true)
+	}
+
+	// Toggle the current value
+	return s.SetRead(ctx, userID, itemID, !state.IsRead)
+}
+
+// SetStar sets the star status for an item to the specified value (spec-compliant: sets, doesn't toggle)
+func (s *itemService) SetStar(ctx context.Context, userID, itemID string, starred bool) (*ItemWithState, error) {
 	// Get the item
 	item, err := s.itemRepo.GetByID(ctx, itemID)
 	if err != nil {
@@ -145,9 +203,8 @@ func (s *itemService) ToggleStar(ctx context.Context, userID, itemID string) (*I
 	}
 
 	// Verify user has access to the feed
-	_, err = s.userFeedRepo.GetByUserAndFeed(ctx, userID, item.FeedID)
-	if err != nil {
-		return nil, ErrItemNotFound
+	if err := s.verifyUserHasAccessToItem(ctx, userID, item); err != nil {
+		return nil, err
 	}
 
 	// Get current state
@@ -156,10 +213,10 @@ func (s *itemService) ToggleStar(ctx context.Context, userID, itemID string) (*I
 		// Create new state
 		now := time.Now()
 		newState := &model.UserItemState{
-			UserID:   userID,
-			ItemID:   itemID,
-			IsStarred: true,
-			IsRead:   false,
+			UserID:    userID,
+			ItemID:    itemID,
+			IsStarred: starred,
+			IsRead:    false,
 		}
 		if err := newState.GenerateID(); err != nil {
 			return nil, err
@@ -171,36 +228,22 @@ func (s *itemService) ToggleStar(ctx context.Context, userID, itemID string) (*I
 			return nil, err
 		}
 
-		return &ItemWithState{
-			Item:      item,
-			IsStarred: true,
-			IsRead:    false,
-		}, nil
+		return buildItemWithState(item, newState), nil
 	}
 
-	// Toggle star status
-	state.IsStarred = !state.IsStarred
+	// Set star status to the provided value (not toggle)
+	state.IsStarred = starred
 	state.UpdatedAt = time.Now()
 
 	if err := s.stateRepo.Update(ctx, state); err != nil {
 		return nil, err
 	}
 
-	result := &ItemWithState{
-		Item:      item,
-		IsStarred: state.IsStarred,
-		IsRead:    state.IsRead,
-	}
-	if state.ReadAt != nil {
-		readAt := state.ReadAt.Format(time.RFC3339)
-		result.ReadAt = &readAt
-	}
-
-	return result, nil
+	return buildItemWithState(item, state), nil
 }
 
-// ToggleRead toggles the read status for an item
-func (s *itemService) ToggleRead(ctx context.Context, userID, itemID string) (*ItemWithState, error) {
+// SetRead sets the read status for an item to the specified value (spec-compliant: sets, doesn't toggle)
+func (s *itemService) SetRead(ctx context.Context, userID, itemID string, read bool) (*ItemWithState, error) {
 	// Get the item
 	item, err := s.itemRepo.GetByID(ctx, itemID)
 	if err != nil {
@@ -208,22 +251,23 @@ func (s *itemService) ToggleRead(ctx context.Context, userID, itemID string) (*I
 	}
 
 	// Verify user has access to the feed
-	_, err = s.userFeedRepo.GetByUserAndFeed(ctx, userID, item.FeedID)
-	if err != nil {
-		return nil, ErrItemNotFound
+	if err := s.verifyUserHasAccessToItem(ctx, userID, item); err != nil {
+		return nil, err
 	}
 
 	// Get current state
 	state, err := s.stateRepo.GetByUserAndItem(ctx, userID, itemID)
 	if err != nil {
-		// Create new state with read=true
+		// Create new state
 		now := time.Now()
 		newState := &model.UserItemState{
-			UserID:  userID,
-			ItemID:  itemID,
-			IsRead:  true,
+			UserID:    userID,
+			ItemID:    itemID,
 			IsStarred: false,
-			ReadAt:  &now,
+			IsRead:    read,
+		}
+		if read {
+			newState.ReadAt = &now
 		}
 		if err := newState.GenerateID(); err != nil {
 			return nil, err
@@ -235,25 +279,16 @@ func (s *itemService) ToggleRead(ctx context.Context, userID, itemID string) (*I
 			return nil, err
 		}
 
-		readAt := now.Format(time.RFC3339)
-		return &ItemWithState{
-			Item:      item,
-			IsStarred: false,
-			IsRead:    true,
-			ReadAt:    &readAt,
-		}, nil
+		return buildItemWithState(item, newState), nil
 	}
 
-	// Toggle read status
-	if state.IsRead {
-		// Mark as unread - clear ReadAt
-		state.IsRead = false
-		state.ReadAt = nil
-	} else {
-		// Mark as read - set ReadAt
+	// Set read status to the provided value (not toggle)
+	state.IsRead = read
+	if read {
 		now := time.Now()
-		state.IsRead = true
 		state.ReadAt = &now
+	} else {
+		state.ReadAt = nil
 	}
 	state.UpdatedAt = time.Now()
 
@@ -261,17 +296,7 @@ func (s *itemService) ToggleRead(ctx context.Context, userID, itemID string) (*I
 		return nil, err
 	}
 
-	result := &ItemWithState{
-		Item:      item,
-		IsStarred: state.IsStarred,
-		IsRead:    state.IsRead,
-	}
-	if state.ReadAt != nil {
-		readAt := state.ReadAt.Format(time.RFC3339)
-		result.ReadAt = &readAt
-	}
-
-	return result, nil
+	return buildItemWithState(item, state), nil
 }
 
 // MarkAllRead marks all items in a feed as read for a user

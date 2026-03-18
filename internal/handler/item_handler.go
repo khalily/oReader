@@ -22,14 +22,14 @@ func NewItemHandler(itemService service.ItemService) *ItemHandler {
 	}
 }
 
-// ToggleStarRequest represents the request to toggle star status
-type ToggleStarRequest struct {
-	Starred bool `json:"starred" binding:"required"`
+// SetStarRequest represents the request to set star status
+type SetStarRequest struct {
+	Starred bool `json:"starred"`
 }
 
-// ToggleReadRequest represents the request to toggle read status
-type ToggleReadRequest struct {
-	Read bool `json:"read" binding:"required"`
+// SetReadRequest represents the request to set read status
+type SetReadRequest struct {
+	Read bool `json:"read"`
 }
 
 // ListItems handles GET /api/v1/items
@@ -124,6 +124,7 @@ func (h *ItemHandler) GetItem(c *gin.Context) {
 }
 
 // ToggleStar handles PUT /api/v1/items/:id/star
+// Deprecated: Use SetStar instead for spec-compliant behavior
 func (h *ItemHandler) ToggleStar(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -133,7 +134,7 @@ func (h *ItemHandler) ToggleStar(c *gin.Context) {
 
 	itemID := c.Param("id")
 
-	var req ToggleStarRequest
+	var req SetStarRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, "Invalid request body", nil)
 		return
@@ -156,7 +157,40 @@ func (h *ItemHandler) ToggleStar(c *gin.Context) {
 	})
 }
 
+// SetStar handles PUT /api/v1/items/:id/star (spec-compliant: sets value from request body)
+func (h *ItemHandler) SetStar(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		apperrors.SendError(c, http.StatusUnauthorized, apperrors.ErrUnauthorized, "User not authenticated", nil)
+		return
+	}
+
+	itemID := c.Param("id")
+
+	var req SetStarRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, "Invalid request body", nil)
+		return
+	}
+
+	// Set star status to the value from request body (spec-compliant)
+	item, err := h.itemService.SetStar(c.Request.Context(), userID.(string), itemID, req.Starred)
+	if err != nil {
+		if errors.Is(err, service.ErrItemNotFound) {
+			apperrors.SendError(c, http.StatusNotFound, apperrors.ErrNotFound, "Item not found", nil)
+			return
+		}
+		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to set star status", nil)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"item": item,
+	})
+}
+
 // ToggleRead handles PUT /api/v1/items/:id/read
+// Deprecated: Use SetRead instead for spec-compliant behavior
 func (h *ItemHandler) ToggleRead(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -166,7 +200,7 @@ func (h *ItemHandler) ToggleRead(c *gin.Context) {
 
 	itemID := c.Param("id")
 
-	var req ToggleReadRequest
+	var req SetReadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, "Invalid request body", nil)
 		return
@@ -181,6 +215,38 @@ func (h *ItemHandler) ToggleRead(c *gin.Context) {
 			return
 		}
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to toggle read status", nil)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"item": item,
+	})
+}
+
+// SetRead handles PUT /api/v1/items/:id/read (spec-compliant: sets value from request body)
+func (h *ItemHandler) SetRead(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		apperrors.SendError(c, http.StatusUnauthorized, apperrors.ErrUnauthorized, "User not authenticated", nil)
+		return
+	}
+
+	itemID := c.Param("id")
+
+	var req SetReadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, "Invalid request body", nil)
+		return
+	}
+
+	// Set read status to the value from request body (spec-compliant)
+	item, err := h.itemService.SetRead(c.Request.Context(), userID.(string), itemID, req.Read)
+	if err != nil {
+		if errors.Is(err, service.ErrItemNotFound) {
+			apperrors.SendError(c, http.StatusNotFound, apperrors.ErrNotFound, "Item not found", nil)
+			return
+		}
+		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to set read status", nil)
 		return
 	}
 

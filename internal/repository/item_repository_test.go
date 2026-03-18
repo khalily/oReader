@@ -1129,3 +1129,292 @@ func TestItemRepository_RaceCondition_MixedOperations(t *testing.T) {
 		t.Errorf("Mixed operation error: %v", err)
 	}
 }
+
+// =============================================================================
+// SPEC COMPLIANCE TESTS: Sorting by pub_date DESC NULLS LAST
+// These tests verify that items are sorted by pub_date descending, with NULL
+// pub_date values appearing at the end (NULLS LAST).
+// =============================================================================
+
+// TestItemRepository_ListByFeedID_SortsByPubDateDescNullsLast verifies sorting order
+// Expected order: Items with pub_date DESC, then items with NULL pub_date
+// This test will FAIL initially because current implementation sorts by created_at DESC
+func TestItemRepository_ListByFeedID_SortsByPubDateDescNullsLast(t *testing.T) {
+	db := setupItemDB(t)
+	repo := NewItemRepository(db)
+
+	ctx := context.Background()
+
+	// Create user
+	user := &model.User{Email: "sort-user@example.com", PasswordHash: "hash"}
+	if err := user.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	// Create feed
+	feed := &model.Feed{FeedURL: "https://sort-test.example.com/feed.xml", Title: "Sort Test Feed"}
+	if err := feed.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(feed).Error; err != nil {
+		t.Fatalf("Failed to create feed: %v", err)
+	}
+
+	// Create items with specific pub_dates
+	baseTime := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+
+	items := []*model.Item{
+		{
+			FeedID: feed.ID,
+			GUID:   "guid-jan-15",
+			Title:  "Jan 15th (newest)",
+			Link:   "https://example.com/jan15",
+			// pub_date = 2024-01-15 12:00 (should be 1st)
+		},
+		{
+			FeedID: feed.ID,
+			GUID:   "guid-jan-10",
+			Title:  "Jan 10th",
+			Link:   "https://example.com/jan10",
+			// pub_date = 2024-01-10 12:00 (should be 2nd)
+		},
+		{
+			FeedID: feed.ID,
+			GUID:   "guid-null",
+			Title:  "No PubDate (null)",
+			Link:   "https://example.com/null",
+			// pub_date = NULL (should be last)
+		},
+		{
+			FeedID: feed.ID,
+			GUID:   "guid-jan-5",
+			Title:  "Jan 5th (oldest)",
+			Link:   "https://example.com/jan5",
+			// pub_date = 2024-01-05 12:00 (should be 3rd)
+		},
+	}
+
+	// Set pub_dates
+	jan15 := baseTime
+	jan10 := baseTime.AddDate(0, 0, -5)
+	jan5 := baseTime.AddDate(0, 0, -10)
+
+	items[0].PubDate = &jan15
+	items[1].PubDate = &jan10
+	items[2].PubDate = nil // NULL
+	items[3].PubDate = &jan5
+
+	for _, item := range items {
+		if err := item.GenerateID(); err != nil {
+			t.Fatalf("Failed to generate ID: %v", err)
+		}
+	}
+
+	if err := repo.CreateBatch(ctx, items); err != nil {
+		t.Fatalf("Failed to create items: %v", err)
+	}
+
+	// List items
+	result, total, err := repo.ListByFeedID(ctx, feed.ID, user.ID, service.ListOptions{Limit: 10, Offset: 0})
+	if err != nil {
+		t.Fatalf("ListByFeedID() returned error: %v", err)
+	}
+
+	if total != 4 {
+		t.Errorf("Expected 4 items, got %d", total)
+	}
+
+	if len(result) != 4 {
+		t.Fatalf("Expected 4 items in result, got %d", len(result))
+	}
+
+	// Verify expected order: Jan 15th, Jan 10th, Jan 5th, No PubDate
+	expectedOrder := []string{"Jan 15th (newest)", "Jan 10th", "Jan 5th (oldest)", "No PubDate (null)"}
+
+	for i, item := range result {
+		if item.Title != expectedOrder[i] {
+			t.Errorf("Position %d: expected title %q, got %q", i, expectedOrder[i], item.Title)
+		}
+	}
+
+	// Additional verification: NULL pub_date should be at the end
+	lastItem := result[len(result)-1]
+	if lastItem.PubDate != nil {
+		t.Errorf("Last item should have NULL pub_date, but got %v", lastItem.PubDate)
+	}
+}
+
+// TestItemRepository_ListStarred_SortsByPubDateDescNullsLast verifies starred items sorting
+func TestItemRepository_ListStarred_SortsByPubDateDescNullsLast(t *testing.T) {
+	db := setupItemDB(t)
+	repo := NewItemRepository(db)
+	stateRepo := NewUserItemStateRepository(db)
+
+	ctx := context.Background()
+
+	// Create user
+	user := &model.User{Email: "star-sort-user@example.com", PasswordHash: "hash"}
+	if err := user.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	// Create feed
+	feed := &model.Feed{FeedURL: "https://star-sort.example.com/feed.xml", Title: "Star Sort Feed"}
+	if err := feed.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(feed).Error; err != nil {
+		t.Fatalf("Failed to create feed: %v", err)
+	}
+
+	// Create items with specific pub_dates
+	baseTime := time.Date(2024, 2, 1, 12, 0, 0, 0, time.UTC)
+	feb1 := baseTime
+	jan15 := baseTime.AddDate(0, 0, -17)
+	jan1 := baseTime.AddDate(0, 0, -31)
+
+	items := []*model.Item{
+		{FeedID: feed.ID, GUID: "star-guid-1", Title: "Feb 1 Starred", Link: "https://example.com/1"},
+		{FeedID: feed.ID, GUID: "star-guid-2", Title: "Jan 15 Starred", Link: "https://example.com/2"},
+		{FeedID: feed.ID, GUID: "star-guid-3", Title: "Jan 1 Starred", Link: "https://example.com/3"},
+		{FeedID: feed.ID, GUID: "star-guid-4", Title: "No Date Starred", Link: "https://example.com/4"},
+	}
+	items[0].PubDate = &feb1
+	items[1].PubDate = &jan15
+	items[2].PubDate = &jan1
+	items[3].PubDate = nil // NULL
+
+	for _, item := range items {
+		if err := item.GenerateID(); err != nil {
+			t.Fatalf("Failed to generate ID: %v", err)
+		}
+	}
+
+	if err := repo.CreateBatch(ctx, items); err != nil {
+		t.Fatalf("Failed to create items: %v", err)
+	}
+
+	// Star all items
+	for _, item := range items {
+		state := &model.UserItemState{
+			UserID:    user.ID,
+			ItemID:    item.ID,
+			IsStarred: true,
+		}
+		if err := state.GenerateID(); err != nil {
+			t.Fatalf("Failed to generate ID: %v", err)
+		}
+		if err := stateRepo.Create(ctx, state); err != nil {
+			t.Fatalf("Failed to create state: %v", err)
+		}
+	}
+
+	// List starred items
+	result, total, err := repo.ListStarred(ctx, user.ID, service.ListOptions{Limit: 10, Offset: 0})
+	if err != nil {
+		t.Fatalf("ListStarred() returned error: %v", err)
+	}
+
+	if total != 4 {
+		t.Errorf("Expected 4 starred items, got %d", total)
+	}
+
+	// Verify order: Feb 1, Jan 15, Jan 1, No Date
+	expectedOrder := []string{"Feb 1 Starred", "Jan 15 Starred", "Jan 1 Starred", "No Date Starred"}
+	for i, item := range result {
+		if item.Title != expectedOrder[i] {
+			t.Errorf("Position %d: expected %q, got %q", i, expectedOrder[i], item.Title)
+		}
+	}
+}
+
+// TestItemRepository_ListUnread_SortsByPubDateDescNullsLast verifies unread items sorting
+func TestItemRepository_ListUnread_SortsByPubDateDescNullsLast(t *testing.T) {
+	db := setupItemDB(t)
+	repo := NewItemRepository(db)
+	stateRepo := NewUserItemStateRepository(db)
+
+	ctx := context.Background()
+
+	// Create user
+	user := &model.User{Email: "unread-sort-user@example.com", PasswordHash: "hash"}
+	if err := user.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	// Create feed
+	feed := &model.Feed{FeedURL: "https://unread-sort.example.com/feed.xml", Title: "Unread Sort Feed"}
+	if err := feed.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(feed).Error; err != nil {
+		t.Fatalf("Failed to create feed: %v", err)
+	}
+
+	// Create items with specific pub_dates
+	baseTime := time.Date(2024, 3, 1, 12, 0, 0, 0, time.UTC)
+	mar1 := baseTime
+	feb15 := baseTime.AddDate(0, 0, -14)
+	feb1 := baseTime.AddDate(0, 0, -29)
+
+	items := []*model.Item{
+		{FeedID: feed.ID, GUID: "unread-guid-1", Title: "Mar 1 Unread", Link: "https://example.com/1"},
+		{FeedID: feed.ID, GUID: "unread-guid-2", Title: "Feb 15 Unread", Link: "https://example.com/2"},
+		{FeedID: feed.ID, GUID: "unread-guid-3", Title: "Feb 1 Unread", Link: "https://example.com/3"},
+		{FeedID: feed.ID, GUID: "unread-guid-4", Title: "No Date Unread", Link: "https://example.com/4"},
+	}
+	items[0].PubDate = &mar1
+	items[1].PubDate = &feb15
+	items[2].PubDate = &feb1
+	items[3].PubDate = nil // NULL
+
+	for _, item := range items {
+		if err := item.GenerateID(); err != nil {
+			t.Fatalf("Failed to generate ID: %v", err)
+		}
+	}
+
+	if err := repo.CreateBatch(ctx, items); err != nil {
+		t.Fatalf("Failed to create items: %v", err)
+	}
+
+	// Mark items as unread explicitly (IsRead = false)
+	for _, item := range items {
+		state := &model.UserItemState{
+			UserID: user.ID,
+			ItemID: item.ID,
+			IsRead: false,
+		}
+		if err := state.GenerateID(); err != nil {
+			t.Fatalf("Failed to generate ID: %v", err)
+		}
+		if err := stateRepo.Create(ctx, state); err != nil {
+			t.Fatalf("Failed to create state: %v", err)
+		}
+	}
+
+	// List unread items
+	result, total, err := repo.ListUnread(ctx, user.ID, service.ListOptions{Limit: 10, Offset: 0})
+	if err != nil {
+		t.Fatalf("ListUnread() returned error: %v", err)
+	}
+
+	// Verify order: Mar 1, Feb 15, Feb 1, No Date
+	expectedOrder := []string{"Mar 1 Unread", "Feb 15 Unread", "Feb 1 Unread", "No Date Unread"}
+	for i, item := range result {
+		if item.Title != expectedOrder[i] {
+			t.Errorf("Position %d: expected %q, got %q", i, expectedOrder[i], item.Title)
+		}
+	}
+
+	_ = total // May vary based on implementation
+}

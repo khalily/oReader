@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"oreader/internal/model"
@@ -15,11 +16,25 @@ import (
 
 // Mock item service for testing
 type mockItemService struct {
-	listErr      error
-	getErr       error
+	listErr       error
+	getErr        error
 	toggleStarErr error
 	toggleReadErr error
-	markAllErr   error
+	setStarErr    error
+	setReadErr    error
+	markAllErr    error
+
+	// Track SetStar/SetRead calls for spec compliance verification
+	SetStarCalls []struct {
+		UserID  string
+		ItemID  string
+		Starred bool
+	}
+	SetReadCalls []struct {
+		UserID string
+		ItemID string
+		Read   bool
+	}
 }
 
 func (m *mockItemService) ListItems(ctx context.Context, userID string, opts service.ListItemOptions) (*service.ItemListResult, error) {
@@ -106,6 +121,59 @@ func (m *mockItemService) MarkAllRead(ctx context.Context, userID, feedID string
 		return 0, m.markAllErr
 	}
 	return 5, nil
+}
+
+// SetStar sets the star status (spec-compliant: sets value, doesn't toggle)
+func (m *mockItemService) SetStar(ctx context.Context, userID, itemID string, starred bool) (*service.ItemWithState, error) {
+	m.SetStarCalls = append(m.SetStarCalls, struct {
+		UserID  string
+		ItemID  string
+		Starred bool
+	}{UserID: userID, ItemID: itemID, Starred: starred})
+
+	if m.setStarErr != nil {
+		return nil, m.setStarErr
+	}
+	item := &model.Item{
+		Base:   model.Base{ID: itemID},
+		FeedID: "feed-1",
+		Title:  "Test Item",
+		Link:   "https://example.com/item",
+	}
+	return &service.ItemWithState{
+		Item:      item,
+		IsStarred: starred,
+		IsRead:    false,
+	}, nil
+}
+
+// SetRead sets the read status (spec-compliant: sets value, doesn't toggle)
+func (m *mockItemService) SetRead(ctx context.Context, userID, itemID string, read bool) (*service.ItemWithState, error) {
+	m.SetReadCalls = append(m.SetReadCalls, struct {
+		UserID string
+		ItemID string
+		Read   bool
+	}{UserID: userID, ItemID: itemID, Read: read})
+
+	if m.setReadErr != nil {
+		return nil, m.setReadErr
+	}
+	item := &model.Item{
+		Base:   model.Base{ID: itemID},
+		FeedID: "feed-1",
+		Title:  "Test Item",
+		Link:   "https://example.com/item",
+	}
+	result := &service.ItemWithState{
+		Item:      item,
+		IsStarred: false,
+		IsRead:    read,
+	}
+	if read {
+		now := time.Now().Format(time.RFC3339)
+		result.ReadAt = &now
+	}
+	return result, nil
 }
 
 // Test ListItems
@@ -480,3 +548,111 @@ func TestItemHandler_MarkAllRead_FeedNotFound(t *testing.T) {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusNotFound)
 	}
 }
+
+// =============================================================================
+// SPEC COMPLIANCE TESTS: SetStar (not toggle)
+// These tests verify that the handler passes the request body value to the service,
+// not ignoring it or toggling.
+// =============================================================================
+
+// TestItemHandler_SetStar_SetsToTrue verifies the handler passes starred=true to service
+func TestItemHandler_SetStar_SetsToTrue(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	userID := "test-user-id"
+	itemID := "item-1"
+
+	mockService := &mockItemService{}
+	handler := NewItemHandler(mockService)
+
+	router := gin.New()
+	router.PUT("/items/:id/star", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		c.Next()
+	}, handler.SetStar)
+
+	// Send request with starred=true
+	body := map[string]bool{"starred": true}
+	jsonBody, _ := json.Marshal(body)
+	req := httptest.NewRequest("PUT", "/items/"+itemID+"/star", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	// Verify the service was called with starred=true (not toggled)
+	if len(mockService.SetStarCalls) == 0 {
+		t.Fatal("SetStar was not called")
+	}
+
+	call := mockService.SetStarCalls[len(mockService.SetStarCalls)-1]
+	if call.Starred != true {
+		t.Errorf("Service.SetStar called with starred=%v, want true", call.Starred)
+	}
+	if call.ItemID != itemID {
+		t.Errorf("Service.SetStar called with itemID=%v, want %v", call.ItemID, itemID)
+	}
+
+	// Verify response
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	item := response["item"].(map[string]interface{})
+	if item["is_starred"] != true {
+		t.Error("Response should have is_starred=true")
+	}
+}
+
+// TestItemHandler_SetStar_SetsToFalse verifies the handler passes starred=false to service
+func TestItemHandler_SetStar_SetsToFalse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	userID := "test-user-id"
+	itemID := "item-1"
+
+	mockService := &mockItemService{}
+	handler := NewItemHandler(mockService)
+
+	router := gin.New()
+	router.PUT("/items/:id/star", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		c.Next()
+	}, handler.SetStar)
+
+	// Send request with starred=false
+	body := map[string]bool{"starred": false}
+	jsonBody, _ := json.Marshal(body)
+	req := httptest.NewRequest("PUT", "/items/"+itemID+"/star", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	// Verify the service was called with starred=false (not toggled)
+	if len(mockService.SetStarCalls) == 0 {
+		t.Fatal("SetStar was not called")
+	}
+
+	call := mockService.SetStarCalls[len(mockService.SetStarCalls)-1]
+	if call.Starred != false {
+		t.Errorf("Service.SetStar called with starred=%v, want false", call.Starred)
+	}
+
+	// Verify response
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	item := response["item"].(map[string]interface{})
+	if item["is_starred"] != false {
+		t.Error("Response should have is_starred=false")
+	}
+}
+

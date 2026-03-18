@@ -800,3 +800,296 @@ func TestItemService_MarkAllRead_FeedNotFound(t *testing.T) {
 		t.Error("Expected error, got nil")
 	}
 }
+
+// =============================================================================
+// SPEC COMPLIANCE TESTS: SetStar (not toggle)
+// These tests verify that SetStar SETS the value from the request body,
+// rather than TOGGLING the current value.
+// =============================================================================
+
+// TestItemService_SetStar_SetsToTrue verifies SetStar(starred=true) sets is_starred=true
+// This test will FAIL initially because the current implementation uses ToggleStar which toggles.
+func TestItemService_SetStar_SetsToTrue(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+	feedID := "feed-1"
+	itemID := "item-1"
+
+	// Item exists with user having starred=false initially
+	item := createTestItem(itemID, feedID, "Test Item")
+	itemRepo := &mockItemRepository{
+		items: []*model.Item{item},
+	}
+
+	// User has existing state with is_starred=false
+	state := &model.UserItemState{
+		Base:      model.Base{ID: "state-1"},
+		UserID:    userID,
+		ItemID:    itemID,
+		IsStarred: false,
+		IsRead:    false,
+	}
+	stateRepo := &mockUserItemStateRepository{
+		states: []*model.UserItemState{state},
+	}
+
+	userFeedRepo := &mockUserFeedRepository{
+		userFeeds: []*model.UserFeed{{UserID: userID, FeedID: feedID}},
+	}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	// Call SetStar with starred=true
+	result, err := service.SetStar(ctx, userID, itemID, true)
+	if err != nil {
+		t.Fatalf("SetStar() returned error: %v", err)
+	}
+
+	// Verify is_starred is SET to true (not toggled)
+	if result.IsStarred != true {
+		t.Errorf("SetStar(starred=true) should set is_starred=true, got is_starred=%v", result.IsStarred)
+	}
+}
+
+// TestItemService_SetStar_SetsToFalse verifies SetStar(starred=false) sets is_starred=false
+// This test will FAIL initially because the current implementation uses ToggleStar which toggles.
+func TestItemService_SetStar_SetsToFalse(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+	feedID := "feed-1"
+	itemID := "item-1"
+
+	// Item exists with user having starred=true initially
+	item := createTestItem(itemID, feedID, "Test Item")
+	itemRepo := &mockItemRepository{
+		items: []*model.Item{item},
+	}
+
+	// User has existing state with is_starred=true
+	state := &model.UserItemState{
+		Base:      model.Base{ID: "state-1"},
+		UserID:    userID,
+		ItemID:    itemID,
+		IsStarred: true,
+		IsRead:    false,
+	}
+	stateRepo := &mockUserItemStateRepository{
+		states: []*model.UserItemState{state},
+	}
+
+	userFeedRepo := &mockUserFeedRepository{
+		userFeeds: []*model.UserFeed{{UserID: userID, FeedID: feedID}},
+	}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	// Call SetStar with starred=false
+	result, err := service.SetStar(ctx, userID, itemID, false)
+	if err != nil {
+		t.Fatalf("SetStar() returned error: %v", err)
+	}
+
+	// Verify is_starred is SET to false (not toggled to stay true)
+	if result.IsStarred != false {
+		t.Errorf("SetStar(starred=false) should set is_starred=false, got is_starred=%v", result.IsStarred)
+	}
+}
+
+// TestItemService_SetStar_Idempotent verifies SetStar is idempotent
+// Calling SetStar(starred=true) twice should result in is_starred=true both times
+func TestItemService_SetStar_Idempotent(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+	feedID := "feed-1"
+	itemID := "item-1"
+
+	item := createTestItem(itemID, feedID, "Test Item")
+	itemRepo := &mockItemRepository{
+		items: []*model.Item{item},
+	}
+
+	state := &model.UserItemState{
+		Base:      model.Base{ID: "state-1"},
+		UserID:    userID,
+		ItemID:    itemID,
+		IsStarred: false,
+		IsRead:    false,
+	}
+	stateRepo := &mockUserItemStateRepository{
+		states: []*model.UserItemState{state},
+	}
+
+	userFeedRepo := &mockUserFeedRepository{
+		userFeeds: []*model.UserFeed{{UserID: userID, FeedID: feedID}},
+	}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	// First call with starred=true
+	result1, err := service.SetStar(ctx, userID, itemID, true)
+	if err != nil {
+		t.Fatalf("First SetStar() returned error: %v", err)
+	}
+	if result1.IsStarred != true {
+		t.Errorf("First call: is_starred=%v, want true", result1.IsStarred)
+	}
+
+	// Second call with starred=true (should be idempotent)
+	result2, err := service.SetStar(ctx, userID, itemID, true)
+	if err != nil {
+		t.Fatalf("Second SetStar() returned error: %v", err)
+	}
+	if result2.IsStarred != true {
+		t.Errorf("Second call (idempotent): is_starred=%v, want true (should not toggle)", result2.IsStarred)
+	}
+}
+
+// =============================================================================
+// SPEC COMPLIANCE TESTS: SetRead (not toggle)
+// These tests verify that SetRead SETS the value from the request body,
+// rather than TOGGLING the current value.
+// =============================================================================
+
+// TestItemService_SetRead_SetsToTrue verifies SetRead(read=true) sets is_read=true
+func TestItemService_SetRead_SetsToTrue(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+	feedID := "feed-1"
+	itemID := "item-1"
+
+	item := createTestItem(itemID, feedID, "Test Item")
+	itemRepo := &mockItemRepository{
+		items: []*model.Item{item},
+	}
+
+	// User has existing state with is_read=false
+	state := &model.UserItemState{
+		Base:      model.Base{ID: "state-1"},
+		UserID:    userID,
+		ItemID:    itemID,
+		IsStarred: false,
+		IsRead:    false,
+	}
+	stateRepo := &mockUserItemStateRepository{
+		states: []*model.UserItemState{state},
+	}
+
+	userFeedRepo := &mockUserFeedRepository{
+		userFeeds: []*model.UserFeed{{UserID: userID, FeedID: feedID}},
+	}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	// Call SetRead with read=true
+	result, err := service.SetRead(ctx, userID, itemID, true)
+	if err != nil {
+		t.Fatalf("SetRead() returned error: %v", err)
+	}
+
+	// Verify is_read is SET to true (not toggled)
+	if result.IsRead != true {
+		t.Errorf("SetRead(read=true) should set is_read=true, got is_read=%v", result.IsRead)
+	}
+
+	// Verify read_at is set when marking as read
+	if result.ReadAt == nil {
+		t.Error("SetRead(read=true) should set read_at timestamp")
+	}
+}
+
+// TestItemService_SetRead_SetsToFalse verifies SetRead(read=false) sets is_read=false
+func TestItemService_SetRead_SetsToFalse(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+	feedID := "feed-1"
+	itemID := "item-1"
+
+	item := createTestItem(itemID, feedID, "Test Item")
+	itemRepo := &mockItemRepository{
+		items: []*model.Item{item},
+	}
+
+	// User has existing state with is_read=true
+	now := time.Now()
+	state := &model.UserItemState{
+		Base:      model.Base{ID: "state-1"},
+		UserID:    userID,
+		ItemID:    itemID,
+		IsStarred: false,
+		IsRead:    true,
+		ReadAt:    &now,
+	}
+	stateRepo := &mockUserItemStateRepository{
+		states: []*model.UserItemState{state},
+	}
+
+	userFeedRepo := &mockUserFeedRepository{
+		userFeeds: []*model.UserFeed{{UserID: userID, FeedID: feedID}},
+	}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	// Call SetRead with read=false
+	result, err := service.SetRead(ctx, userID, itemID, false)
+	if err != nil {
+		t.Fatalf("SetRead() returned error: %v", err)
+	}
+
+	// Verify is_read is SET to false (not toggled)
+	if result.IsRead != false {
+		t.Errorf("SetRead(read=false) should set is_read=false, got is_read=%v", result.IsRead)
+	}
+
+	// Verify read_at is cleared when marking as unread
+	if result.ReadAt != nil {
+		t.Errorf("SetRead(read=false) should clear read_at, got read_at=%v", result.ReadAt)
+	}
+}
+
+// TestItemService_SetRead_Idempotent verifies SetRead is idempotent
+func TestItemService_SetRead_Idempotent(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+	feedID := "feed-1"
+	itemID := "item-1"
+
+	item := createTestItem(itemID, feedID, "Test Item")
+	itemRepo := &mockItemRepository{
+		items: []*model.Item{item},
+	}
+
+	state := &model.UserItemState{
+		Base:      model.Base{ID: "state-1"},
+		UserID:    userID,
+		ItemID:    itemID,
+		IsStarred: false,
+		IsRead:    false,
+	}
+	stateRepo := &mockUserItemStateRepository{
+		states: []*model.UserItemState{state},
+	}
+
+	userFeedRepo := &mockUserFeedRepository{
+		userFeeds: []*model.UserFeed{{UserID: userID, FeedID: feedID}},
+	}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	// First call with read=true
+	result1, err := service.SetRead(ctx, userID, itemID, true)
+	if err != nil {
+		t.Fatalf("First SetRead() returned error: %v", err)
+	}
+	if result1.IsRead != true {
+		t.Errorf("First call: is_read=%v, want true", result1.IsRead)
+	}
+
+	// Second call with read=true (should be idempotent)
+	result2, err := service.SetRead(ctx, userID, itemID, true)
+	if err != nil {
+		t.Fatalf("Second SetRead() returned error: %v", err)
+	}
+	if result2.IsRead != true {
+		t.Errorf("Second call (idempotent): is_read=%v, want true (should not toggle)", result2.IsRead)
+	}
+}

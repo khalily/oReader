@@ -198,8 +198,8 @@ func main() {
 			{
 				items.GET("", itemHandler.ListItems)
 				items.GET("/:id", itemHandler.GetItem)
-				items.POST("/:id/star", itemHandler.ToggleStar)
-				items.POST("/:id/read", itemHandler.ToggleRead)
+				items.PUT("/:id/star", itemHandler.SetStar)
+				items.PUT("/:id/read", itemHandler.SetRead)
 			}
 
 			// OPML import

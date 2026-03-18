@@ -30,6 +30,7 @@ var (
 // ItemWithState represents an item with user-specific state
 type ItemWithState struct {
 	*model.Item
+	FeedTitle string  `json:"feed_title"`
 	IsStarred bool    `json:"is_starred"`
 	IsRead    bool    `json:"is_read"`
 	ReadAt    *string `json:"read_at,omitempty"`
@@ -80,9 +81,15 @@ type ItemService interface {
 	// GetItem retrieves a single item by ID with user state
 	GetItem(ctx context.Context, userID, itemID string) (*ItemWithState, error)
 	// ToggleStar toggles the star status for an item
+	// Deprecated: Use SetStar instead for spec-compliant behavior
 	ToggleStar(ctx context.Context, userID, itemID string) (*ItemWithState, error)
 	// ToggleRead toggles the read status for an item
+	// Deprecated: Use SetRead instead for spec-compliant behavior
 	ToggleRead(ctx context.Context, userID, itemID string) (*ItemWithState, error)
+	// SetStar sets the star status for an item to the specified value (spec-compliant: sets, doesn't toggle)
+	SetStar(ctx context.Context, userID, itemID string, starred bool) (*ItemWithState, error)
+	// SetRead sets the read status for an item to the specified value (spec-compliant: sets, doesn't toggle)
+	SetRead(ctx context.Context, userID, itemID string, read bool) (*ItemWithState, error)
 	// MarkAllRead marks all items in a feed as read for a user
 	MarkAllRead(ctx context.Context, userID, feedID string) (int, error)
 }
