@@ -51,15 +51,25 @@ build-prepare:
 	@cp -r web/dist/* $(MAIN_PACKAGE)/dist/
 	@echo "Frontend copied for embedding"
 
-## build: Build the binary with embedded frontend
-build: build-prepare
+## build: Build the binary with embedded frontend (alias for build-prod)
+build: build-prod
+
+## build-prod: Build production binary with embedded frontend
+build-prod: build-prepare
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
-	@echo "Binary built at $(BUILD_DIR)/$(BINARY_NAME)"
+	@echo "Production binary: $(BUILD_DIR)/$(BINARY_NAME)"
 
-## run: Run the application
-run:
-	$(GOCMD) run $(MAIN_PACKAGE)
+## dev: Run backend in API-only mode (no frontend build required)
+dev:
+	$(GOCMD) run -tags noembed $(MAIN_PACKAGE)
+
+## dev-full: Run both backend and frontend development servers
+dev-full:
+	@./dev.sh
+
+## run: Run the application (alias for dev)
+run: dev
 
 ## migrate-up: Run database migrations up
 migrate-up:

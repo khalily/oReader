@@ -222,23 +222,35 @@ func main() {
 	// Static file serving - use embedded files in production, local files in development
 	var staticFS fs.FS
 	if cfg.IsDevelopment() {
-		// In development, serve from local web/dist directory
-		staticFS = os.DirFS("web/dist")
-		log.Info().Str("path", "web/dist").Msg("Serving static files from local directory")
+		// Development mode: try local web/dist first, fallback to API-only
+		if _, err := os.Stat("web/dist"); err == nil {
+			staticFS = os.DirFS("web/dist")
+			log.Info().Str("path", "web/dist").Msg("Serving static files from local directory")
+		} else {
+			log.Info().Msg("API-only mode - run 'make frontend-dev' for frontend")
+		}
 	} else {
-		// In production, use embedded files
+		// Production mode: must use embedded files
 		staticFS = StaticFS()
+		if staticFS == nil {
+			log.Fatal().Msg("Production requires embedded frontend. Use 'make build-prod'")
+		}
 		log.Info().Msg("Serving static files from embedded filesystem")
 	}
 
-	// Create a file server for static assets
-	fileServer := http.FileServer(http.FS(staticFS))
+	// Create file server only if staticFS is available
+	var fileServer http.Handler
+	if staticFS != nil {
+		fileServer = http.FileServer(http.FS(staticFS))
+	}
 
-	// Serve static assets directly (JS, CSS, images, etc.)
-	router.GET("/assets/*filepath", func(c *gin.Context) {
-		c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/assets")
-		fileServer.ServeHTTP(c.Writer, c.Request)
-	})
+	// Serve static assets directly (JS, CSS, images, etc.) - only if available
+	if staticFS != nil {
+		router.GET("/assets/*filepath", func(c *gin.Context) {
+			c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/assets")
+			fileServer.ServeHTTP(c.Writer, c.Request)
+		})
+	}
 
 	// SPA fallback routing - serve index.html for all non-API routes
 	// This allows React Router to handle client-side routing
@@ -254,9 +266,27 @@ func main() {
 			return
 		}
 
-		// For all other routes, serve index.html (SPA fallback)
-		c.Request.URL.Path = "/"
-		fileServer.ServeHTTP(c.Writer, c.Request)
+		// Development mode without static files: redirect to Vite dev server
+		if staticFS == nil && cfg.IsDevelopment() {
+			viteURL := "http://localhost:5173" + c.Request.URL.Path
+			c.Redirect(http.StatusTemporaryRedirect, viteURL)
+			return
+		}
+
+		// For all other routes with static files, serve index.html (SPA fallback)
+		if staticFS != nil {
+			c.Request.URL.Path = "/"
+			fileServer.ServeHTTP(c.Writer, c.Request)
+			return
+		}
+
+		// No frontend available
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": gin.H{
+				"code":    "FRONTEND_NOT_AVAILABLE",
+				"message": "Frontend not available. Run 'make frontend-dev' for development or 'make build-prod' for production",
+			},
+		})
 	})
 
 	// Start background refresh worker
