@@ -1,83 +1,83 @@
-# Article Management Specification
+# 文章管理规格
 
-> **Note**: `is_starred` and `is_read` are stored in `UserItemState` table, not on `Item` directly.
-> This allows multiple users to have independent read/starred states for the same article.
-> See `specs/data-model/spec.md` for details.
+> **注意**：`is_starred` 和 `is_read` 存储在 `UserItemState` 表中，而非直接存储在 `Item` 上。
+> 这允许多个用户对同一篇文章拥有独立的已读/收藏状态。
+> 详情请参阅 `specs/data-model/spec.md`。
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: List all articles across subscriptions
-The system SHALL allow authenticated users to list all articles from their subscriptions.
+### 需求：列出所有订阅的文章
+系统应允许已认证用户列出其订阅的所有文章。
 
-#### Scenario: List all articles
-- **WHEN** authenticated user calls GET /api/v1/items
-- **THEN** system returns paginated array of items from user's subscribed feeds
-- **AND** items are sorted by published_at descending
-- **AND** each item includes id, title, link, description, feed_id, feed_title, published_at
-- **AND** each item includes is_starred, is_read from UserItemState (defaults to false if no state exists)
+#### 场景：列出所有文章
+- **当** 已认证用户调用 GET /api/v1/items
+- **则** 系统返回用户订阅源中的分页文章数组
+- **且** 文章按 published_at 降序排列
+- **且** 每篇文章包含 id、title、link、description、feed_id、feed_title、published_at
+- **且** 每篇文章包含来自 UserItemState 的 is_starred、is_read（如无状态则默认为 false）
 
-#### Scenario: Filter by read status
-- **WHEN** user calls GET /api/v1/items?read=false
-- **THEN** system returns only unread items
+#### 场景：按已读状态筛选
+- **当** 用户调用 GET /api/v1/items?read=false
+- **则** 系统仅返回未读文章
 
-#### Scenario: Filter by starred status
-- **WHEN** user calls GET /api/v1/items?starred=true
-- **THEN** system returns only starred items
+#### 场景：按收藏状态筛选
+- **当** 用户调用 GET /api/v1/items?starred=true
+- **则** 系统仅返回已收藏文章
 
-### Requirement: List articles for specific feed
-The system SHALL allow authenticated users to list articles from a specific subscription.
+### 需求：列出特定订阅源的文章
+系统应允许已认证用户列出特定订阅源的文章。
 
-#### Scenario: List feed articles
-- **WHEN** authenticated user calls GET /api/v1/feeds/:feed_id/items
-- **THEN** system returns paginated array of items for that feed
-- **AND** feed belongs to requesting user
+#### 场景：列出订阅源文章
+- **当** 已认证用户调用 GET /api/v1/feeds/:feed_id/items
+- **则** 系统返回该订阅源的分页文章数组
+- **且** 订阅源属于请求��户
 
-### Requirement: Get article details
-The system SHALL allow authenticated users to view full article content.
+### 需求：获取文章详情
+系统应允许已认证用户查看完整的文章内容。
 
-#### Scenario: Get article
-- **WHEN** authenticated user calls GET /api/v1/items/:id
-- **THEN** system returns full item details including content field
-- **AND** item belongs to user's feed
+#### 场景：获取文章
+- **当** 已认证用户调用 GET /api/v1/items/:id
+- **则** 系统返回完整的文章详情，包含 content 字段
+- **且** 文章属于用户的订阅源
 
-#### Scenario: Article not found
-- **WHEN** user requests non-existent item ID
-- **THEN** system returns 404 Not Found
+#### 场景：文章未找到
+- **当** 用户请求不存在的文章 ID
+- **则** 系统返回 404 Not Found
 
-#### Scenario: Article belongs to another user
-- **WHEN** user requests item from another user's feed
-- **THEN** system returns 404 Not Found
+#### 场景：文章属于其他用户
+- **当** 用户请求属于其他用户订阅源的文章
+- **则** 系统返回 404 Not Found
 
-### Requirement: Star/unstar articles
-The system SHALL allow authenticated users to mark articles as favorites.
+### 需求：收藏/取消收藏文章
+系统应允许已认证用户将文章标记为收藏。
 
-#### Scenario: Star article
-- **WHEN** authenticated user calls PUT /api/v1/items/:id/star with { starred: true }
-- **THEN** system sets is_starred = true
-- **AND** system returns updated item
+#### 场景：收藏文章
+- **当** 已认证用户调用 PUT /api/v1/items/:id/star，请求体为 { starred: true }
+- **则** 系统设置 is_starred = true
+- **且** 系统返回更新后的文章
 
-#### Scenario: Unstar article
-- **WHEN** authenticated user calls PUT /api/v1/items/:id/star with { starred: false }
-- **THEN** system sets is_starred = false
-- **AND** system returns updated item
+#### 场景：取消收藏文章
+- **当** 已认证用户调用 PUT /api/v1/items/:id/star，请求体为 { starred: false }
+- **则** 系统设置 is_starred = false
+- **且** 系统返回更新后的文章
 
-### Requirement: Mark articles as read/unread
-The system SHALL allow authenticated users to mark articles as read.
+### 需求：标记文章为已读/未读
+系统应允许已认证用户将文章标记为已读。
 
-#### Scenario: Mark as read
-- **WHEN** authenticated user calls PUT /api/v1/items/:id/read with { read: true }
-- **THEN** system sets is_read = true
-- **AND** system returns updated item
+#### 场景：标记为已读
+- **当** 已认证用户调用 PUT /api/v1/items/:id/read，请求体为 { read: true }
+- **则** 系统设置 is_read = true
+- **且** 系统返回更新后的文章
 
-#### Scenario: Mark as unread
-- **WHEN** authenticated user calls PUT /api/v1/items/:id/read with { read: false }
-- **THEN** system sets is_read = false
-- **AND** system returns updated item
+#### 场景：标记为未读
+- **当** 已认证用户调用 PUT /api/v1/items/:id/read，请求体为 { read: false }
+- **则** 系统设置 is_read = false
+- **且** 系统返回更新后的文章
 
-### Requirement: Mark all feed articles as read
-The system SHALL allow authenticated users to mark all articles in a feed as read.
+### 需求：将订阅源所有文章标记为已读
+系统应允许已认证用户将订阅源中的所有文章标记为已读。
 
-#### Scenario: Mark all read
-- **WHEN** authenticated user calls POST /api/v1/feeds/:id/read-all
-- **THEN** system sets is_read = true for all items in feed
-- **AND** system returns count of updated items
+#### 场景：全部标记为已读
+- **当** 已认证用户调用 POST /api/v1/feeds/:id/read-all
+- **则** 系统将订阅源中所有文章的 is_read 设置为 true
+- **且** 系统返回已更新文章的数量

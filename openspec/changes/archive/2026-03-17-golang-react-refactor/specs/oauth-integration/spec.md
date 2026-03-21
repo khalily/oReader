@@ -1,76 +1,76 @@
-# OAuth Integration Specification
+# OAuth 集成规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: GitHub OAuth login initiation
-The system SHALL provide an endpoint to initiate GitHub OAuth flow.
+### 需求：GitHub OAuth 登录发起
+系统应提供端点以发起 GitHub OAuth 流程。
 
-#### Scenario: Initiate GitHub OAuth
-- **WHEN** user calls GET /api/v1/auth/github
-- **THEN** system generates secure state parameter
-- **AND** system stores state in session or cookie
-- **AND** system redirects to GitHub authorization URL with client_id, redirect_uri, scope, state
+#### 场景：发起 GitHub OAuth
+- **当** 用户调用 GET /api/v1/auth/github
+- **则** 系统生成安全的 state 参数
+- **且** 系统将 state 存储在 session 或 cookie 中
+- **且** 系统重定向到 GitHub 授权 URL，带有 client_id、redirect_uri、scope、state
 
-### Requirement: GitHub OAuth callback handling
-The system SHALL handle GitHub OAuth callback and create/link user account.
+### 需求：GitHub OAuth 回调处理
+系统应处理 GitHub OAuth 回调并创建/关联用户账户。
 
-#### Scenario: Successful GitHub OAuth
-- **WHEN** GitHub redirects to GET /api/v1/auth/github/callback with valid code and state
-- **THEN** system verifies state matches stored value
-- **AND** system exchanges code for GitHub access token
-- **AND** system fetches GitHub user profile
-- **AND** system finds or creates local user by github_id
-- **AND** system sets access_token and refresh_token cookies
-- **AND** system redirects to frontend with user profile
+#### 场景：GitHub OAuth 成功
+- **当** GitHub 重定向到 GET /api/v1/auth/github/callback，带有有效的 code 和 state
+- **则** 系统验证 state 与存储值匹配
+- **且** 系统用 code 交换 GitHub 访问令牌
+- **且** 系统获取 GitHub 用户资料
+- **且** 系统通过 github_id 查找或创建本地用户
+- **且** 系统设置 access_token 和 refresh_token cookies
+- **且** 系统重定向到前端并携带用户资料
 
-#### Scenario: Invalid state parameter
-- **WHEN** callback has state that doesn't match stored value
-- **THEN** system returns 400 Bad Request
-- **AND** system does not proceed with OAuth flow
+#### 场景：无效的 state 参数
+- **当** 回调的 state 与存储值不匹配
+- **则** 系统返回 400 Bad Request
+- **且** 系统不继续 OAuth 流程
 
-#### Scenario: GitHub API error
-- **WHEN** GitHub returns error or fails to respond
-- **THEN** system returns appropriate error
-- **AND** system redirects to frontend with error message
+#### 场景：GitHub API 错误
+- **当** GitHub 返回错误或无法响应
+- **则** 系统返回适当的错误
+- **且** 系统重定向到前端并携带错误消息
 
-### Requirement: OAuth user account creation
-The system SHALL create user accounts for new OAuth users.
+### 需求：OAuth 用户账户创建
+系统应为新的 OAuth 用户创建账户。
 
-#### Scenario: New GitHub user
-- **WHEN** GitHub OAuth succeeds for user without existing account
-- **THEN** system creates new User with:
-  - id: UUID
-  - email: GitHub email (if available and public)
-  - nickname: GitHub login or name
-  - avatar_url: GitHub avatar URL
-  - auth_provider: "github"
-  - github_id: GitHub user ID
-  - password_hash: null
+#### 场景：新 GitHub 用户
+- **当** GitHub OAuth 对无现有账户的用户成功
+- **则** 系统创建新 User，包含：
+  - id：UUID
+  - email：GitHub 邮箱（如可用且公开）
+  - nickname：GitHub login 或 name
+  - avatar_url：GitHub 头像 URL
+  - auth_provider："github"
+  - github_id：GitHub 用户 ID
+  - password_hash：null
 
-#### Scenario: Existing user with same email
-- **WHEN** GitHub OAuth returns email matching existing local account
-- **THEN** system links GitHub account to existing user
-- **AND** system sets github_id on existing user
-- **AND** system does not create duplicate account
+#### 场景：相同邮箱的现有用户
+- **当** GitHub OAuth 返回的邮箱与现有本地账户匹配
+- **则** 系统将 GitHub 账户关联到现有用户
+- **且** 系统在现有用户上设置 github_id
+- **且** 系统不创建重复账户
 
-### Requirement: OAuth user profile mapping
-The system SHALL map GitHub profile fields to local user fields.
+### 需求：OAuth 用户资料映射
+系统应将 GitHub 资料字段映射到本地用户字段。
 
-#### Scenario: Profile field mapping
-- **WHEN** user authenticates via GitHub
-- **THEN** system maps:
+#### 场景：资料字段映射
+- **当** 用户通过 GitHub 认证
+- **则** 系统映射：
   - GitHub id → github_id
-  - GitHub login → nickname (if name not available)
-  - GitHub name → nickname (preferred)
+  - GitHub login → nickname（如 name 不可用）
+  - GitHub name → nickname（优先）
   - GitHub avatar_url → avatar_url
-  - GitHub email → email (if public)
+  - GitHub email → email（如公开）
 
-### Requirement: Reserved OAuth endpoints for future providers
-The system SHALL reserve endpoint patterns for additional OAuth providers.
+### 需求：为未来提供商预留 OAuth 端点
+系统应为额外的 OAuth 提供商预留端点模式。
 
-#### Scenario: Future provider endpoints
-- **WHEN** system is deployed
-- **THEN** following endpoint patterns are reserved:
+#### 场景：未来提供商端点
+- **当** 系统部署
+- **则** 以下端点模式被预留：
   - GET /api/v1/auth/google
   - GET /api/v1/auth/google/callback
-- **AND** endpoints return 501 Not Implemented until implemented
+- **且** 端点在实现前返回 501 Not Implemented

@@ -1,66 +1,66 @@
-# RSS Parsing Specification
+# RSS 解析规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: Parse RSS 2.0 feeds
-The system SHALL parse RSS 2.0 format feeds and extract feed and item data.
+### 需求：解析 RSS 2.0 订阅源
+系统应解析 RSS 2.0 格式的订阅源并提取订阅源和文章数据。
 
-#### Scenario: Parse valid RSS 2.0 feed
-- **WHEN** system parses a valid RSS 2.0 feed
-- **THEN** system extracts feed title, link, description, lastBuildDate
-- **AND** system extracts items with title, link, description, pubDate, author, content:encoded
+#### 场景：解析有效的 RSS 2.0 订阅源
+- **当** 系统解析有效的 RSS 2.0 订阅源
+- **则** 系统提取订阅源 title、link、description、lastBuildDate
+- **且** 系统提取文章的 title、link、description、pubDate、author、content:encoded
 
-### Requirement: Parse Atom 1.0 feeds
-The system SHALL parse Atom 1.0 format feeds and extract feed and entry data.
+### 需求：解析 Atom 1.0 订阅源
+系统应解析 Atom 1.0 格式的订阅源并提取订阅源和条目数据。
 
-#### Scenario: Parse valid Atom feed
-- **WHEN** system parses a valid Atom feed
-- **THEN** system extracts feed title, link, subtitle, updated
-- **AND** system extracts entries with title, link, summary, content, published, updated, author
+#### 场景：解析有效的 Atom 订阅源
+- **当** 系统解析有效的 Atom 订阅源
+- **则** 系统提取订阅源 title、link、subtitle、updated
+- **且** 系统提取条目的 title、link、summary、content、published、updated、author
 
-### Requirement: Handle malformed feeds gracefully
-The system SHALL handle malformed or incomplete feeds without crashing.
+### 需求：优雅处理格式错误的订阅源
+系统应处理格式错误或不完整的订阅源而不崩溃。
 
-#### Scenario: Missing optional fields
-- **WHEN** feed is missing optional fields (description, author, etc.)
-- **THEN** system parses successfully with empty/null values for missing fields
+#### 场景：缺少可选字段
+- **当** 订阅源缺少可选字段（description、author 等）
+- **则** 系统成功解析，缺少的字段为空/null 值
 
-#### Scenario: Invalid XML
-- **WHEN** feed contains invalid XML
-- **THEN** system returns parse error without crashing
+#### 场景：无效的 XML
+- **当** 订阅源包含无效的 XML
+- **则** 系统返回解析错误而不崩溃
 
-### Requirement: Deduplicate feed items
-The system SHALL not create duplicate items for the same feed entry.
+### 需求：去重订阅源文章
+系统不应为同一订阅源条目创建重复文章。
 
-#### Scenario: Item with same GUID
-- **WHEN** feed contains item with GUID that already exists for this feed
-- **THEN** system skips creating duplicate item
-- **AND** system does not update existing item
+#### 场景：相同 GUID 的文章
+- **当** 订阅源包含该订阅源已存在 GUID 的文章
+- **则** 系统跳过创建重复文章
+- **且** 系统不更新现有文章
 
-#### Scenario: Item without GUID uses link
-- **WHEN** feed item has no GUID but has link
-- **THEN** system uses link as unique identifier
-- **AND** system does not create duplicate for same link
+#### 场景：无 GUID 的文章使用链接
+- **当** 订阅源文章没有 GUID 但有链接
+- **则** 系统使用链接作为唯一标识符
+- **且** 系统不为相同链接创建重复文章
 
-### Requirement: Extract feed favicon
-The system SHALL attempt to extract favicon URL for feed display.
+### 需求：提取订阅源图标
+系统应尝试提取订阅源显示的图标 URL。
 
-#### Scenario: Favicon available
-- **WHEN** feed source website has favicon at /favicon.ico
-- **THEN** system stores favicon URL as image_url
+#### 场景：图标可用
+- **当** 订阅源网站在 /favicon.ico 有图标
+- **则** 系统将图标 URL 存储为 image_url
 
-#### Scenario: Favicon not available
-- **WHEN** feed source website has no favicon
-- **THEN** system stores null for image_url
-- **AND** parsing still succeeds
+#### 场景：图标不可用
+- **当** 订阅源网站没有图标
+- **则** 系统将 image_url 存储为 null
+- **且** 解析仍然成功
 
-### Requirement: Sanitize item content
-The system SHALL store raw content but provide sanitized excerpts for display.
+### 需求：清理文章内容
+系统应存储原始内容但为显示提供清理后的摘要。
 
-#### Scenario: Store raw content
-- **WHEN** item has HTML content
-- **THEN** system stores raw HTML in content field
+#### 场景：存储原始内容
+- **当** 文章包含 HTML 内容
+- **则** 系统在 content 字段存储原始 HTML
 
-#### Scenario: Generate description excerpt
-- **WHEN** item is created
-- **THEN** system generates plain text description (stripped HTML, truncated to 200 chars)
+#### 场景：生成描述摘要
+- **当** 文章被创建
+- **则** 系统生成纯文本描述（去除 HTML，截断至 200 字符）

@@ -1,91 +1,91 @@
-# User Authentication Specification
+# 用户认证规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: User registration with email and password
-The system SHALL allow new users to register with email and password. Passwords MUST be hashed using bcrypt before storage.
+### 需求：使用邮箱和密码的用户注册
+系统应允许新用户使用邮箱和密码注册。密码必须在存储前使用 bcrypt 哈希。
 
-#### Scenario: Successful registration
-- **WHEN** user submits valid email and password to POST /api/v1/auth/register
-- **THEN** system creates a new user with UUID identifier
-- **AND** system returns user profile without password hash
+#### 场景：成功注册
+- **当** 用户向 POST /api/v1/auth/register 提交有效的邮箱和密码
+- **则** 系统创建带有 UUID 标识符的新用户
+- **且** 系统返回用户资料（不含密码哈希）
 
-#### Scenario: Duplicate email registration
-- **WHEN** user submits an email that already exists
-- **THEN** system returns 409 Conflict error
-- **AND** system does not reveal whether email exists
+#### 场景：重复邮箱注册
+- **当** 用户提交已存在的邮箱
+- **则** 系统返回 409 Conflict 错误
+- **且** 系统不透露邮箱是否已存在
 
-#### Scenario: Invalid email format
-- **WHEN** user submits invalid email format
-- **THEN** system returns 400 Bad Request with validation error
+#### 场景：无效的邮箱格式
+- **当** 用户提交无效的邮箱格式
+- **则** 系统返回 400 Bad Request 及验证错误
 
-### Requirement: User login with dual-token authentication
-The system SHALL authenticate users with email and password, issuing dual tokens (access and refresh) stored in HttpOnly cookies, and returning the CSRF token in the response body.
+### 需求：双令牌认证的用户登录
+系统应使用邮箱和密码认证用户，颁发存储在 HttpOnly cookies 中的双令牌（访问和刷新），并在响应体中返回 CSRF 令牌。
 
-#### Scenario: Successful login
-- **WHEN** user submits correct email and password to POST /api/v1/auth/login
-- **THEN** system sets access_token cookie (HttpOnly, SameSite=Lax in dev, 15 minutes)
-- **AND** system sets csrf_token cookie (readable by JS, 15 minutes)
-- **AND** system sets refresh_token cookie (HttpOnly, SameSite=Lax in dev, 7 days, Path=/api/v1/auth/refresh)
-- **AND** system returns user profile in response body
-- **AND** system returns csrf_token in response body for client use
+#### 场景：成功登录
+- **当** 用户向 POST /api/v1/auth/login 提交正确的邮箱和密码
+- **则** 系统设置 access_token cookie（HttpOnly，开发环境 SameSite=Lax，15 分钟）
+- **且** 系统设置 csrf_token cookie（可被 JS 读取，15 分钟）
+- **且** 系统设置 refresh_token cookie（HttpOnly，开发环境 SameSite=Lax，7 天，Path=/api/v1/auth/refresh）
+- **且** 系统在响应体中返回用户资料
+- **且** 系统在响应体中返回 csrf_token 供客户端使用
 
-#### Scenario: Invalid credentials
-- **WHEN** user submits incorrect email or password
-- **THEN** system returns 401 Unauthorized
-- **AND** system does not reveal which field is incorrect
+#### 场景：无效凭据
+- **当** 用户提交不正确的邮箱或密码
+- **则** 系统返回 401 Unauthorized
+- **且** 系统不透露哪个字段不正确
 
-### Requirement: Token refresh mechanism
-The system SHALL allow clients to refresh access tokens using valid refresh tokens.
+### 需求：令牌刷新机制
+系统应允许客户端使用有效的刷新令牌刷新访问令牌。
 
-#### Scenario: Successful token refresh
-- **WHEN** client calls POST /api/v1/auth/refresh with valid refresh_token cookie
-- **THEN** system validates refresh token against database
-- **AND** system issues new access_token via Set-Cookie
-- **AND** system returns user profile
+#### 场景：成功刷新令牌
+- **当** 客户端使用有效的 refresh_token cookie 调用 POST /api/v1/auth/refresh
+- **则** 系统根据数据库验证刷新令牌
+- **且** 系统通过 Set-Cookie 颁发新的 access_token
+- **且** 系统返回用户资料
 
-#### Scenario: Expired or revoked refresh token
-- **WHEN** client calls POST /api/v1/auth/refresh with invalid/expired/revoked refresh token
-- **THEN** system returns 401 Unauthorized
-- **AND** system clears both token cookies
+#### 场景：过期或已撤销的刷新令牌
+- **当** 客户端使用无效/过期/已撤销的刷新令牌调用 POST /api/v1/auth/refresh
+- **则** 系统返回 401 Unauthorized
+- **且** 系统清除两个令牌 cookies
 
-### Requirement: User logout with token revocation
-The system SHALL allow users to logout, revoking their refresh token.
+### 需求：令牌撤销的用户登出
+系统应允许用户登出，撤销其刷新令牌。
 
-#### Scenario: Successful logout
-- **WHEN** authenticated user calls POST /api/v1/auth/logout
-- **THEN** system marks refresh token as revoked in database
-- **AND** system clears both token cookies (Max-Age=0)
+#### 场景：成功登出
+- **当** 已认证用户调用 POST /api/v1/auth/logout
+- **则** 系统在数据库中标记刷新令牌为已撤销
+- **且** 系统清除两个令牌 cookies（Max-Age=0）
 
-### Requirement: Protected API authentication
-The system SHALL require valid access token for protected endpoints.
+### 需求：受保护 API 认证
+系统应要求受保护端点具有有效的访问令牌。
 
-#### Scenario: Valid access token
-- **WHEN** client accesses protected endpoint with valid access_token cookie
-- **THEN** system validates JWT signature and expiration
-- **AND** system injects user_id into request context
-- **AND** request proceeds to handler
+#### 场景：有效的访问令牌
+- **当** 客户端使用有效的 access_token cookie 访问受保护端点
+- **则** 系统验证 JWT 签名和过期时间
+- **且** 系统将 user_id 注入请求上下文
+- **且** 请求继续到处理程序
 
-#### Scenario: Expired access token
-- **WHEN** client accesses protected endpoint with expired access_token cookie
-- **THEN** system returns 401 Unauthorized
-- **AND** response body indicates token expired for client refresh logic
+#### 场景：过期的访问令牌
+- **当** 客户端使用过期的 access_token cookie 访问受保护端点
+- **则** 系统返回 401 Unauthorized
+- **且** 响应体指示令牌已过期，供客户端刷新逻辑使用
 
-#### Scenario: Missing access token
-- **WHEN** client accesses protected endpoint without access_token cookie
-- **THEN** system returns 401 Unauthorized
+#### 场景：缺少访问令牌
+- **当** 客户端无 access_token cookie 访问受保护端点
+- **则** 系统返回 401 Unauthorized
 
-### Requirement: Get current user profile
-The system SHALL allow authenticated users to retrieve their profile.
+### 需求：获取当前用户资料
+系统应允许已认证用户获取其资料。
 
-#### Scenario: Get profile
-- **WHEN** authenticated user calls GET /api/v1/auth/me
-- **THEN** system returns user profile (id, email, nickname, avatar_url, auth_provider)
+#### 场景：获取资料
+- **当** 已认证用户调用 GET /api/v1/auth/me
+- **则** 系统返回用户资料（id、email、nickname、avatar_url、auth_provider）
 
-### Requirement: User identifier security
-The system SHALL use UUID v7 for user identifiers to prevent enumeration attacks.
+### 需求：用户标识符安全
+系统应使用 UUID v7 作为用户标识符以防止枚举攻击。
 
-#### Scenario: User ID format
-- **WHEN** user is created
-- **THEN** user ID is a UUID v7 string
-- **AND** user ID is not sequential or predictable
+#### 场景：用户 ID 格式
+- **当** 创建用户
+- **则** 用户 ID 是 UUID v7 字符串
+- **且** 用户 ID 不是顺序或可预测的

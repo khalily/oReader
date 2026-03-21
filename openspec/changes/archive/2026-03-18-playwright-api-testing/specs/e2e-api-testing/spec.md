@@ -1,133 +1,133 @@
-# E2E API Testing Specification
+# E2E API 测试规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: Playwright test infrastructure
-The system SHALL provide Playwright-based end-to-end API testing infrastructure with headless browser support for CI/CD compatibility.
+### 需求：Playwright 测试基础设施
+系统应提供基于 Playwright 的端到端 API 测试基础设施，支持无头浏览器以兼容 CI/CD。
 
-#### Scenario: Test environment setup
-- **WHEN** tests are executed
-- **THEN** system uses separate test database (oreader_test.db)
-- **AND** system disables rate limiting (RATE_LIMIT_ENABLED=false)
-- **AND** system runs in headless Chromium mode
+#### 场景：测试环境设置
+- **当** 执行测试
+- **则** 系统使用独立的测试数据库 (oreader_test.db)
+- **且** 系统禁用速率限制 (RATE_LIMIT_ENABLED=false)
+- **且** 系统在无头 Chromium 模式下运行
 
-### Requirement: Authentication test fixtures
-The system SHALL provide reusable authentication fixtures that handle login, CSRF token extraction, and authenticated request setup.
+### 需求：认证测试夹具
+系统应提供可复用的认证夹具，处理登录、CSRF 令牌提取和认证请求设置。
 
-#### Scenario: Authenticated test context
-- **WHEN** a test requires authentication
-- **THEN** fixture registers/logs in a test user
-- **AND** fixture extracts csrf_token from response
-- **AND** fixture returns context with cookies and CSRF token for subsequent requests
+#### 场景：认证测试上下文
+- **当** 测试需要认证
+- **则** 夹具注册/登录测试用户
+- **且** 夹具从响应中提取 csrf_token
+- **且** 夹具返回包含 cookies 和 CSRF 令牌的上下文用于后续请求
 
-### Requirement: Authentication API test coverage
-The system SHALL provide comprehensive tests for all authentication endpoints.
+### 需求：认证 API 测试覆盖
+系统应为所有认证端点提供全面的测试。
 
-#### Scenario: Registration test
-- **WHEN** POST /api/v1/auth/register with valid email and password
-- **THEN** response is 201 Created with user object and csrf_token
-- **AND** cookies include access_token and csrf_token
+#### 场景：注册测试
+- **当** 使用有效邮箱和密码请求 POST /api/v1/auth/register
+- **则** 响应为 201 Created，包含用户对象和 csrf_token
+- **且** cookies 包含 access_token 和 csrf_token
 
-#### Scenario: Login test
-- **WHEN** POST /api/v1/auth/login with valid credentials
-- **THEN** response is 200 OK with user object and csrf_token
-- **AND** cookies include access_token and csrf_token
+#### 场景：登录测试
+- **当** 使用有效凭据请求 POST /api/v1/auth/login
+- **则** 响应为 200 OK，包含用户对象和 csrf_token
+- **且** cookies 包含 access_token 和 csrf_token
 
-#### Scenario: Get current user test
-- **WHEN** GET /api/v1/auth/me with valid access_token cookie
-- **THEN** response is 200 OK with user profile
+#### 场景：获取当前用户测试
+- **当** 使用有效 access_token cookie 请求 GET /api/v1/auth/me
+- **则** 响应为 200 OK，包含用户资料
 
-#### Scenario: Token refresh test
-- **WHEN** POST /api/v1/auth/refresh with valid refresh_token cookie
-- **THEN** response is 200 OK with user profile
-- **AND** new access_token cookie is set
+#### 场景：令牌刷新测试
+- **当** 使用有效 refresh_token cookie 请求 POST /api/v1/auth/refresh
+- **则** 响应为 200 OK，包含用户资料
+- **且** 设置新的 access_token cookie
 
-#### Scenario: Logout test
-- **WHEN** POST /api/v1/auth/logout
-- **THEN** response is 200 OK with success message
-- **AND** all auth cookies are cleared
+#### 场景：登出测试
+- **当** 请求 POST /api/v1/auth/logout
+- **则** 响应为 200 OK，包含成功消息
+- **且** 清除所有认证 cookies
 
-### Requirement: Feed API test coverage
-The system SHALL provide comprehensive tests for all feed management endpoints.
+### 需求：订阅源 API 测试覆盖
+系统应为所有订阅源管理端点提供全面的测试。
 
-#### Scenario: Create feed subscription
-- **WHEN** POST /api/v1/feeds with valid feed_url and X-CSRF-Token header
-- **THEN** response is 201 Created with feed object and new_item_count
+#### 场景：创建订阅源订阅
+- **当** 使用有效 feed_url 和 X-CSRF-Token 请求头请求 POST /api/v1/feeds
+- **则** 响应为 201 Created，包含订阅源对象和 new_item_count
 
-#### Scenario: List feeds
-- **WHEN** GET /api/v1/feeds with valid authentication
-- **THEN** response is 200 OK with feeds array and total count
+#### 场景：列出订阅源
+- **当** 使用有效认证请求 GET /api/v1/feeds
+- **则** 响应为 200 OK，包含订阅源数组和总数
 
-#### Scenario: Get single feed
-- **WHEN** GET /api/v1/feeds/:id with valid authentication
-- **THEN** response is 200 OK with feed object and item_count
+#### 场景：获取单个订阅源
+- **当** 使用有效认证请求 GET /api/v1/feeds/:id
+- **则** 响应为 200 OK，包含订阅源对象和 item_count
 
-#### Scenario: Delete feed
-- **WHEN** DELETE /api/v1/feeds/:id with X-CSRF-Token header
-- **THEN** response is 204 No Content
+#### 场景：删除订阅源
+- **当** 使用 X-CSRF-Token 请求头请求 DELETE /api/v1/feeds/:id
+- **则** 响应为 204 No Content
 
-#### Scenario: Refresh feed
-- **WHEN** POST /api/v1/feeds/:id/refresh with X-CSRF-Token header
-- **THEN** response is 200 OK with refresh result
+#### 场景：刷新订阅源
+- **当** 使用 X-CSRF-Token 请求头请求 POST /api/v1/feeds/:id/refresh
+- **则** 响应为 200 OK，包含刷新结果
 
-#### Scenario: Mark all items read
-- **WHEN** POST /api/v1/feeds/:id/mark-all-read with X-CSRF-Token header
-- **THEN** response is 200 OK with count of items marked read
+#### 场景：标记所有文章为已读
+- **当** 使用 X-CSRF-Token 请求头请求 POST /api/v1/feeds/:id/mark-all-read
+- **则** 响应为 200 OK，包含已标记为已读的文章数量
 
-### Requirement: Item API test coverage
-The System SHALL provide comprehensive tests for all item management endpoints.
+### 需求：文章 API 测试覆盖
+系统应为所有文章管理端点提供全面的测试。
 
-#### Scenario: List items with pagination
-- **WHEN** GET /api/v1/items with valid authentication
-- **THEN** response is 200 OK with items array, total, has_more, and next_cursor
+#### 场景：分页列出文章
+- **当** 使用有效认证请求 GET /api/v1/items
+- **则** 响应为 200 OK，包含文章数组、total、has_more 和 next_cursor
 
-#### Scenario: Get single item
-- **WHEN** GET /api/v1/items/:id with valid authentication
-- **THEN** response is 200 OK with item object
+#### 场景：获取单个文章
+- **当** 使用有效认证请求 GET /api/v1/items/:id
+- **则** 响应为 200 OK，包含文章对象
 
-#### Scenario: Toggle star status
-- **WHEN** POST /api/v1/items/:id/star with X-CSRF-Token header and {starred: true}
-- **THEN** response is 200 OK with updated item object
+#### 场景：切换收藏状态
+- **当** 使用 X-CSRF-Token 请求头和 {starred: true} 请求 POST /api/v1/items/:id/star
+- **则** 响应为 200 OK，包含更新后的文章对象
 
-#### Scenario: Toggle read status
-- **WHEN** POST /api/v1/items/:id/read with X-CSRF-Token header and {read: true}
-- **THEN** response is 200 OK with updated item object
+#### 场景：切换已读状态
+- **当** 使用 X-CSRF-Token 请求头和 {read: true} 请求 POST /api/v1/items/:id/read
+- **则** 响应为 200 OK，包含更新后的文章对象
 
-### Requirement: OPML API test coverage
-The system SHALL provide comprehensive tests for OPML import/export endpoints.
+### 需求：OPML API 测试覆盖
+系统应为 OPML 导入/导出端点提供全面的测试。
 
-#### Scenario: Export feeds as OPML
-- **WHEN** GET /api/v1/opml/export with valid authentication
-- **THEN** response is 200 OK with Content-Type: application/xml
-- **AND** response body is valid OPML document
+#### 场景：导出订阅源为 OPML
+- **当** 使用有效认证请求 GET /api/v1/opml/export
+- **则** 响应为 200 OK，Content-Type: application/xml
+- **且** 响应体为有效的 OPML 文档
 
-#### Scenario: Import OPML file
-- **WHEN** POST /api/v1/opml/import with X-CSRF-Token header and valid OPML file
-- **THEN** response is 202 Accepted with job_id and total_feeds
+#### 场景：导入 OPML 文件
+- **当** 使用 X-CSRF-Token 请求头和有效 OPML 文件请求 POST /api/v1/opml/import
+- **则** 响应为 202 Accepted，包含 job_id 和 total_feeds
 
-#### Scenario: Get import job status
-- **WHEN** GET /api/v1/opml/import/:job_id with valid authentication
-- **THEN** response is 200 OK with job status, progress, and counts
+#### 场景：获取导入任务状态
+- **当** 使用有效认证请求 GET /api/v1/opml/import/:job_id
+- **则** 响应为 200 OK，包含任务状态、进度和计数
 
-### Requirement: Error case test coverage
-The system SHALL provide tests for error scenarios including authentication failures, validation errors, and not found cases.
+### 需求：错误场景测试覆盖
+系统应为错误场景提供测试，包括认证失败、验证错误和未找到情况。
 
-#### Scenario: Unauthorized access
-- **WHEN** accessing protected endpoint without valid access_token
-- **THEN** response is 401 Unauthorized
+#### 场景：未授权访问
+- **当** 无有效 access_token 访问受保护端点
+- **则** 响应为 401 Unauthorized
 
-#### Scenario: Missing CSRF token
-- **WHEN** POST/PUT/DELETE to protected endpoint without X-CSRF-Token header
-- **THEN** response is 403 Forbidden with CSRF error
+#### 场景：缺少 CSRF 令牌
+- **当** 无 X-CSRF-Token 请求头对受保护端点执行 POST/PUT/DELETE
+- **则** 响应为 403 Forbidden，包含 CSRF 错误
 
-#### Scenario: Resource not found
-- **WHEN** requesting non-existent feed or item
-- **THEN** response is 404 Not Found
+#### 场景：资源未找到
+- **当** 请求不存在的订阅源或文章
+- **则** 响应为 404 Not Found
 
-### Requirement: Test database isolation
-The system SHALL ensure complete test isolation through separate database and cleanup between runs.
+### 需求：测试数据库隔离
+系统应通过独立数据库和运行间清理确保完全的测试隔离。
 
-#### Scenario: Fresh database per run
-- **WHEN** test suite starts
-- **THEN** test database is created fresh with all migrations applied
-- **AND** no data from previous runs persists
+#### 场景：每次运行使用全新数据库
+- **当** 测试套件启动
+- **则** 测试数据库全新创建并应用所有迁移
+- **且** 不保留之前运行的任何数据

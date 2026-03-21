@@ -1,80 +1,80 @@
-# RSS Subscription Specification
+# RSS 订阅规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: Add RSS feed subscription
-The system SHALL allow authenticated users to subscribe to RSS/Atom feeds by URL.
+### 需求：添加 RSS 订阅源订阅
+系统应允许已认证用户通过 URL 订阅 RSS/Atom 订阅源。
 
-#### Scenario: Successful subscription
-- **WHEN** authenticated user submits valid RSS URL to POST /api/v1/feeds
-- **THEN** system fetches and parses the feed
-- **AND** system creates Feed record linked to user
-- **AND** system creates Item records for all feed entries
-- **AND** system returns feed details with items
+#### 场景：成功订阅
+- **当** 已认证用户向 POST /api/v1/feeds 提交有效的 RSS URL
+- **则** 系统获取并解析订阅源
+- **且** 系统创建与用户关联的 Feed 记录
+- **且** 系统为所有订阅源条目创建 Item 记录
+- **且** 系统返回包含文章的订阅源详情
 
-#### Scenario: Invalid URL
-- **WHEN** user submits malformed or non-URL string
-- **THEN** system returns 400 Bad Request with validation error
+#### 场景：无效的 URL
+- **当** 用户提交格式错误或非 URL 字符串
+- **则** 系统返回 400 Bad Request 及验证错误
 
-#### Scenario: Unreachable URL
-- **WHEN** user submits URL that cannot be fetched
-- **THEN** system returns 400 Bad Request with fetch error
+#### 场景：不可达的 URL
+- **当** 用户提交无法获取的 URL
+- **则** 系统返回 400 Bad Request 及获取错误
 
-#### Scenario: Invalid RSS/Atom feed
-- **WHEN** user submits URL that is not valid RSS/Atom
-- **THEN** system returns 400 Bad Request with parse error
+#### 场景：无效的 RSS/Atom 订阅源
+- **当** 用户提交非有效 RSS/Atom 的 URL
+- **则** 系统返回 400 Bad Request 及解析错误
 
-#### Scenario: Duplicate subscription
-- **WHEN** user submits URL already subscribed
-- **THEN** system returns 409 Conflict
-- **AND** system does not create duplicate feed
+#### 场景：重复订阅
+- **当** 用户提交已订阅的 URL
+- **则** 系统返回 409 Conflict
+- **且** 系统不创建重复的订阅源
 
-### Requirement: List user subscriptions
-The system SHALL allow authenticated users to list their subscriptions.
+### 需求：列出用户订阅
+系统应允许已认证用户列出其订阅。
 
-#### Scenario: List all subscriptions
-- **WHEN** authenticated user calls GET /api/v1/feeds
-- **THEN** system returns array of user's feeds
-- **AND** each feed includes id, title, link, description, image_url, last_updated, item_count
+#### 场景：列出所有订阅
+- **当** 已认证用户调用 GET /api/v1/feeds
+- **则** 系统返回用户的订阅源数组
+- **且** 每个订阅源包含 id、title、link、description、image_url、last_updated、item_count
 
-### Requirement: Get subscription details
-The system SHALL allow authenticated users to view a specific subscription.
+### 需求：获取订阅详情
+系统应允许已认证用户查看特定订阅。
 
-#### Scenario: Get feed details
-- **WHEN** authenticated user calls GET /api/v1/feeds/:id
-- **THEN** system returns feed details
-- **AND** feed belongs to requesting user
+#### 场景：获取订阅源详情
+- **当** 已认证用户调用 GET /api/v1/feeds/:id
+- **则** 系统返回订阅源详情
+- **且** 订阅源属于请求用户
 
-#### Scenario: Feed not found
-- **WHEN** user requests non-existent feed ID
-- **THEN** system returns 404 Not Found
+#### 场景：订阅源未找到
+- **当** 用户请求不存在的订阅源 ID
+- **则** 系统返回 404 Not Found
 
-#### Scenario: Feed belongs to another user
-- **WHEN** user requests feed ID belonging to another user
-- **THEN** system returns 404 Not Found (not 403 to prevent enumeration)
+#### 场景：订阅源属于其他用户
+- **当** 用户请求属于其他用户的订阅源 ID
+- **则** 系统返回 404 Not Found（而非 403，以防止枚举）
 
-### Requirement: Delete subscription
-The system SHALL allow authenticated users to unsubscribe from feeds.
+### 需求：删除订阅
+系统应允许已认证用户取消订阅。
 
-#### Scenario: Successful deletion
-- **WHEN** authenticated user calls DELETE /api/v1/feeds/:id for their own feed
-- **THEN** system deletes feed and all associated items
-- **AND** system returns 204 No Content
+#### 场景：成功删除
+- **当** 已认证用户对自己的订阅源调用 DELETE /api/v1/feeds/:id
+- **则** 系统删除订阅源及所有关联文章
+- **且** 系统返回 204 No Content
 
-#### Scenario: Delete another user's feed
-- **WHEN** user attempts to delete feed belonging to another user
-- **THEN** system returns 404 Not Found
+#### 场景：删除其他用户的订阅源
+- **当** 用户尝试删除属于其他用户的订阅源
+- **则** 系统返回 404 Not Found
 
-### Requirement: Manual feed refresh
-The system SHALL allow authenticated users to manually refresh a subscription.
+### 需求：手动刷新订阅源
+系统应允许已认证用户手动刷新订阅。
 
-#### Scenario: Successful refresh
-- **WHEN** authenticated user calls POST /api/v1/feeds/:id/refresh for their own feed
-- **THEN** system fetches latest feed content
-- **AND** system creates new items not already in database
-- **AND** system updates last_updated field
-- **AND** system returns updated feed with new item count
+#### 场景：成功刷新
+- **当** 已认证用户对自己的订阅源调用 POST /api/v1/feeds/:id/refresh
+- **则** 系统获取最新订阅源内容
+- **且** 系统创建数据库中尚不存在的新文章
+- **且** 系统更新 last_updated 字段
+- **且** 系统返回更新后的订阅源及新文章数量
 
-#### Scenario: No new items
-- **WHEN** feed has no new items since last refresh
-- **THEN** system returns feed with new_item_count: 0
+#### 场景：无新文章
+- **当** 订阅源自上次刷新后无新文章
+- **则** 系统返回订阅源，new_item_count: 0

@@ -1,104 +1,104 @@
-# Feed Import/Export Specification
+# Feed 导入导出规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: Export feeds to OPML format
-The system SHALL allow authenticated users to export their subscriptions as OPML 2.0 file.
+### 需求：导出订阅源为 OPML 格式
+系统应允许已认证用户将其订阅导出为 OPML 2.0 文件。
 
-#### Scenario: Successful export
-- **WHEN** authenticated user calls GET /api/v1/feeds/export
-- **THEN** system generates OPML 2.0 formatted XML
-- **AND** response has Content-Type: application/xml
-- **AND** response has Content-Disposition: attachment; filename="oreader-subscriptions.xml"
-- **AND** OPML includes all user's feed subscriptions
+#### 场景：成功导出
+- **当** 已认证用户调用 GET /api/v1/feeds/export
+- **则** 系统生成 OPML 2.0 格式的 XML
+- **且** 响应 Content-Type: application/xml
+- **且** 响应 Content-Disposition: attachment; filename="oreader-subscriptions.xml"
+- **且** OPML 包含用户的所有订阅源
 
-#### Scenario: Empty subscriptions export
-- **WHEN** user with no subscriptions calls export endpoint
-- **THEN** system returns valid OPML with empty body
-- **AND** response status is 200 OK
+#### 场景：空订阅导出
+- **当** 无订阅的用户调用导出端点
+- **则** 系统返回有效的 OPML，body 为空
+- **且** 响应状态为 200 OK
 
-### Requirement: OPML export format compliance
-The system SHALL generate OPML 2.0 compliant XML.
+### 需求：OPML 导出格式合规性
+系统应生成符合 OPML 2.0 标准的 XML。
 
-#### Scenario: OPML structure
-- **WHEN** system generates OPML export
-- **THEN** XML includes:
-  - XML declaration with UTF-8 encoding
-  - opml element with version="2.0"
-  - head element with title and dateCreated
-  - body element with outline elements for each feed
-- **AND** each outline includes:
+#### 场景：OPML 结构
+- **当** 系统生成 OPML 导出
+- **则** XML 包含：
+  - 带有 UTF-8 编码的 XML 声明
+  - 带有 version="2.0" 的 opml 元素
+  - 带有 title 和 dateCreated 的 head 元素
+  - 带有每个订阅源 outline 元素的 body 元素
+- **且** 每个 outline 包含：
   - type="rss"
-  - text: feed title
-  - xmlUrl: feed URL
-  - htmlUrl: feed website link (if available)
+  - text：订阅源标题
+  - xmlUrl：订阅源 URL
+  - htmlUrl：订阅源网站链接（如可用）
 
-### Requirement: Import feeds from OPML file
-The system SHALL allow authenticated users to import subscriptions from OPML file.
+### 需求：从 OPML 文件导入订阅源
+系统应允许已认证用户从 OPML 文件导入订阅。
 
-#### Scenario: Successful import
-- **WHEN** authenticated user uploads valid OPML file to POST /api/v1/feeds/import
-- **THEN** system parses OPML and extracts feed URLs
-- **AND** system creates subscriptions for feeds not already subscribed
-- **AND** system returns import summary with counts (added, skipped, failed)
+#### 场景：成功导入
+- **当** 已认证用户上传有效 OPML 文件到 POST /api/v1/feeds/import
+- **则** 系统解析 OPML 并提取订阅源 URL
+- **且** 系统为尚未订阅的订阅源创建订阅
+- **且** 系统返回包含计数的导入摘要（added、skipped、failed）
 
-#### Scenario: Import with duplicate feeds
-- **WHEN** OPML contains feed URL user already subscribes to
-- **THEN** system skips that feed
-- **AND** system includes in skipped count in response
+#### 场景：导入包含重复订阅源
+- **当** OPML 包含用户已订阅的订阅源 URL
+- **则** 系统跳过该订阅源
+- **且** 系统在响应的 skipped 计数中包含
 
-#### Scenario: Import with invalid feed URLs
-- **WHEN** OPML contains invalid or unreachable feed URLs
-- **THEN** system attempts to parse each URL
-- **AND** system adds valid feeds only
-- **AND** system includes failed URLs in response with error reasons
+#### 场景：导入包含无效订阅源 URL
+- **当** OPML 包含无效或不可达的订阅源 URL
+- **则** 系统尝试解析每个 URL
+- **且** 系统仅添加有效的订阅源
+- **且** 系统在响应中包含失败的 URL 及错误原因
 
-### Requirement: OPML import validation
-The system SHALL validate OPML file structure and content.
+### 需求：OPML 导入验证
+系统应验证 OPML 文件结构和内容。
 
-#### Scenario: Invalid OPML format
-- **WHEN** user uploads malformed XML
-- **THEN** system returns 400 Bad Request
-- **AND** response includes parse error details
+#### 场景：无效的 OPML 格式
+- **当** 用户上传格式错误的 XML
+- **则** 系统返回 400 Bad Request
+- **且** 响应包含解析错误详情
 
-#### Scenario: Missing required elements
-- **WHEN** OPML is valid XML but missing required structure
-- **THEN** system returns 400 Bad Request
-- **AND** response indicates missing elements
+#### 场景：缺少必需元素
+- **当** OPML 是有效 XML 但缺少必需结构
+- **则** 系统返回 400 Bad Request
+- **且** 响应指明缺少的元素
 
-#### Scenario: File size limit
-- **WHEN** uploaded file exceeds 1MB
-- **THEN** system returns 413 Payload Too Large
+#### 场景：文件大小限制
+- **当** 上传文件超过 1MB
+- **则** 系统返回 413 Payload Too Large
 
-### Requirement: Bulk import with rate awareness
-The system SHALL handle large imports without overwhelming external feed servers.
+### 需求：带速率感知的批量导入
+系统应处理大量导入而不对外部订阅源服务器造成压力。
 
-#### Scenario: Large import processing
-- **WHEN** user imports OPML with many feeds (>50)
-- **THEN** system processes feeds in batches
-- **AND** system returns immediate response with job ID
-- **AND** system processes feeds asynchronously
-- **AND** system provides status endpoint to check progress
+#### 场景：大批量导入处理
+- **当** 用户导入包含大量订阅源（>50）的 OPML
+- **则** 系统分批处理订阅源
+- **且** 系统立即返回带有任务 ID 的响应
+- **且** 系统异步处理订阅源
+- **且** 系统提供状态端点以检查进度
 
-#### Scenario: Check import progress
-- **WHEN** user calls GET /api/v1/feeds/import/:job_id/status
-- **THEN** system returns import progress (total, processed, added, failed)
-- **AND** system indicates if import is complete or in progress
+#### 场景：检查导入进度
+- **当** 用户调用 GET /api/v1/feeds/import/:job_id/status
+- **则** 系统返回导入进度（total、processed、added、failed）
+- **且** 系统指示导入是否完成或进行中
 
-### Requirement: OPML version compatibility
-The system SHALL support common OPML versions for import.
+### 需求：OPML 版本兼容性
+系统应支持导入常见的 OPML 版本。
 
-#### Scenario: OPML 1.0 import
-- **WHEN** user uploads OPML 1.0 format
-- **THEN** system parses successfully
-- **AND** system extracts feed information
+#### 场景：OPML 1.0 导入
+- **当** 用户上传 OPML 1.0 格式
+- **则** 系统成功解析
+- **且** 系统提取订阅源信息
 
-#### Scenario: OPML 2.0 import
-- **WHEN** user uploads OPML 2.0 format
-- **THEN** system parses successfully
-- **AND** system extracts all available metadata
+#### 场景：OPML 2.0 导入
+- **当** 用户上传 OPML 2.0 格式
+- **则** 系统成功解析
+- **且** 系统提取所有可用的元数据
 
-#### Scenario: No version specified
-- **WHEN** OPML has no version attribute
-- **THEN** system attempts to parse as best effort
-- **AND** system extracts feeds if structure is valid
+#### 场景：未指定版本
+- **当** OPML 没有版本属性
+- **则** 系统尝试尽力解析
+- **且** 如果结构有效，系统提取订阅源

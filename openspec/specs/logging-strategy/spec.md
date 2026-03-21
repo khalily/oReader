@@ -1,70 +1,70 @@
-# Logging Strategy Specification
+# 日志策略规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: Structured JSON logging
-The system SHALL use structured JSON logging for all application logs.
+### 需求：结构化 JSON 日志
+系统应对所有应用日志使用结构化 JSON 日志。
 
-#### Scenario: Log format
-- **WHEN** any log message is written
-- **THEN** log is formatted as JSON with timestamp, level, message, and context fields
-- **AND** timestamp uses ISO 8601 format with timezone
+#### 场景：日志格式
+- **当** 写入任何日志消息
+- **则** 日志格式为 JSON，包含 timestamp、level、message 和 context 字段
+- **且** timestamp 使用带时区的 ISO 8601 格式
 
-#### Scenario: Log levels
-- **WHEN** application logs events
-- **THEN** system uses standard levels: debug, info, warn, error
-- **AND** level is configurable via LOG_LEVEL environment variable
+#### 场景：日志级别
+- **当** 应用记录事件
+- **则** 系统使用标准级别：debug、info、warn、error
+- **且** 级别可通过 LOG_LEVEL 环境变量配置
 
-### Requirement: Request context logging
-The system SHALL include request context in all handler logs.
+### 需求：请求上下文日志
+系统应在所有处理程序日志中包含请求上下文。
 
-#### Scenario: Request logging
-- **WHEN** HTTP request is processed
-- **THEN** log includes request_id, user_id (if authenticated), method, path, status, latency
-- **AND** request_id is unique per request and returned in response header
+#### 场景：请求日志
+- **当** 处理 HTTP 请求
+- **则** 日志包含 request_id、user_id（如已认证）、method、path、status、latency
+- **且** request_id 每个请求唯一，并在响应头中返回
 
-#### Scenario: Error logging
-- **WHEN** error occurs during request processing
-- **THEN** log includes error message, stack trace (in development), and request context
-- **AND** sensitive data (passwords, tokens) is never logged
+#### 场景：错误日志
+- **当** 请求处理期间发生错误
+- **则** 日志包含错误消息、堆栈跟踪（开发环境）和请求上下文
+- **且** 敏感数据（密码、令牌）永不记录
 
-### Requirement: Feed refresh operation logging
-The system SHALL log feed refresh operations with relevant metrics.
+### 需求：订阅源刷新操作日志
+系统应记录带有相关指标的订阅源刷新操作。
 
-#### Scenario: Successful refresh
-- **WHEN** feed is successfully refreshed
-- **THEN** log includes feed_id, items_added, duration, source_url
+#### 场景：成功刷新
+- **当** 订阅源成功刷新
+- **则** 日志包含 feed_id、items_added、duration、source_url
 
-#### Scenario: Failed refresh
-- **WHEN** feed refresh fails
-- **THEN** log includes feed_id, error_type, error_message, duration
-- **AND** consecutive failure count is logged
+#### 场景：刷新失败
+- **当** 订阅源刷新失败
+- **则** 日志包含 feed_id、error_type、error_message、duration
+- **且** 记录连续失败计数
 
-### Requirement: Authentication event logging
-The system SHALL log authentication events for security auditing.
+### 需求：认证事件日志
+系统应为安全审计记录认证事件。
 
-#### Scenario: Login attempt
-- **WHEN** user attempts login
-- **THEN** log includes event_type=login, email, success, ip_address, user_agent
+#### 场景：登录尝试
+- **当** 用户尝试登录
+- **则** 日志包含 event_type=login、email、success、ip_address、user_agent
 
-#### Scenario: Token refresh
-- **WHEN** token is refreshed
-- **THEN** log includes event_type=token_refresh, user_id, success
+#### 场景：令牌刷新
+- **当** 令牌被刷新
+- **则** 日志包含 event_type=token_refresh、user_id、success
 
-#### Scenario: Logout
-- **WHEN** user logs out
-- **THEN** log includes event_type=logout, user_id
+#### 场景：登出
+- **当** 用户登出
+- **则** 日志包含 event_type=logout、user_id
 
-### Requirement: Development vs Production logging
-The system SHALL adapt logging format based on environment.
+### 需求：开发与生产日志
+系统应根据环境调整日志格式。
 
-#### Scenario: Development mode
-- **WHEN** ENV=development
-- **THEN** logs use human-readable console format with colors
-- **AND** debug level is enabled by default
+#### 场景：开发模式
+- **当** ENV=development
+- **则** 日志使用人类可读的控制台格式，带颜色
+- **且** 默认启用 debug 级别
 
-#### Scenario: Production mode
-- **WHEN** ENV=production
-- **THEN** logs use JSON format
-- **AND** info level is default
-- **AND** no colors or extra formatting
+#### 场景：生产模式
+- **当** ENV=production
+- **则** 日志使用 JSON 格式
+- **且** 默认为 info 级别
+- **且** 无颜色或额外格式化

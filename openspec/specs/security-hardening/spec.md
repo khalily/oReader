@@ -1,13 +1,13 @@
-# Security Hardening Specification
+# 安全加固规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: Security headers on all responses
-The system SHALL include security headers on all HTTP responses.
+### 需求：所有响应的安全头
+系统应在所有 HTTP 响应中包含安全头。
 
-#### Scenario: Response headers
-- **WHEN** any HTTP response is sent
-- **THEN** response includes:
+#### 场景：响应头
+- **当** 发送任何 HTTP 响应
+- **则** 响应包含：
   - `X-Content-Type-Options: nosniff`
   - `X-Frame-Options: DENY`
   - `X-XSS-Protection: 1; mode=block`
@@ -15,119 +15,119 @@ The system SHALL include security headers on all HTTP responses.
   - `Referrer-Policy: strict-origin-when-cross-origin`
   - `Permissions-Policy: geolocation=(), microphone=(), camera=()`
 
-### Requirement: CSRF token protection
-The system SHALL validate CSRF tokens on all state-changing requests.
+### 需求：CSRF 令牌保护
+系统应在所有状态变更请求上验证 CSRF 令牌。
 
-#### Scenario: CSRF token generation
-- **WHEN** user logs in successfully
-- **THEN** server generates CSRF token
-- **AND** sets CSRF token in cookie (HttpOnly=false, readable by JS)
-- **AND** returns CSRF token in response body
+#### 场景：CSRF 令牌生成
+- **当** 用户成功登录
+- **则** 服务器生成 CSRF 令牌
+- **且** 在 cookie 中设置 CSRF 令牌（HttpOnly=false，可被 JS 读取）
+- **且** 在响应体中返回 CSRF 令牌
 
-#### Scenario: CSRF token validation
-- **WHEN** client makes POST/PUT/DELETE/PATCH request
-- **THEN** client includes `X-CSRF-Token` header
-- **AND** server validates header matches cookie value
-- **AND** mismatch returns 403 with `CSRF_TOKEN_MISMATCH` error
+#### 场景：CSRF 令牌验证
+- **当** 客户端发送 POST/PUT/DELETE/PATCH 请求
+- **则** 客户端包含 `X-CSRF-Token` 请求头
+- **且** 服务器验证请求头与 cookie 值匹配
+- **且** 不匹配返回 403 及 `CSRF_TOKEN_MISMATCH` 错误
 
-#### Scenario: CSRF token rotation
-- **WHEN** access token is refreshed
-- **THEN** new CSRF token is generated and returned
+#### 场景：CSRF 令牌轮换
+- **当** 访问令牌被刷新
+- **则** 生成并返回新的 CSRF 令牌
 
-### Requirement: RSS content sanitization
-The system SHALL sanitize all HTML content from RSS feeds.
+### 需求：RSS 内容清理
+系统应清理来自 RSS 订阅源的所有 HTML 内容。
 
-#### Scenario: Article content sanitization
-- **WHEN** RSS feed item contains HTML content
-- **THEN** content is sanitized using UGC policy before storage or display
-- **AND** allowed tags: p, br, a, img, ul, ol, li, blockquote, pre, code, strong, em, h1-h6
-- **AND** all script tags, onclick attributes, and javascript: URLs are removed
+#### 场景：文章内容清理
+- **当** RSS 订阅源条目包含 HTML 内容
+- **则** 内容在存储或显示前使用 UGC 策略清理
+- **且** 允许的标签：p、br、a、img、ul、ol、li、blockquote、pre、code、strong、em、h1-h6
+- **且** 移除所有 script 标签、onclick 属性和 javascript: URL
 
-#### Scenario: Feed metadata sanitization
-- **WHEN** feed title or description is parsed
-- **THEN** content is sanitized using strict policy (text only, no HTML)
+#### 场景：订阅源元数据清理
+- **当** 解析订阅源标题或描述
+- **则** 内容使用严格策略清理（仅文本，无 HTML）
 
-### Requirement: Feed URL SSRF protection
-The system SHALL validate and restrict feed URL fetching.
+### 需求：订阅源 URL SSRF 保护
+系统应验证并限制订阅源 URL 获取。
 
-#### Scenario: URL scheme validation
-- **WHEN** user adds new feed URL
-- **THEN** only http:// and https:// schemes are allowed
-- **AND** other schemes return 400 error
+#### 场景：URL 协议验证
+- **当** 用户添加新的订阅源 URL
+- **则** 仅允许 http:// 和 https:// 协议
+- **且** 其他协议返回 400 错误
 
-#### Scenario: Private IP blocking
-- **WHEN** feed URL is resolved
-- **THEN** system blocks IPs in these ranges:
-  - 10.0.0.0/8 (Private)
-  - 172.16.0.0/12 (Private)
-  - 192.168.0.0/16 (Private)
-  - 127.0.0.0/8 (Loopback)
-  - 169.254.0.0/16 (Link-local/AWS metadata)
-  - ::1/128 (IPv6 loopback)
-  - fc00::/7 (IPv6 private)
-- **AND** blocked URLs return 400 with `URL_NOT_ALLOWED` error
+#### 场景：私有 IP 阻止
+- **当** 订阅源 URL 被解析
+- **则** 系统阻止以下范围的 IP：
+  - 10.0.0.0/8（私有）
+  - 172.16.0.0/12（私有）
+  - 192.168.0.0/16（私有）
+  - 127.0.0.0/8（回环）
+  - 169.254.0.0/16（链路本地/AWS 元数据）
+  - ::1/128（IPv6 回环）
+  - fc00::/7（IPv6 私有）
+- **且** 被阻止的 URL 返回 400 及 `URL_NOT_ALLOWED` 错误
 
-### Requirement: Feed size limits
-The system SHALL enforce size limits on feed content.
+### 需求：订阅源大小限制
+系统应对订阅源内容强制执行大小限制。
 
-#### Scenario: Feed fetch timeout
-- **WHEN** fetching feed URL
-- **THEN** request times out after 30 seconds
-- **AND** timeout is logged as feed fetch failure
+#### 场景：订阅源获取超时
+- **当** 获取订阅源 URL
+- **则** 请求在 30 秒后超时
+- **且** 超时作为订阅源获取失败记录日志
 
-#### Scenario: Item count limit
-- **WHEN** parsing RSS feed
-- **THEN** only first 1000 items are processed
-- **AND** excess items are logged but not stored
+#### 场景：文章数量限制
+- **当** 解析 RSS 订阅源
+- **则** 仅处理前 1000 篇文章
+- **且** 超出文章记录日志但不存储
 
-#### Scenario: Content size limit
-- **WHEN** individual item content exceeds 1MB
-- **THEN** content is truncated with marker `[truncated]`
-- **AND** original size is logged
+#### 场景：内容大小限制
+- **当** 单个文章内容超过 1MB
+- **则** 内容被截断并添加 `[truncated]` 标记
+- **且** 记录原始大小日志
 
-### Requirement: Password security
-The system SHALL enforce secure password handling.
+### 需求：密码安全
+系统应强制执行安全的密码处理。
 
-#### Scenario: Password complexity
-- **WHEN** user registers or changes password
-- **THEN** password must be at least 8 characters
-- **AND** bcrypt cost factor is 12 or higher
+#### 场景：密码复杂度
+- **当** 用户注册或更改密码
+- **则** 密码必须至少 8 个字符
+- **且** bcrypt cost 因子为 12 或更高
 
-#### Scenario: Password hashing
-- **WHEN** password is stored
-- **THEN** password is hashed with bcrypt
-- **AND** plaintext password is never logged
+#### 场景：密码哈希
+- **当** 存储密码
+- **则** 密码使用 bcrypt 哈希
+- **且** 明文密码永不记录日志
 
-### Requirement: JWT signing security
-The system SHALL use secure JWT signing configuration.
+### 需求：JWT 签名安全
+系统应使用安全的 JWT 签名配置。
 
-#### Scenario: Signing algorithm
-- **WHEN** JWT is generated
-- **THEN** HS256 algorithm is used (or RS256 for production)
-- **AND** secret key is at least 256 bits (32 bytes)
+#### 场景：签名算法
+- **当** 生成 JWT
+- **则** 使用 HS256 算法（或生产环境使用 RS256）
+- **且** 密钥至少 256 位（32 字节）
 
-#### Scenario: Token claims
-- **WHEN** access token is generated
-- **THEN** claims include: sub (user_id), exp, iat, csrf_token
-- **AND** claims do NOT include sensitive data (password, email)
+#### 场景：令牌声明
+- **当** 生成访问令牌
+- **则** 声明包含：sub (user_id)、exp、iat、csrf_token
+- **且** 声明不包含敏感数据（密码、邮箱）
 
-### Requirement: Rate limiting key combination
-The system SHALL use combined keys for authenticated rate limiting.
+### 需求：速率限制键组合
+系统应为已认证的速率限制使用组合键。
 
-#### Scenario: Unauthenticated rate limiting
-- **WHEN** request has no valid access token
-- **THEN** rate limit key is client IP address
+#### 场景：未认证速率限制
+- **当** 请求无有效访问令牌
+- **则** 速率限制键为客户端 IP 地址
 
-#### Scenario: Authenticated rate limiting
-- **WHEN** request has valid access token
-- **THEN** rate limit key is combination of IP + user_id
-- **AND** this prevents single compromised account from using full quota
+#### 场景：已认证速率限制
+- **当** 请求有有效访问令牌
+- **则** 速率限制键为 IP + user_id 的组合
+- **且** 这防止单个被盗账户使用全部配额
 
-### Requirement: Dependency vulnerability scanning
-The system SHALL detect vulnerable dependencies.
+### 需求：依赖漏洞扫描
+系统应检测有漏洞的依赖。
 
-#### Scenario: CI vulnerability check
-- **WHEN** CI pipeline runs
-- **THEN** `govulncheck` scans Go dependencies
-- **AND** `npm audit` scans frontend dependencies
-- **AND** pipeline fails on high/critical vulnerabilities
+#### 场景：CI 漏洞检查
+- **当** CI 管道运行
+- **则** `govulncheck` 扫描 Go 依赖
+- **且** `npm audit` 扫描前端依赖
+- **且** 发现高/严重漏洞时管道失败

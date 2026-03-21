@@ -1,113 +1,113 @@
-# Implementation Summary: Playwright API Testing
+# 实现总结：Playwright API 测试
 
-## Overview
-Successfully implemented comprehensive Playwright-based end-to-end API testing infrastructure for the oReader application, covering all REST endpoints with proper authentication, CSRF handling, and test database isolation.
+## 概述
+成功为 oReader 应用实现了基于 Playwright 的全面端到端 API 测试基础设施，覆盖所有 REST 端点，具有适当的认证、CSRF 处理和测试数据库隔离。
 
-## What Was Accomplished
+## 完成内容
 
-### 1. Infrastructure Setup ✓
-- Installed Playwright in web/ directory
-- Created tests/e2e/ directory structure with fixtures subdirectory
-- Created playwright.config.ts with:
-  - Base URL: http://localhost:8080
-  - Headless Chromium mode
-  - Test database configuration (oreader_test.db)
-  - Development environment with rate limiting disabled
-  - Automatic server startup
-- Created .env.test with test environment variables
-- Added npm scripts: test:e2e and test:e2e:ui
+### 1. 基础设施设置 ✓
+- 在 web/ 目录安装 Playwright
+- 创建 tests/e2e/ 目录结构和 fixtures 子目录
+- 创建 playwright.config.ts，配置：
+  - 基础 URL：http://localhost:8080
+  - 无头 Chromium 模式
+  - 测试数据库配置（oreader_test.db）
+  - 禁用速率限制的开发环境
+  - 自动服务器启动
+- 创建 .env.test 配置测试环境变量
+- 添加 npm 脚本：test:e2e 和 test:e2e:ui
 
-### 2. Test Fixtures and Helpers ✓
-- Created comprehensive auth.ts fixture with:
-  - Test user factory (unique email generation)
-  - Login helper with CSRF token extraction
-  - Register helper with CSRF token extraction
-  - Authenticated request helpers (GET, POST, DELETE)
-  - Cookie extraction utilities
-  - CSRF header injection
+### 2. 测试夹具和辅助函数 ✓
+- 创建全面的 auth.ts 夹具，包含：
+  - 测试用户工厂（唯一邮箱生成）
+  - 带 CSRF 令牌提取的登录辅助函数
+  - 带 CSRF 令牌提取的注册辅助函数
+  - 认证请求辅助函数（GET、POST、DELETE）
+  - Cookie 提取工具
+  - CSRF 头注入
 
-### 3. Bug Fixes ✓
-**Fixed 2 critical bugs in authentication flow:**
+### 3. Bug 修复 ✓
+**修复了认证流程中的 2 个关键 bug：**
 
-#### Bug #1: Login Response Missing CSRF Token
-- **File**: internal/handler/auth.go
-- **Issue**: Login endpoint not returning csrf_token in response body
-- **Fix**: Removed duplicate c.JSON() call, allowing setAuthCookies() to send complete response
+#### Bug #1：登录响应缺少 CSRF 令牌
+- **文件**：internal/handler/auth.go
+- **问题**：登录端点未在响应体中返回 csrf_token
+- **修复**：移除重复的 c.JSON() 调用，让 setAuthCookies() 发送完整响应
 
-#### Bug #2: Refresh Token Response Missing CSRF Token
-- **File**: internal/handler/auth.go
-- **Issue**: Same as Bug #1 in Refresh endpoint
-- **Fix**: Removed duplicate c.JSON() call
+#### Bug #2：刷新令牌响应缺少 CSRF 令牌
+- **文件**：internal/handler/auth.go
+- **问题**：与 Bug #1 相同，在刷新端点
+- **修复**：移除重复的 c.JSON() 调用
 
-**Impact**: Both Login and Refresh now consistently return CSRF token, matching Register behavior
+**影响**：登录和刷新现在一致返回 CSRF 令牌，与注册行为匹配
 
-### 4. Test Suites Created ✓
+### 4. 创建的测试套件 ✓
 
-#### Authentication Tests (auth.spec.ts)
-- 8 test cases covering:
-  - Successful registration
-  - Duplicate email error
-  - Invalid email format
-  - Successful login with CSRF token
-  - Invalid credentials
-  - Get current user
-  - Token refresh
-  - Logout
+#### 认证测试 (auth.spec.ts)
+- 8 个测试用例，覆盖：
+  - 成功注册
+  - 重复邮箱错误
+  - 无效邮箱格式
+  - 带 CSRF 令牌的成功登录
+  - 无效凭据
+  - 获取当前用户
+  - 令牌刷新
+  - 登出
 
-#### Feed Tests (feeds.spec.ts)
-- 7 test cases covering:
-  - Create feed subscription (using OpenAI RSS)
-  - List feeds
-  - Get single feed
-  - Refresh feed
-  - Mark all items read
-  - Delete feed
-  - Error cases (invalid URL, duplicate, not found)
+#### 订阅源测试 (feeds.spec.ts)
+- 7 个测试用例，覆盖：
+  - 创建订阅源订阅（使用 OpenAI RSS）
+  - 列出订阅源
+  - 获取单个订阅源
+  - 刷新订阅源
+  - 标记所有文章为已读
+  - 删除订阅源
+  - 错误场景（无效 URL、重复、未找到）
 
-#### Item Tests (items.spec.ts)
-- 7 test cases covering:
-  - List items with pagination
-  - Filter by feed
-  - Filter by starred
-  - Get single item
-  - Toggle star status
-  - Toggle read status
-  - Error cases
+#### 文章测试 (items.spec.ts)
+- 7 个测试用例，覆盖：
+  - 分页列出文章
+  - 按订阅源筛选
+  - 按收藏筛选
+  - 获取单个文章
+  - 切换收藏状态
+  - 切换已读状态
+  - 错误场景
 
-#### OPML Tests (opml.spec.ts)
-- 3 test cases covering:
-  - Export feeds as OPML
-  - Import OPML file
-  - Get import job status
+#### OPML 测试 (opml.spec.ts)
+- 3 个测试用例，覆盖：
+  - 导出订阅源为 OPML
+  - 导入 OPML 文件
+  - 获取导入任务状态
 
-#### Error Handling Tests (error-handling.spec.ts)
-- 5 test cases covering:
-  - 401 Unauthorized (missing token)
-  - 403 Forbidden (missing CSRF)
-  - 403 Forbidden (CSRF mismatch)
+#### 错误处理测试 (error-handling.spec.ts)
+- 5 个测试用例，覆盖：
+  - 401 Unauthorized（缺少令牌）
+  - 403 Forbidden（缺少 CSRF）
+  - 403 Forbidden（CSRF 不匹配）
   - 404 Not Found
-  - Rate limiting behavior
+  - 速率限制行为
 
-### 5. Test Infrastructure ✓
-- Created setup.ts for test database initialization
-- Configured sequential test execution to avoid DB conflicts
-- Set up automatic test database cleanup
-- Configured CI-friendly settings (retries, reporting)
+### 5. 测试基础设施 ✓
+- 创建 setup.ts 用于测试数据库初始化
+- 配置顺序测试执行以避免数据库冲突
+- 设置自动测试数据库清理
+- 配置 CI 友好设置（重试、报告）
 
-### 6. Documentation ✓
-- Created comprehensive tests/e2e/README.md with:
-  - Setup instructions
-  - Running tests guide
-  - Test structure overview
-  - Authentication flow documentation
-  - Debugging guide
-  - CI/CD integration notes
-  - Troubleshooting section
-- Updated main README.md with E2E testing section
-- Created BUGS_FIXED.md documenting discovered issues
-- Updated .gitignore to track .env.test template
+### 6. 文档 ✓
+- 创建全面的 tests/e2e/README.md，包含：
+  - 设置说明
+  - 运行测试指南
+  - 测试结构概述
+  - 认证流程文档
+  - 调试指南
+  - CI/CD 集成说明
+  - 故障排除部分
+- 更新主 README.md 添加 E2E 测试部分
+- 创建 BUGS_FIXED.md 记录发现的问题
+- 更新 .gitignore 以跟踪 .env.test 模板
 
-## Files Created
+## 创建的文件
 - web/tests/e2e/playwright.config.ts
 - web/tests/e2e/setup.ts
 - web/tests/e2e/fixtures/auth.ts
@@ -120,54 +120,54 @@ Successfully implemented comprehensive Playwright-based end-to-end API testing i
 - .env.test
 - openspec/changes/playwright-api-testing/BUGS_FIXED.md
 
-## Files Modified
-- internal/handler/auth.go (fixed Login and Refresh responses)
-- web/package.json (added test:e2e scripts)
-- README.md (added E2E testing section)
-- .gitignore (track .env.test)
+## 修改的文件
+- internal/handler/auth.go（修复登录和刷新响应）
+- web/package.json（添加 test:e2e 脚本）
+- README.md（添加 E2E 测试部分）
+- .gitignore（跟踪 .env.test）
 
-## Test Coverage
-- **Total Test Cases**: 30
-- **API Endpoints Covered**: 20+
-- **Test Categories**: 5 (Auth, Feeds, Items, OPML, Errors)
-- **Lines of Test Code**: ~600
+## 测试覆盖
+- **总测试用例**：30
+- **覆盖的 API 端点**：20+
+- **测试类别**：5（认证、订阅源、文章、OPML、错误）
+- **测试代码行数**：约 600
 
-## How to Use
+## 使用方法
 
-### Run All Tests
+### 运行所有测试
 ```bash
 cd web
 npm run test:e2e
 ```
 
-### Run with UI
+### 带 UI 运行
 ```bash
 cd web
 npm run test:e2e:ui
 ```
 
-### Run Specific Suite
+### 运行特定套件
 ```bash
 cd web
 npx playwright test --config=tests/e2e/playwright.config.ts tests/e2e/auth.spec.ts
 ```
 
-## Benefits
-1. **Regression Prevention**: Automated tests catch bugs before deployment
-2. **API Contract Validation**: Ensures endpoints behave as expected
-3. **Authentication Testing**: Validates complete auth flow with CSRF
-4. **Documentation**: Tests serve as living API documentation
-5. **CI/CD Ready**: Configured for automated pipeline execution
-6. **Fast Feedback**: Tests run in seconds with isolated database
+## 收益
+1. **回归预防**：自动化测试在部署前捕获 bug
+2. **API 契约验证**：确保端点按预期行为
+3. **认证测试**：验证带 CSRF 的完整认证流程
+4. **文档**：测试作为活的 API 文档
+5. **CI/CD 就绪**：配置为自动化管道执行
+6. **快速反馈**：测试在隔离数据库中几秒内运行
 
-## Next Steps
-- Run tests to verify all pass
-- Consider adding to CI pipeline
-- Archive this change with /opsx:archive
+## 下一步
+- 运行测试验证全部通过
+- 考虑添加到 CI 管道
+- 使用 /opsx:archive 归档此变更
 
-## Lessons Learned
-1. CSRF token must be in response body for client-side access
-2. Avoid duplicate HTTP response sends in handlers
-3. Test database isolation is critical for reliable E2E tests
-4. Sequential execution prevents database conflicts
-5. External RSS feeds provide realistic test scenarios
+## 经验教训
+1. CSRF 令牌必须在响应体中供客户端访问
+2. 避免在处理程序中发送重复的 HTTP 响应
+3. 测试数据库隔离对可靠的 E2E 测试至关重要
+4. 顺序执行防止数据库冲突
+5. 外部 RSS 订阅源提供真实的测试场景

@@ -1,73 +1,73 @@
-# Rate Limiting Specification
+# 速率限制规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: API rate limiting for abuse prevention
-The system SHALL enforce rate limits on API endpoints to prevent abuse and protect server resources.
+### 需求：API 速率限制以防止滥用
+系统应对 API 端点强制执行速率限制，以防止滥用并保护服务器资源。
 
-#### Scenario: Request within rate limit
-- **WHEN** client makes requests within configured rate limit
-- **THEN** system processes requests normally
-- **AND** response includes rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
+#### 场景：请求在速率限制内
+- **当** 客户端在配置的速率限制内发送请求
+- **则** 系统正常处理请求
+- **且** 响应包含速率限制头 (X-RateLimit-Limit、X-RateLimit-Remaining、X-RateLimit-Reset)
 
-#### Scenario: Request exceeds rate limit
-- **WHEN** client exceeds rate limit for an endpoint
-- **THEN** system returns 429 Too Many Requests
-- **AND** response includes Retry-After header
-- **AND** response body includes error message and reset time
+#### 场景：请求超出速率限制
+- **当** 客户端超出端点的速率限制
+- **则** 系统返回 429 Too Many Requests
+- **且** 响应包含 Retry-After 头
+- **且** 响应体包含错误消息和重置时间
 
-### Requirement: Differentiated rate limits by endpoint type
-The system SHALL apply different rate limits based on endpoint sensitivity.
+### 需求：按端点类型区分速率限制
+系统应根据端点敏感性应用不同的速率限制。
 
-#### Scenario: Auth endpoint rate limit (strict)
-- **WHEN** client calls /api/v1/auth/login or /api/v1/auth/register
-- **THEN** system allows maximum 10 requests per minute per IP
-- **AND** system returns 429 when exceeded
+#### 场景：认证端点速率限制（严格）
+- **当** 客户端调用 /api/v1/auth/login 或 /api/v1/auth/register
+- **则** 系统允许每个 IP 每分钟最多 10 次请求
+- **且** 超出时返回 429
 
-#### Scenario: API endpoint rate limit (standard)
-- **WHEN** client calls other authenticated API endpoints
-- **THEN** system allows maximum 60 requests per minute per user
-- **AND** unauthenticated requests limited to 30 requests per minute per IP
+#### 场景：API 端点速率限制（标准）
+- **当** 客户端调用其他已认证 API 端点
+- **则** 系统允许每个用户每分钟最多 60 次请求
+- **且** 未认证请求限制为每个 IP 每分钟 30 次请求
 
-#### Scenario: Feed refresh rate limit
-- **WHEN** client calls POST /api/v1/feeds/:id/refresh
-- **THEN** system allows maximum 6 requests per minute per feed
-- **AND** system prevents refresh spam for same feed
+#### 场景：订阅源刷新速率限制
+- **当** 客户端调用 POST /api/v1/feeds/:id/refresh
+- **则** 系统允许每个订阅源每分钟最多 6 次请求
+- **且** 系统防止对同一订阅源的刷新刷屏
 
-### Requirement: Rate limit key identification
-The system SHALL identify clients using appropriate keys for rate limiting.
+### 需求：速率限制键识别
+系统应使用适当的键识别客户端进行速率限制。
 
-#### Scenario: Authenticated user
-- **WHEN** request includes valid authentication
-- **THEN** system uses user_id as rate limit key
+#### 场景：已认证用户
+- **当** 请求包含有效认证
+- **则** 系统使用 user_id 作为速率限制键
 
-#### Scenario: Unauthenticated request
-- **WHEN** request has no authentication
-- **THEN** system uses client IP address as rate limit key
-- **AND** system handles X-Forwarded-For header for reverse proxy deployments
+#### 场景：未认证请求
+- **当** 请求无认证
+- **则** 系统使用客户端 IP 地址作为速率限制键
+- **且** 系统处理 X-Forwarded-For 头以支持反向代理部署
 
-### Requirement: Rate limit response headers
-The system SHALL include rate limit information in response headers.
+### 需求：速率限制响应头
+系统应在响应头中包含速率限制信息。
 
-#### Scenario: Headers included in all responses
-- **WHEN** client makes any API request
-- **THEN** response includes:
-  - X-RateLimit-Limit: Maximum requests per window
-  - X-RateLimit-Remaining: Requests remaining in current window
-  - X-RateLimit-Reset: Unix timestamp when window resets
+#### 场景：所有响应都包含头信息
+- **当** 客户端发送任何 API 请求
+- **则** 响应包含：
+  - X-RateLimit-Limit：时间窗口内最大请求数
+  - X-RateLimit-Remaining：当前窗口内剩余请求数
+  - X-RateLimit-Reset：窗口重置时的 Unix 时间戳
 
-### Requirement: Sliding window rate limiting
-The system SHALL use sliding window algorithm for smoother rate limiting.
+### 需求：滑动窗口速率限制
+系统应使用滑动窗口算法实现更平滑的速率限制。
 
-#### Scenario: Request near window boundary
-- **WHEN** client makes requests near the end of rate limit window
-- **THEN** system counts requests in rolling window
-- **AND** system does not allow burst at window boundary
+#### 场景：窗口边界附近的请求
+- **当** 客户端在速率限制窗口末尾附近发送请求
+- **则** 系统计算滚动窗口内的请求数
+- **且** 系统不允许在窗口边界突发请求
 
-### Requirement: Rate limit bypass for health checks
-The system SHALL exempt health check endpoints from rate limiting.
+### 需求：健康检查绕过速率限制
+系统应豁免健康检查端点的速率限制。
 
-#### Scenario: Health check not rate limited
-- **WHEN** client calls GET /health or GET /api/v1/health
-- **THEN** system does not apply rate limiting
-- **AND** system does not include rate limit headers
+#### 场景：健康检查不受速率限制
+- **当** 客户端调用 GET /health 或 GET /api/v1/health
+- **则** 系统不应用速率限制
+- **且** 系统不包含速率限制头

@@ -1,63 +1,63 @@
-# Background Refresh Specification
+# 后台刷新规格
 
-## ADDED Requirements
+## 新增需求
 
-### Requirement: Automatic periodic feed refresh
-The system SHALL automatically refresh all subscribed feeds at configurable intervals.
+### 需求：自动周期性订阅源刷新
+系统应按可配置的间隔自动刷新所有已订阅的订阅源。
 
-#### Scenario: Periodic refresh trigger
-- **WHEN** refresh interval elapses (default 15 minutes)
-- **THEN** system iterates through all feeds
-- **AND** system fetches and parses each feed
-- **AND** system creates new items not in database
-- **AND** system updates last_updated timestamp
+#### 场景：周期性刷新触发
+- **当** 刷新间隔到期（默认 15 分钟）
+- **则** 系统遍历所有订阅源
+- **且** 系统获取并解析每个订阅源
+- **且** 系统创建数据库中不存在的新文章
+- **且** 系统更新 last_updated 时间戳
 
-#### Scenario: Refresh continues on individual feed error
-- **WHEN** one feed fails to fetch or parse during periodic refresh
-- **THEN** system logs the error
-- **AND** system continues refreshing remaining feeds
-- **AND** system does not stop the refresh process
+#### 场景：单个订阅源错误时继续刷新
+- **当** 周期性刷新期间某个订阅源获取或解析失败
+- **则** 系统记录错误
+- **且** 系统继续刷新剩余订阅源
+- **且** 系统不停止刷新流程
 
-### Requirement: Concurrent feed refresh
-The system SHALL refresh multiple feeds concurrently for efficiency.
+### 需求：并发订阅源刷新
+系统应并发刷新多个订阅源以提高效率。
 
-#### Scenario: Parallel processing
-- **WHEN** periodic refresh runs
-- **THEN** system processes multiple feeds in parallel (up to configurable limit)
-- **AND** system uses goroutines with context timeout
+#### 场景：并行处理
+- **当** 周期性刷新运行时
+- **则** 系统并行处理多个订阅源（上限可配置）
+- **且** 系统使用带有 context 超时的 goroutine
 
-#### Scenario: Timeout handling
-- **WHEN** feed fetch exceeds timeout (default 30 seconds)
-- **THEN** system cancels the request
-- **AND** system logs timeout error
-- **AND** system proceeds to next feed
+#### 场景：超时处理
+- **当** 订阅源获取超过超时时间（默认 30 秒）
+- **则** 系统取消请求
+- **且** 系统记录超时错误
+- **且** 系统继续处理下一个订阅源
 
-### Requirement: Refresh on startup
-The system SHALL refresh feeds on application startup.
+### 需求：启动时刷新
+系统应在应用启动时刷新订阅源。
 
-#### Scenario: Startup refresh
-- **WHEN** application starts
-- **THEN** system waits for database connection
-- **AND** system triggers initial refresh of all feeds
-- **AND** system starts periodic ticker after initial refresh
+#### 场景：启动刷新
+- **当** 应用启动
+- **则** 系统等待数据库连接
+- **且** 系统触发所有订阅源的初始刷新
+- **且** 系统在初始刷新后启动周期性定时器
 
-### Requirement: Configurable refresh interval
-The system SHALL allow configuration of refresh interval.
+### 需求：可配置的刷新间隔
+系统应允许配置刷新间隔。
 
-#### Scenario: Default interval
-- **WHEN** no interval is configured
-- **THEN** system uses 15 minute default
+#### 场景：默认间隔
+- **当** 未配置间隔
+- **则** 系统使用 15 分钟作为默认值
 
-#### Scenario: Custom interval
-- **WHEN** REFRESH_INTERVAL environment variable is set
-- **THEN** system uses configured interval
-- **AND** invalid values fall back to default
+#### 场景：自定义间隔
+- **当** 设置了 REFRESH_INTERVAL 环境变量
+- **则** 系统使用配置的间隔
+- **且** 无效值回退到默认值
 
-### Requirement: Graceful shutdown
-The system SHALL handle graceful shutdown during refresh operations.
+### 需求：优雅关闭
+系统应在刷新操作期间处理优雅关闭。
 
-#### Scenario: Shutdown during refresh
-- **WHEN** application receives SIGTERM or SIGINT
-- **THEN** system stops refresh ticker
-- **AND** system waits for in-progress refreshes to complete (with timeout)
-- **AND** system exits cleanly
+#### 场景：刷新期间关闭
+- **当** 应用收到 SIGTERM 或 SIGINT 信号
+- **则** 系统停止刷新定时器
+- **且** 系统等待进行中的刷新完成（带超时）
+- **且** 系统正常退出
