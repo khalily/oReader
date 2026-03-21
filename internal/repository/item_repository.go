@@ -20,28 +20,47 @@ func NewItemRepository(db *gorm.DB) service.ItemRepository {
 	return &itemRepository{db: db}
 }
 
-// getFeedTitle extracts the feed title from an item's preloaded Feed relationship
-func getFeedTitle(item *model.Item) string {
-	if item.Feed != nil {
-		return item.Feed.Title
+// buildFeedResponse creates a service.FeedResponse from a model.Feed
+func buildFeedResponse(feed *model.Feed) *service.FeedResponse {
+	if feed == nil {
+		return nil
 	}
-	return ""
+	result := &service.FeedResponse{
+		ID:          feed.ID,
+		Title:       feed.Title,
+		FeedURL:     feed.FeedURL,
+		Description: feed.Description,
+	}
+	// Only set ImageURL if it's not empty
+	if feed.ImageURL != "" {
+		result.ImageURL = &feed.ImageURL
+	}
+	return result
+}
+
+// buildUserItemStateResponse creates a service.UserItemStateResponse from a model.UserItemState
+func buildUserItemStateResponse(state *model.UserItemState) *service.UserItemStateResponse {
+	if state == nil {
+		return nil
+	}
+	result := &service.UserItemStateResponse{
+		ItemID:    state.ItemID,
+		IsStarred: state.IsStarred,
+		IsRead:    state.IsRead,
+	}
+	if state.ReadAt != nil {
+		readAt := state.ReadAt.Format(time.RFC3339)
+		result.ReadAt = &readAt
+	}
+	return result
 }
 
 // buildItemWithState creates an ItemWithState from an item and optional state
 func buildItemWithState(item *model.Item, state *model.UserItemState) *service.ItemWithState {
 	result := &service.ItemWithState{
 		Item:      item,
-		FeedTitle: getFeedTitle(item),
-	}
-
-	if state != nil {
-		result.IsStarred = state.IsStarred
-		result.IsRead = state.IsRead
-		if state.ReadAt != nil {
-			readAt := state.ReadAt.Format(time.RFC3339)
-			result.ReadAt = &readAt
-		}
+		Feed:      buildFeedResponse(item.Feed),
+		UserState: buildUserItemStateResponse(state),
 	}
 
 	return result
@@ -161,17 +180,22 @@ func (r *itemRepository) ListByFeedID(ctx context.Context, feedID, userID string
 func (r *itemRepository) ListStarred(ctx context.Context, userID string, opts service.ListOptions) ([]*service.ItemWithState, int64, error) {
 	var total int64
 
-	// Count total
+	// Count total - only count items from feeds the user is subscribed to
+	// Note: explicit deleted_at IS NULL check because raw JOINs don't apply GORM soft delete filter
 	if err := r.db.WithContext(ctx).
 		Model(&model.UserItemState{}).
-		Where("user_id = ? AND is_starred = ?", userID, true).
+		Joins("JOIN items ON items.id = user_item_states.item_id").
+		Joins("JOIN user_feeds ON user_feeds.feed_id = items.feed_id AND user_feeds.user_id = ? AND user_feeds.deleted_at IS NULL", userID).
+		Where("user_item_states.user_id = ? AND user_item_states.is_starred = ?", userID, true).
 		Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// Get states with items, sorted by pub_date DESC NULLS LAST
+	// Only get items from feeds the user is subscribed to
 	query := r.db.WithContext(ctx).
 		Joins("JOIN items ON items.id = user_item_states.item_id").
+		Joins("JOIN user_feeds ON user_feeds.feed_id = items.feed_id AND user_feeds.user_id = ? AND user_feeds.deleted_at IS NULL", userID).
 		Where("user_item_states.user_id = ? AND user_item_states.is_starred = ?", userID, true).
 		Order("items.pub_date DESC NULLS LAST").
 		Offset(opts.Offset)
@@ -198,18 +222,26 @@ func (r *itemRepository) ListStarred(ctx context.Context, userID string, opts se
 func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts service.ListOptions) ([]*service.ItemWithState, int64, error) {
 	var total int64
 
-	// Count total
+	// Count items with is_read=false state, only from subscribed feeds
 	if err := r.db.WithContext(ctx).
 		Model(&model.UserItemState{}).
-		Where("user_id = ? AND is_read = ?", userID, false).
+		Joins("JOIN items ON items.id = user_item_states.item_id").
+		Joins("JOIN user_feeds ON user_feeds.feed_id = items.feed_id AND user_feeds.user_id = ? AND user_feeds.deleted_at IS NULL", userID).
+		Where("user_item_states.user_id = ? AND user_item_states.is_read = ?", userID, false).
 		Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// Also count items without any state (unread by default)
+	// Only count items from feeds the user is subscribed to
 	var itemsWithoutState int64
 	if err := r.db.WithContext(ctx).
 		Model(&model.Item{}).
+		Where("feed_id IN (?)",
+			r.db.WithContext(ctx).
+				Model(&model.UserFeed{}).
+				Select("feed_id").
+				Where("user_id = ?", userID)).
 		Where("id NOT IN (?)",
 			r.db.WithContext(ctx).
 				Model(&model.UserItemState{}).
@@ -222,8 +254,10 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 	total += itemsWithoutState
 
 	// Get unread items with states first (sorted by pub_date DESC NULLS LAST)
+	// Only get items from feeds the user is subscribed to
 	query := r.db.WithContext(ctx).
 		Joins("JOIN items ON items.id = user_item_states.item_id").
+		Joins("JOIN user_feeds ON user_feeds.feed_id = items.feed_id AND user_feeds.user_id = ? AND user_feeds.deleted_at IS NULL", userID).
 		Where("user_item_states.user_id = ? AND user_item_states.is_read = ?", userID, false).
 		Order("items.pub_date DESC NULLS LAST").
 		Offset(opts.Offset)
@@ -244,11 +278,17 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 	}
 
 	// If we need more items, get items without state
+	// Only get items from feeds the user is subscribed to
 	remaining := opts.Limit - len(result)
 	if opts.Limit > 0 && remaining > 0 {
 		var items []*model.Item
 		itemQuery := r.db.WithContext(ctx).
 			Preload("Feed").
+			Where("feed_id IN (?)",
+				r.db.WithContext(ctx).
+					Model(&model.UserFeed{}).
+					Select("feed_id").
+					Where("user_id = ?", userID)).
 			Where("id NOT IN (?)",
 				r.db.WithContext(ctx).
 					Model(&model.UserItemState{}).

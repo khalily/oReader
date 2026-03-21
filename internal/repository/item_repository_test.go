@@ -21,7 +21,7 @@ func setupItemDB(t *testing.T) *gorm.DB {
 	}
 
 	// Migrate tables
-	if err := db.AutoMigrate(&model.Feed{}, &model.User{}, &model.Item{}, &model.UserItemState{}); err != nil {
+	if err := db.AutoMigrate(&model.Feed{}, &model.User{}, &model.Item{}, &model.UserItemState{}, &model.UserFeed{}); err != nil {
 		t.Fatalf("Failed to migrate database: %v", err)
 	}
 
@@ -290,12 +290,12 @@ func TestItemRepository_ListByFeedID(t *testing.T) {
 	}
 
 	// Check first item is starred
-	if !result[0].IsStarred {
+	if result[0].UserState == nil || !result[0].UserState.IsStarred {
 		t.Error("First item should be starred")
 	}
 
 	// Check second item is read
-	if !result[1].IsRead {
+	if result[1].UserState == nil || !result[1].UserState.IsRead {
 		t.Error("Second item should be read")
 	}
 }
@@ -367,6 +367,18 @@ func TestItemRepository_ListStarred(t *testing.T) {
 	}
 	if err := db.Create(feed).Error; err != nil {
 		t.Fatalf("Failed to create feed: %v", err)
+	}
+
+	// Create user-feed relationship (user subscribes to feed)
+	userFeed := &model.UserFeed{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	if err := userFeed.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeed ID: %v", err)
+	}
+	if err := db.Create(userFeed).Error; err != nil {
+		t.Fatalf("Failed to create user_feed: %v", err)
 	}
 
 	// Create items
@@ -441,6 +453,18 @@ func TestItemRepository_ListUnread(t *testing.T) {
 		t.Fatalf("Failed to create feed: %v", err)
 	}
 
+	// Create user-feed relationship (user subscribes to feed)
+	userFeed := &model.UserFeed{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	if err := userFeed.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeed ID: %v", err)
+	}
+	if err := db.Create(userFeed).Error; err != nil {
+		t.Fatalf("Failed to create user_feed: %v", err)
+	}
+
 	// Create items
 	items := []*model.Item{}
 	for i := 1; i <= 3; i++ {
@@ -483,6 +507,136 @@ func TestItemRepository_ListUnread(t *testing.T) {
 	}
 	if len(result) != 2 {
 		t.Fatalf("Items count = %d, want 2", len(result))
+	}
+}
+
+// TestItemRepository_ListUnread_ExcludesUnsubscribedFeed verifies that items from
+// unsubscribed feeds (soft-deleted UserFeed) do not appear in the unread list.
+// This is a regression test for the 404 issue when clicking items in ListUnread.
+func TestItemRepository_ListUnread_ExcludesUnsubscribedFeed(t *testing.T) {
+	db := setupItemDB(t)
+	repo := NewItemRepository(db)
+	stateRepo := NewUserItemStateRepository(db)
+
+	ctx := context.Background()
+
+	// Create user
+	user := &model.User{Email: "user@example.com", PasswordHash: "hash"}
+	if err := user.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	// Create Feed A (will be unsubscribed)
+	feedA := &model.Feed{FeedURL: "https://feed-a.com/feed.xml", Title: "Feed A"}
+	if err := feedA.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(feedA).Error; err != nil {
+		t.Fatalf("Failed to create feed A: %v", err)
+	}
+
+	// Create Feed B (will remain subscribed)
+	feedB := &model.Feed{FeedURL: "https://feed-b.com/feed.xml", Title: "Feed B"}
+	if err := feedB.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(feedB).Error; err != nil {
+		t.Fatalf("Failed to create feed B: %v", err)
+	}
+
+	// Create user-feed relationships
+	userFeedA := &model.UserFeed{UserID: user.ID, FeedID: feedA.ID}
+	if err := userFeedA.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeedA ID: %v", err)
+	}
+	if err := db.Create(userFeedA).Error; err != nil {
+		t.Fatalf("Failed to create user_feed A: %v", err)
+	}
+
+	userFeedB := &model.UserFeed{UserID: user.ID, FeedID: feedB.ID}
+	if err := userFeedB.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeedB ID: %v", err)
+	}
+	if err := db.Create(userFeedB).Error; err != nil {
+		t.Fatalf("Failed to create user_feed B: %v", err)
+	}
+
+	// Create items for Feed A
+	itemA1 := &model.Item{
+		FeedID: feedA.ID,
+		GUID:   "guid-a1",
+		Title:  "Item A1",
+		Link:   "https://feed-a.com/item1",
+	}
+	if err := itemA1.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+
+	itemA2 := &model.Item{
+		FeedID: feedA.ID,
+		GUID:   "guid-a2",
+		Title:  "Item A2 (marked unread)",
+		Link:   "https://feed-a.com/item2",
+	}
+	if err := itemA2.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+
+	// Create items for Feed B
+	itemB1 := &model.Item{
+		FeedID: feedB.ID,
+		GUID:   "guid-b1",
+		Title:  "Item B1",
+		Link:   "https://feed-b.com/item1",
+	}
+	if err := itemB1.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+
+	if err := repo.CreateBatch(ctx, []*model.Item{itemA1, itemA2, itemB1}); err != nil {
+		t.Fatalf("Failed to create items: %v", err)
+	}
+
+	// Mark itemA2 as unread explicitly (creates UserItemState with is_read=false)
+	stateA2 := &model.UserItemState{
+		UserID: user.ID,
+		ItemID: itemA2.ID,
+		IsRead: false,
+	}
+	if err := stateA2.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := stateRepo.Create(ctx, stateA2); err != nil {
+		t.Fatalf("Failed to create state: %v", err)
+	}
+
+	// Soft delete user_feed A (user unsubscribes from Feed A)
+	if err := db.Delete(userFeedA).Error; err != nil {
+		t.Fatalf("Failed to soft delete user_feed A: %v", err)
+	}
+
+	// List unread items
+	result, total, err := repo.ListUnread(ctx, user.ID, service.ListOptions{Limit: 10, Offset: 0})
+	if err != nil {
+		t.Fatalf("ListUnread() returned error: %v", err)
+	}
+
+	// Should only include items from Feed B (itemB1)
+	// Should NOT include itemA1 (no state, but unsubscribed)
+	// Should NOT include itemA2 (has is_read=false state, but unsubscribed)
+	if total != 1 {
+		t.Errorf("Total = %d, want 1 (only items from subscribed feeds)", total)
+	}
+	if len(result) != 1 {
+		t.Fatalf("Items count = %d, want 1", len(result))
+	}
+
+	// Verify the item is from Feed B
+	if result[0].Item.FeedID != feedB.ID {
+		t.Errorf("Expected item from Feed B, got from feed %s", result[0].Item.FeedID)
 	}
 }
 
@@ -632,6 +786,18 @@ func TestItemRepository_LargeDataset_ListStarred(t *testing.T) {
 		t.Fatalf("Failed to create feed: %v", err)
 	}
 
+	// Create user-feed relationship (user subscribes to feed)
+	userFeed := &model.UserFeed{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	if err := userFeed.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeed ID: %v", err)
+	}
+	if err := db.Create(userFeed).Error; err != nil {
+		t.Fatalf("Failed to create user_feed: %v", err)
+	}
+
 	// Create 200 items, star 50 of them
 	const numItems = 200
 	const numStarred = 50
@@ -681,9 +847,155 @@ func TestItemRepository_LargeDataset_ListStarred(t *testing.T) {
 
 	// Verify all returned items are starred
 	for _, item := range result {
-		if !item.IsStarred {
+		if item.UserState == nil || !item.UserState.IsStarred {
 			t.Error("ListStarred returned non-starred item")
 		}
+	}
+}
+
+// TestItemRepository_ListStarred_UnsubscribedFeed tests that starred items from
+// unsubscribed feeds are not returned (regression test for 404 error when clicking item)
+func TestItemRepository_ListStarred_UnsubscribedFeed(t *testing.T) {
+	db := setupItemDB(t)
+	repo := NewItemRepository(db)
+	stateRepo := NewUserItemStateRepository(db)
+
+	ctx := context.Background()
+
+	// Create user
+	user := &model.User{Email: "user@example.com", PasswordHash: "hash"}
+	if err := user.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	// Create feed A (user will subscribe and then unsubscribe)
+	feedA := &model.Feed{FeedURL: "https://feed-a.example.com/feed.xml", Title: "Feed A"}
+	if err := feedA.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(feedA).Error; err != nil {
+		t.Fatalf("Failed to create feed A: %v", err)
+	}
+
+	// Create feed B (user will stay subscribed)
+	feedB := &model.Feed{FeedURL: "https://feed-b.example.com/feed.xml", Title: "Feed B"}
+	if err := feedB.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := db.Create(feedB).Error; err != nil {
+		t.Fatalf("Failed to create feed B: %v", err)
+	}
+
+	// Create user-feed relationship for feed A (will be soft deleted later)
+	userFeedA := &model.UserFeed{
+		UserID: user.ID,
+		FeedID: feedA.ID,
+	}
+	if err := userFeedA.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeed ID: %v", err)
+	}
+	if err := db.Create(userFeedA).Error; err != nil {
+		t.Fatalf("Failed to create user_feed A: %v", err)
+	}
+
+	// Create user-feed relationship for feed B (will stay subscribed)
+	userFeedB := &model.UserFeed{
+		UserID: user.ID,
+		FeedID: feedB.ID,
+	}
+	if err := userFeedB.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeed ID: %v", err)
+	}
+	if err := db.Create(userFeedB).Error; err != nil {
+		t.Fatalf("Failed to create user_feed B: %v", err)
+	}
+
+	// Create item in feed A
+	itemA := &model.Item{
+		FeedID: feedA.ID,
+		GUID:   "guid-a",
+		Title:  "Item from Feed A",
+		Link:   "https://feed-a.example.com/item",
+	}
+	if err := itemA.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := repo.CreateBatch(ctx, []*model.Item{itemA}); err != nil {
+		t.Fatalf("Failed to create item A: %v", err)
+	}
+
+	// Create item in feed B
+	itemB := &model.Item{
+		FeedID: feedB.ID,
+		GUID:   "guid-b",
+		Title:  "Item from Feed B",
+		Link:   "https://feed-b.example.com/item",
+	}
+	if err := itemB.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := repo.CreateBatch(ctx, []*model.Item{itemB}); err != nil {
+		t.Fatalf("Failed to create item B: %v", err)
+	}
+
+	// Star both items
+	stateA := &model.UserItemState{
+		UserID:    user.ID,
+		ItemID:    itemA.ID,
+		IsStarred: true,
+	}
+	if err := stateA.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := stateRepo.Create(ctx, stateA); err != nil {
+		t.Fatalf("Failed to create state A: %v", err)
+	}
+
+	stateB := &model.UserItemState{
+		UserID:    user.ID,
+		ItemID:    itemB.ID,
+		IsStarred: true,
+	}
+	if err := stateB.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate ID: %v", err)
+	}
+	if err := stateRepo.Create(ctx, stateB); err != nil {
+		t.Fatalf("Failed to create state B: %v", err)
+	}
+
+	// Verify both items are in starred list
+	result, total, err := repo.ListStarred(ctx, user.ID, service.ListOptions{Limit: 10, Offset: 0})
+	if err != nil {
+		t.Fatalf("ListStarred() returned error: %v", err)
+	}
+	if total != 2 {
+		t.Fatalf("Expected 2 starred items, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Fatalf("Expected 2 starred items in result, got %d", len(result))
+	}
+
+	// User unsubscribes from feed A (soft delete user_feed)
+	if err := db.Delete(userFeedA).Error; err != nil {
+		t.Fatalf("Failed to soft delete user_feed A: %v", err)
+	}
+
+	// Now starred list should only contain item from feed B
+	result, total, err = repo.ListStarred(ctx, user.ID, service.ListOptions{Limit: 10, Offset: 0})
+	if err != nil {
+		t.Fatalf("ListStarred() after unsubscribe returned error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("Expected 1 starred item after unsubscribe, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("Expected 1 starred item in result after unsubscribe, got %d", len(result))
+	}
+	if len(result) > 0 && result[0].Title != "Item from Feed B" {
+		t.Errorf("Expected 'Item from Feed B', got %q", result[0].Title)
 	}
 }
 
@@ -711,6 +1023,18 @@ func TestItemRepository_LargeDataset_ListUnread(t *testing.T) {
 	}
 	if err := db.Create(feed).Error; err != nil {
 		t.Fatalf("Failed to create feed: %v", err)
+	}
+
+	// Create user-feed relationship (user subscribes to feed)
+	userFeed := &model.UserFeed{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	if err := userFeed.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeed ID: %v", err)
+	}
+	if err := db.Create(userFeed).Error; err != nil {
+		t.Fatalf("Failed to create user_feed: %v", err)
 	}
 
 	// Create 300 items
@@ -763,7 +1087,8 @@ func TestItemRepository_LargeDataset_ListUnread(t *testing.T) {
 
 	// Verify all returned items are unread
 	for _, item := range result {
-		if item.IsRead {
+		// Item is unread if UserState is nil (never read) or IsRead is false
+		if item.UserState != nil && item.UserState.IsRead {
 			t.Error("ListUnread returned read item")
 		}
 	}
@@ -1271,6 +1596,18 @@ func TestItemRepository_ListStarred_SortsByPubDateDescNullsLast(t *testing.T) {
 	}
 	if err := db.Create(feed).Error; err != nil {
 		t.Fatalf("Failed to create feed: %v", err)
+	}
+
+	// Create user-feed relationship (user subscribes to feed)
+	userFeed := &model.UserFeed{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	if err := userFeed.GenerateID(); err != nil {
+		t.Fatalf("Failed to generate UserFeed ID: %v", err)
+	}
+	if err := db.Create(userFeed).Error; err != nil {
+		t.Fatalf("Failed to create user_feed: %v", err)
 	}
 
 	// Create items with specific pub_dates

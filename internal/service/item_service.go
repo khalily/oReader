@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"oreader/internal/model"
@@ -27,28 +28,47 @@ func NewItemService(
 	}
 }
 
-// getFeedTitle extracts the feed title from an item's preloaded Feed relationship
-func getFeedTitle(item *model.Item) string {
-	if item.Feed != nil {
-		return item.Feed.Title
+// buildFeedResponse creates a FeedResponse from a model.Feed
+func buildFeedResponse(feed *model.Feed) *FeedResponse {
+	if feed == nil {
+		return nil
 	}
-	return ""
+	result := &FeedResponse{
+		ID:          feed.ID,
+		Title:       feed.Title,
+		FeedURL:     feed.FeedURL,
+		Description: feed.Description,
+	}
+	// Only set ImageURL if it's not empty
+	if feed.ImageURL != "" {
+		result.ImageURL = &feed.ImageURL
+	}
+	return result
+}
+
+// buildUserItemStateResponse creates a UserItemStateResponse from a model.UserItemState
+func buildUserItemStateResponse(state *model.UserItemState) *UserItemStateResponse {
+	if state == nil {
+		return nil
+	}
+	result := &UserItemStateResponse{
+		ItemID:    state.ItemID,
+		IsStarred: state.IsStarred,
+		IsRead:    state.IsRead,
+	}
+	if state.ReadAt != nil {
+		readAt := state.ReadAt.Format(time.RFC3339)
+		result.ReadAt = &readAt
+	}
+	return result
 }
 
 // buildItemWithState creates an ItemWithState from an item and its user state
 func buildItemWithState(item *model.Item, state *model.UserItemState) *ItemWithState {
 	result := &ItemWithState{
 		Item:      item,
-		FeedTitle: getFeedTitle(item),
-	}
-
-	if state != nil {
-		result.IsStarred = state.IsStarred
-		result.IsRead = state.IsRead
-		if state.ReadAt != nil {
-			readAt := state.ReadAt.Format(time.RFC3339)
-			result.ReadAt = &readAt
-		}
+		Feed:      buildFeedResponse(item.Feed),
+		UserState: buildUserItemStateResponse(state),
 	}
 
 	return result
@@ -119,6 +139,29 @@ func (s *itemService) ListItems(ctx context.Context, userID string, opts ListIte
 		for _, item := range itemMap {
 			items = append(items, item)
 		}
+
+		// Sort items by pub_date DESC NULLS LAST to ensure consistent ordering
+		// Use ID as secondary sort key for deterministic ordering when pub_date is equal
+		sort.Slice(items, func(i, j int) bool {
+			// Handle NULL values: NULL should come last
+			if items[i].PubDate == nil && items[j].PubDate == nil {
+				// Both NULL: sort by ID descending as tiebreaker
+				return items[i].ID > items[j].ID
+			}
+			if items[i].PubDate == nil {
+				return false
+			}
+			if items[j].PubDate == nil {
+				return true
+			}
+			// If pub_date is equal, use ID as secondary sort key
+			if items[i].PubDate.Equal(*items[j].PubDate) {
+				return items[i].ID > items[j].ID
+			}
+			// Descending order (newest first)
+			return items[i].PubDate.After(*items[j].PubDate)
+		})
+
 		total = int64(len(items))
 
 		// Apply limit

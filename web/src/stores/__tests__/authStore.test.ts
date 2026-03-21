@@ -1,13 +1,23 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { authStore, AuthStore } from '../authStore'
+import { authStore } from '../authStore'
 
 // Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-}
+const localStorageMock = (() => {
+  let store: Record<string, string> = {}
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key]
+    }),
+    clear: vi.fn(() => {
+      store = {}
+    }),
+  }
+})()
+
 Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
 })
@@ -21,6 +31,7 @@ describe('authStore', () => {
       csrfToken: null,
     })
     vi.clearAllMocks()
+    localStorageMock.clear()
   })
 
   afterEach(() => {
@@ -57,7 +68,7 @@ describe('authStore', () => {
       expect(state.isAuthenticated).toBe(true)
     })
 
-    it('should store CSRF token in localStorage', () => {
+    it('should correctly set authentication state', () => {
       const mockUser = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         email: 'test@example.com',
@@ -70,7 +81,11 @@ describe('authStore', () => {
 
       authStore.getState().setUser(mockUser, 'csrf-token-456')
 
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('csrf_token', 'csrf-token-456')
+      // Verify state is correctly set
+      const state = authStore.getState()
+      expect(state.isAuthenticated).toBe(true)
+      expect(state.user).toEqual(mockUser)
+      expect(state.csrfToken).toBe('csrf-token-456')
     })
   })
 
@@ -101,7 +116,7 @@ describe('authStore', () => {
       expect(state.isAuthenticated).toBe(false)
     })
 
-    it('should remove CSRF token from localStorage', () => {
+    it('should correctly clear authentication state', () => {
       const mockUser = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         email: 'test@example.com',
@@ -115,26 +130,26 @@ describe('authStore', () => {
       authStore.getState().setUser(mockUser, 'csrf-token')
       authStore.getState().clearUser()
 
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith('csrf_token')
+      // Verify state is correctly cleared
+      const state = authStore.getState()
+      expect(state.isAuthenticated).toBe(false)
+      expect(state.user).toBeNull()
+      expect(state.csrfToken).toBeNull()
     })
   })
 
   describe('initializeFromStorage', () => {
-    it('should restore CSRF token from localStorage', () => {
-      localStorageMock.getItem.mockReturnValue('stored-csrf-token')
+    it('should be a no-op (persist middleware handles hydration)', () => {
+      // With persist middleware, initializeFromStorage is a no-op
+      // because hydration happens automatically before any render
+      const initialState = authStore.getState()
 
       authStore.getState().initializeFromStorage()
 
-      expect(authStore.getState().csrfToken).toBe('stored-csrf-token')
-    })
-
-    it('should handle missing CSRF token in localStorage', () => {
-      localStorageMock.getItem.mockReturnValue(null)
-
-      authStore.getState().initializeFromStorage()
-
-      expect(authStore.getState().csrfToken).toBeNull()
-      expect(authStore.getState().isAuthenticated).toBe(false)
+      const state = authStore.getState()
+      // State should remain unchanged
+      expect(state.isAuthenticated).toBe(initialState.isAuthenticated)
+      expect(state.csrfToken).toBe(initialState.csrfToken)
     })
   })
 

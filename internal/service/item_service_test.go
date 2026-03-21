@@ -62,8 +62,11 @@ func (m *mockItemRepository) ListByFeedID(ctx context.Context, feedID, userID st
 			// Check for user state
 			for _, state := range m.itemStates {
 				if state.UserID == userID && state.ItemID == item.ID {
-					iws.IsStarred = state.IsStarred
-					iws.IsRead = state.IsRead
+					iws.UserState = &UserItemStateResponse{
+						ItemID:    state.ItemID,
+						IsStarred: state.IsStarred,
+						IsRead:    state.IsRead,
+					}
 				}
 			}
 			result = append(result, iws)
@@ -81,7 +84,14 @@ func (m *mockItemRepository) ListStarred(ctx context.Context, userID string, opt
 		if state.UserID == userID && state.IsStarred {
 			for _, item := range m.items {
 				if item.ID == state.ItemID {
-					iws := &ItemWithState{Item: item, IsStarred: true, IsRead: state.IsRead}
+					iws := &ItemWithState{
+						Item: item,
+						UserState: &UserItemStateResponse{
+							ItemID:    state.ItemID,
+							IsStarred: true,
+							IsRead:    state.IsRead,
+						},
+					}
 					result = append(result, iws)
 					break
 				}
@@ -101,7 +111,14 @@ func (m *mockItemRepository) ListUnread(ctx context.Context, userID string, opts
 		if state.UserID == userID && !state.IsRead {
 			for _, item := range m.items {
 				if item.ID == state.ItemID {
-					iws := &ItemWithState{Item: item, IsStarred: state.IsStarred, IsRead: false}
+					iws := &ItemWithState{
+						Item: item,
+						UserState: &UserItemStateResponse{
+							ItemID:    state.ItemID,
+							IsStarred: state.IsStarred,
+							IsRead:    false,
+						},
+					}
 					result = append(result, iws)
 					break
 				}
@@ -117,7 +134,13 @@ func (m *mockItemRepository) ListUnread(ctx context.Context, userID string, opts
 	}
 	for _, item := range m.items {
 		if !itemIDs[item.ID] {
-			iws := &ItemWithState{Item: item, IsRead: false}
+			iws := &ItemWithState{
+				Item: item,
+				UserState: &UserItemStateResponse{
+					ItemID: item.ID,
+					IsRead: false,
+				},
+			}
 			result = append(result, iws)
 		}
 	}
@@ -414,7 +437,7 @@ func TestItemService_ListItems_WithStarredFilter(t *testing.T) {
 	if len(result.Items) != 1 {
 		t.Errorf("Expected 1 starred item, got %d", len(result.Items))
 	}
-	if !result.Items[0].IsStarred {
+	if !result.Items[0].UserState.IsStarred {
 		t.Error("Expected item to be starred")
 	}
 }
@@ -455,7 +478,7 @@ func TestItemService_ListItems_WithReadFilter(t *testing.T) {
 	if len(result.Items) != 1 {
 		t.Errorf("Expected 1 unread item, got %d", len(result.Items))
 	}
-	if result.Items[0].IsRead {
+	if result.Items[0].UserState.IsRead {
 		t.Error("Expected item to be unread")
 	}
 }
@@ -528,10 +551,10 @@ func TestItemService_GetItem_Success(t *testing.T) {
 	if item.ID != "item-1" {
 		t.Errorf("Expected item-1, got %s", item.ID)
 	}
-	if !item.IsStarred {
+	if !item.UserState.IsStarred {
 		t.Error("Expected item to be starred")
 	}
-	if !item.IsRead {
+	if !item.UserState.IsRead {
 		t.Error("Expected item to be read")
 	}
 }
@@ -612,7 +635,7 @@ func TestItemService_ToggleStar_Enable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	if !item.IsStarred {
+	if !item.UserState.IsStarred {
 		t.Error("Expected item to be starred")
 	}
 }
@@ -643,7 +666,7 @@ func TestItemService_ToggleStar_Disable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	if item.IsStarred {
+	if item.UserState.IsStarred {
 		t.Error("Expected item to not be starred")
 	}
 }
@@ -672,7 +695,7 @@ func TestItemService_ToggleStar_CreateNewState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	if !item.IsStarred {
+	if !item.UserState.IsStarred {
 		t.Error("Expected item to be starred")
 	}
 }
@@ -704,10 +727,10 @@ func TestItemService_ToggleRead_Enable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	if !item.IsRead {
+	if !item.UserState.IsRead {
 		t.Error("Expected item to be read")
 	}
-	if item.ReadAt == nil {
+	if item.UserState.ReadAt == nil {
 		t.Error("Expected ReadAt to be set")
 	}
 }
@@ -738,10 +761,10 @@ func TestItemService_ToggleRead_Disable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	if item.IsRead {
+	if item.UserState.IsRead {
 		t.Error("Expected item to not be read")
 	}
-	if item.ReadAt != nil {
+	if item.UserState.ReadAt != nil {
 		t.Error("Expected ReadAt to be nil")
 	}
 }
@@ -846,8 +869,8 @@ func TestItemService_SetStar_SetsToTrue(t *testing.T) {
 	}
 
 	// Verify is_starred is SET to true (not toggled)
-	if result.IsStarred != true {
-		t.Errorf("SetStar(starred=true) should set is_starred=true, got is_starred=%v", result.IsStarred)
+	if result.UserState.IsStarred != true {
+		t.Errorf("SetStar(starred=true) should set is_starred=true, got is_starred=%v", result.UserState.IsStarred)
 	}
 }
 
@@ -890,8 +913,8 @@ func TestItemService_SetStar_SetsToFalse(t *testing.T) {
 	}
 
 	// Verify is_starred is SET to false (not toggled to stay true)
-	if result.IsStarred != false {
-		t.Errorf("SetStar(starred=false) should set is_starred=false, got is_starred=%v", result.IsStarred)
+	if result.UserState.IsStarred != false {
+		t.Errorf("SetStar(starred=false) should set is_starred=false, got is_starred=%v", result.UserState.IsStarred)
 	}
 }
 
@@ -930,8 +953,8 @@ func TestItemService_SetStar_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("First SetStar() returned error: %v", err)
 	}
-	if result1.IsStarred != true {
-		t.Errorf("First call: is_starred=%v, want true", result1.IsStarred)
+	if result1.UserState.IsStarred != true {
+		t.Errorf("First call: is_starred=%v, want true", result1.UserState.IsStarred)
 	}
 
 	// Second call with starred=true (should be idempotent)
@@ -939,8 +962,8 @@ func TestItemService_SetStar_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Second SetStar() returned error: %v", err)
 	}
-	if result2.IsStarred != true {
-		t.Errorf("Second call (idempotent): is_starred=%v, want true (should not toggle)", result2.IsStarred)
+	if result2.UserState.IsStarred != true {
+		t.Errorf("Second call (idempotent): is_starred=%v, want true (should not toggle)", result2.UserState.IsStarred)
 	}
 }
 
@@ -987,12 +1010,12 @@ func TestItemService_SetRead_SetsToTrue(t *testing.T) {
 	}
 
 	// Verify is_read is SET to true (not toggled)
-	if result.IsRead != true {
-		t.Errorf("SetRead(read=true) should set is_read=true, got is_read=%v", result.IsRead)
+	if result.UserState.IsRead != true {
+		t.Errorf("SetRead(read=true) should set is_read=true, got is_read=%v", result.UserState.IsRead)
 	}
 
 	// Verify read_at is set when marking as read
-	if result.ReadAt == nil {
+	if result.UserState.ReadAt == nil {
 		t.Error("SetRead(read=true) should set read_at timestamp")
 	}
 }
@@ -1036,13 +1059,13 @@ func TestItemService_SetRead_SetsToFalse(t *testing.T) {
 	}
 
 	// Verify is_read is SET to false (not toggled)
-	if result.IsRead != false {
-		t.Errorf("SetRead(read=false) should set is_read=false, got is_read=%v", result.IsRead)
+	if result.UserState.IsRead != false {
+		t.Errorf("SetRead(read=false) should set is_read=false, got is_read=%v", result.UserState.IsRead)
 	}
 
 	// Verify read_at is cleared when marking as unread
-	if result.ReadAt != nil {
-		t.Errorf("SetRead(read=false) should clear read_at, got read_at=%v", result.ReadAt)
+	if result.UserState.ReadAt != nil {
+		t.Errorf("SetRead(read=false) should clear read_at, got read_at=%v", result.UserState.ReadAt)
 	}
 }
 
@@ -1080,8 +1103,8 @@ func TestItemService_SetRead_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("First SetRead() returned error: %v", err)
 	}
-	if result1.IsRead != true {
-		t.Errorf("First call: is_read=%v, want true", result1.IsRead)
+	if result1.UserState.IsRead != true {
+		t.Errorf("First call: is_read=%v, want true", result1.UserState.IsRead)
 	}
 
 	// Second call with read=true (should be idempotent)
@@ -1089,7 +1112,189 @@ func TestItemService_SetRead_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Second SetRead() returned error: %v", err)
 	}
-	if result2.IsRead != true {
-		t.Errorf("Second call (idempotent): is_read=%v, want true (should not toggle)", result2.IsRead)
+	if result2.UserState.IsRead != true {
+		t.Errorf("Second call (idempotent): is_read=%v, want true (should not toggle)", result2.UserState.IsRead)
 	}
+}
+
+// =============================================================================
+// SORTING TESTS: All Items should be sorted by pub_date DESC
+// These tests verify that ListItems returns items in consistent order
+// =============================================================================
+
+// TestItemService_ListItems_AllItems_SortedByPubDate verifies that all items
+// from multiple feeds are sorted by pub_date DESC (newest first)
+func TestItemService_ListItems_AllItems_SortedByPubDate(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+
+	// Create two feeds
+	feed1 := "feed-1"
+	feed2 := "feed-2"
+
+	// Create items with different pub_dates
+	now := time.Now()
+
+	item1 := createTestItem("item-1", feed1, "Item 1 (oldest)")
+	item1.PubDate = ptrTime(now)
+
+	item2 := createTestItem("item-2", feed2, "Item 2 (newest)")
+	item2.PubDate = ptrTime(now.Add(2 * time.Hour))
+
+	item3 := createTestItem("item-3", feed1, "Item 3 (middle)")
+	item3.PubDate = ptrTime(now.Add(1 * time.Hour))
+
+	itemRepo := &mockItemRepository{
+		items: []*model.Item{item1, item2, item3},
+	}
+	stateRepo := &mockUserItemStateRepository{}
+	userFeedRepo := &mockUserFeedRepository{
+		userFeeds: []*model.UserFeed{
+			{UserID: userID, FeedID: feed1},
+			{UserID: userID, FeedID: feed2},
+		},
+	}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	opts := ListItemOptions{Limit: 10}
+	result, err := service.ListItems(ctx, userID, opts)
+	if err != nil {
+		t.Fatalf("ListItems() error = %v", err)
+	}
+
+	// Verify we got all 3 items
+	if len(result.Items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(result.Items))
+	}
+
+	// Verify sorting: newest first (item2 > item3 > item1)
+	if result.Items[0].ID != "item-2" {
+		t.Errorf("expected first item to be item-2 (newest), got %s", result.Items[0].ID)
+	}
+	if result.Items[1].ID != "item-3" {
+		t.Errorf("expected second item to be item-3 (middle), got %s", result.Items[1].ID)
+	}
+	if result.Items[2].ID != "item-1" {
+		t.Errorf("expected third item to be item-1 (oldest), got %s", result.Items[2].ID)
+	}
+}
+
+// TestItemService_ListItems_AllItems_NullPubDate tests that items with NULL pub_date
+// are sorted to the end (NULLS LAST behavior)
+func TestItemService_ListItems_AllItems_NullPubDate(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+
+	feed1 := "feed-1"
+	feed2 := "feed-2"
+
+	now := time.Now()
+
+	// Item with pub_date
+	item1 := createTestItem("item-1", feed1, "Item 1 (has date)")
+	item1.PubDate = ptrTime(now)
+
+	// Item without pub_date (NULL)
+	item2 := createTestItem("item-2", feed2, "Item 2 (NULL date)")
+	item2.PubDate = nil
+
+	// Another item with pub_date (older)
+	item3 := createTestItem("item-3", feed1, "Item 3 (older date)")
+	item3.PubDate = ptrTime(now.Add(-1 * time.Hour))
+
+	itemRepo := &mockItemRepository{
+		items: []*model.Item{item1, item2, item3},
+	}
+	stateRepo := &mockUserItemStateRepository{}
+	userFeedRepo := &mockUserFeedRepository{
+		userFeeds: []*model.UserFeed{
+			{UserID: userID, FeedID: feed1},
+			{UserID: userID, FeedID: feed2},
+		},
+	}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	opts := ListItemOptions{Limit: 10}
+	result, err := service.ListItems(ctx, userID, opts)
+	if err != nil {
+		t.Fatalf("ListItems() error = %v", err)
+	}
+
+	if len(result.Items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(result.Items))
+	}
+
+	// Verify NULL pub_date items come last
+	// Order should be: item1 (newest) > item3 (older) > item2 (NULL)
+	if result.Items[0].ID != "item-1" {
+		t.Errorf("expected first item to be item-1 (newest), got %s", result.Items[0].ID)
+	}
+	if result.Items[1].ID != "item-3" {
+		t.Errorf("expected second item to be item-3 (older), got %s", result.Items[1].ID)
+	}
+	if result.Items[2].ID != "item-2" {
+		t.Errorf("expected third item to be item-2 (NULL date), got %s", result.Items[2].ID)
+	}
+}
+
+// TestItemService_ListItems_AllItems_ConsistentOrder verifies that multiple calls
+// return items in the same order (no random map iteration)
+func TestItemService_ListItems_AllItems_ConsistentOrder(t *testing.T) {
+	ctx := context.Background()
+	userID := "user-1"
+
+	// Create multiple feeds with items
+	now := time.Now()
+	var items []*model.Item
+	var userFeeds []*model.UserFeed
+
+	for feedNum := 1; feedNum <= 3; feedNum++ {
+		feedID := "feed-" + string(rune('0'+feedNum))
+		userFeeds = append(userFeeds, &model.UserFeed{UserID: userID, FeedID: feedID})
+
+		for itemNum := 1; itemNum <= 5; itemNum++ {
+			itemID := feedID + "-item-" + string(rune('0'+itemNum))
+			item := createTestItem(itemID, feedID, "Item")
+			// Vary pub_date to create different ordering
+			item.PubDate = ptrTime(now.Add(time.Duration(feedNum*itemNum) * time.Minute))
+			items = append(items, item)
+		}
+	}
+
+	itemRepo := &mockItemRepository{items: items}
+	stateRepo := &mockUserItemStateRepository{}
+	userFeedRepo := &mockUserFeedRepository{userFeeds: userFeeds}
+
+	service := NewItemService(itemRepo, stateRepo, userFeedRepo)
+
+	// Call ListItems multiple times and verify consistent order
+	opts := ListItemOptions{Limit: 15}
+
+	result1, err := service.ListItems(ctx, userID, opts)
+	if err != nil {
+		t.Fatalf("First ListItems() error = %v", err)
+	}
+
+	// Call multiple times to ensure order is consistent (not random)
+	for i := 0; i < 5; i++ {
+		result, err := service.ListItems(ctx, userID, opts)
+		if err != nil {
+			t.Fatalf("ListItems() iteration %d error = %v", i, err)
+		}
+
+		// Compare order with first result
+		for j := range result1.Items {
+			if result.Items[j].ID != result1.Items[j].ID {
+				t.Errorf("Iteration %d: item at position %d differs: got %s, want %s",
+					i, j, result.Items[j].ID, result1.Items[j].ID)
+			}
+		}
+	}
+}
+
+// ptrTime is a helper function to create a pointer to a time.Time
+func ptrTime(t time.Time) *time.Time {
+	return &t
 }

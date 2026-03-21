@@ -30,7 +30,22 @@ var (
 // ItemWithState represents an item with user-specific state
 type ItemWithState struct {
 	*model.Item
-	FeedTitle string  `json:"feed_title"`
+	Feed      *FeedResponse `json:"feed"`
+	UserState *UserItemStateResponse `json:"user_state"`
+}
+
+// FeedResponse represents feed information in API responses
+type FeedResponse struct {
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	FeedURL     string  `json:"feed_url"`
+	Description string  `json:"description,omitempty"`
+	ImageURL    *string `json:"image_url,omitempty"`
+}
+
+// UserItemStateResponse represents user-specific item state in API responses
+type UserItemStateResponse struct {
+	ItemID    string  `json:"item_id"`
 	IsStarred bool    `json:"is_starred"`
 	IsRead    bool    `json:"is_read"`
 	ReadAt    *string `json:"read_at,omitempty"`

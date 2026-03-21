@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
 
 interface AuthStore {
@@ -13,44 +14,44 @@ interface AuthStore {
   getCsrfToken: () => string | null
 }
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
-  isAuthenticated: false,
-  user: null,
-  csrfToken: null,
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set, get) => ({
+      isAuthenticated: false,
+      user: null,
+      csrfToken: null,
 
-  setUser: (user, csrfToken) => {
-    set({ isAuthenticated: true, user, csrfToken })
+      setUser: (user, csrfToken) => {
+        set({ isAuthenticated: true, user, csrfToken })
+      },
 
-    // Store CSRF token in localStorage for axios interceptor
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('csrf_token', csrfToken)
+      clearUser: () => {
+        set({ isAuthenticated: false, user: null, csrfToken: null })
+      },
+
+      // This is now handled automatically by persist middleware
+      // but we keep it for backward compatibility
+      initializeFromStorage: () => {
+        // No-op: persist middleware handles this automatically
+        // The state is already hydrated from localStorage before any render
+      },
+
+      getCsrfToken: () => get().csrfToken,
+    }),
+    {
+      name: 'auth-storage', // unique name for localStorage key
+      partialize: (state) => ({
+        // Only persist these fields
+        isAuthenticated: state.isAuthenticated,
+        user: state.user,
+        csrfToken: state.csrfToken,
+      }),
     }
-  },
-
-  clearUser: () => {
-    set({ isAuthenticated: false, user: null, csrfToken: null })
-
-    // Remove CSRF token from localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('csrf_token')
-    }
-  },
-
-  initializeFromStorage: () => {
-    if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem('csrf_token')
-      if (storedToken) {
-        set({ csrfToken: storedToken })
-      }
-    }
-  },
-
-  getCsrfToken: () => get().csrfToken,
-}))
+  )
+)
 
 // Export a named export for consistency with the tests
 export const authStore = {
   getState: useAuthStore.getState,
   setState: useAuthStore.setState,
 }
-

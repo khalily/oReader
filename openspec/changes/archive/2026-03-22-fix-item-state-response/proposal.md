@@ -2,6 +2,16 @@
 
 oReader 应用的后端 API 响应结构与前端对文章状态（is_starred、is_read）的期望存在不匹配。后端将这些作为文章对象上的扁平字段返回，而前端期望一个嵌套的 `user_state` 对象。这导致前端始终显示默认值。
 
+### 问题 3：All Items 列表顺序随机变化
+- **症状**：在 "All Articles" 视图点击 star/read 后，列表顺序发生变化
+- **根因**：Go map 遍历顺序随机 + 合并后缺少排序
+- **修复**：添加 `sort.Slice` 按 `pub_date DESC NULLS LAST` 排序，ID 作为次要键
+
+### 问题 4：F5 刷新后跳转登录页
+- **症状**：页面刷新后被重定向到登录页
+- **根因**：Zustand store 状态在刷新后重置，原 `initializeFromStorage` 只恢复 token
+- **修复**：使用 Zustand `persist` 中间件自动持久化认证状态
+
 ### 当前状态
 ```go
 // internal/service/interfaces.go
@@ -77,10 +87,30 @@ interface Article extends Item {
 2. **集成测试** - 处理程序响应结构
 3. **E2E 测试** - 完整 API 契约验证
 
-### 决策 3：E2E 测试修复策略
+### 决策 3：E2E 测试修复策略（已废弃）
 **选择：** 添加 `authPut` 辅助函数并更新 star/read 测试。
 
 **理由：** 最小更改以修复 HTTP 方法不匹配。`authPut` 辅助函数遵循与现有 `authPost` 和 `authGet` 相同的模式。
+
+**更新：** Playwright E2E 测试已被移除，原因是维护成本高且环境依赖复杂。后端 Go 测试和前端 Vitest 测试已提供足够的覆盖。
+
+### 决策 4：All Items 排序
+**选择：** 在服务层合并 items 后添加 `sort.Slice` 排序。
+
+**实现：**
+- 主键：`pub_date DESC NULLS LAST`
+- 次要键：`ID DESC`（确保确定性）
+
+**理由：** Go map 遍历顺序是随机的，导致 "All Articles" 视图在每次操作后顺序变化。添加确定性排序确保用户体验一致性。
+
+### 决策 5：前端认证持久化
+**选择：** 使用 Zustand persist 中间件。
+
+**配置：**
+- 持久化字段：`isAuthenticated`, `user`, `csrfToken`
+- localStorage key: `auth-storage`
+
+**理由：** 原有的 `initializeFromStorage` 方法只在初始化时恢复 token，刷新后 `isAuthenticated` 仍为 false。使用 persist 中间件可以自动同步状态到 localStorage，在刷新后自动恢复完整的认证状态。
 
 ## 风险 / 权衡
 

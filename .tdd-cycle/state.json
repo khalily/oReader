@@ -1,21 +1,12 @@
 {
-  "feature": "Article Management - Spec Compliance Fix",
+  "feature": "fix-item-state-response",
   "status": "in_progress",
   "mode": "suite",
   "coverage_target": 80,
-  "current_step": "checkpoint-4",
-  "current_phase": 4,
-  "completed_steps": [1, 2, 3, 4, 5, 6, 7, 8],
-  "files_created": [
-    "01-requirements.md",
-    "02-test-architecture.md",
-    "03-failing-tests.md",
-    "04-failure-verification.md",
-    "05-implementation.md",
-    "06-green-verification.md",
-    "07-refactored-code.md",
-    "08-refactored-tests.md"
-  ],
-  "started_at": "2026-03-18T12:00:00Z",
-  "last_updated": "2026-03-19T00:15:00Z"
+  "current_step": 1,
+  "current_phase": 1,
+  "completed_steps": [],
+  "files_created": [],
+  "started_at": "2026-03-21T13:45:00Z",
+  "last_updated": "2026-03-21T13:45:00Z"
 }
