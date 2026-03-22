@@ -1,4 +1,4 @@
-import axios, { type AxiosError } from 'axios'
+import axios, { type AxiosError, type AxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 
 // Create axios instance
@@ -41,22 +41,82 @@ apiClient.interceptors.request.use(
   }
 )
 
-// Response interceptor - Handle auth errors
+// Silent Refresh: Token refresh state management
+let isRefreshing = false
+let failedQueue: Array<{
+  resolve: (value?: unknown) => void
+  reject: (error?: unknown) => void
+}> = []
+
+// Process queued requests after refresh attempt
+const processQueue = (error: AxiosError | null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve()
+    }
+  })
+  failedQueue = []
+}
+
+// Response interceptor - Handle auth errors with Silent Refresh
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }
     const errorData = error.response?.data as { error?: { code?: string; message?: string } } | undefined
 
-    // Handle token expired error
-    if (error.response?.status === 401) {
-      const errorCode = errorData?.error?.code
-
-      if (errorCode === 'TOKEN_EXPIRED') {
-        // Token expired - clear auth state
-        // The refresh logic should be handled by a separate interceptor
-        // or by checking the error code in the components
-        useAuthStore.getState().clearUser()
+    // Handle TOKEN_EXPIRED with Silent Refresh
+    if (
+      error.response?.status === 401 &&
+      errorData?.error?.code === 'TOKEN_EXPIRED' &&
+      !originalRequest._retry
+    ) {
+      // If already refreshing, queue this request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        }).then(() => apiClient(originalRequest))
       }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      try {
+        // Call refresh endpoint - cookies are sent automatically via withCredentials
+        const response = await axios.post(
+          '/api/v1/auth/refresh',
+          {},
+          { withCredentials: true }
+        )
+
+        const { csrf_token } = response.data
+
+        // Update CSRF token in both local storage and auth store
+        if (csrf_token) {
+          setCsrfToken(csrf_token)
+          useAuthStore.setState({ csrfToken: csrf_token })
+        }
+
+        // Process all queued requests - they will now succeed with new token
+        processQueue(null)
+
+        // Retry the original request
+        return apiClient(originalRequest)
+      } catch (refreshError) {
+        // Refresh failed - clear auth state and reject all queued requests
+        processQueue(refreshError as AxiosError)
+        useAuthStore.getState().clearUser()
+        return Promise.reject(refreshError)
+      } finally {
+        isRefreshing = false
+      }
+    }
+
+    // Other 401 errors (invalid token, no token, etc.) - clear auth state
+    if (error.response?.status === 401) {
+      useAuthStore.getState().clearUser()
     }
 
     return Promise.reject(error)

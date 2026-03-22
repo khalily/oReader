@@ -1,27 +1,47 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import { apiClient, setCsrfToken } from '../axios'
 import { server } from '../../../test/server'
 import { http, HttpResponse } from 'msw'
 
-// Mock authStore
-vi.mock('../../stores/authStore', () => ({
-  authStore: {
-    getState: vi.fn(() => ({
-      getCsrfToken: () => 'mock-csrf-token',
-      setUser: vi.fn(),
-      clearUser: vi.fn(),
-    })),
+// Use vi.hoisted to define mock functions before vi.mock runs
+const mockClearUser = vi.hoisted(() => vi.fn())
+const mockGetCsrfToken = vi.hoisted(() => vi.fn(() => 'mock-csrf-token'))
+const mockSetState = vi.hoisted(() => vi.fn())
+
+vi.mock('../../../stores/authStore', () => ({
+  useAuthStore: {
+    getState: () => ({
+      getCsrfToken: mockGetCsrfToken,
+      clearUser: mockClearUser,
+    }),
+    setState: mockSetState,
   },
 }))
 
 describe('axios client', () => {
+  // Start MSW server before all tests
+  beforeAll(() => {
+    server.listen({ onUnhandledRequest: 'error' })
+  })
+
+  // Reset handlers after each test
+  afterEach(() => {
+    server.resetHandlers()
+    vi.clearAllMocks()
+  })
+
+  // Clean up after all tests
+  afterAll(() => {
+    server.close()
+  })
+
   beforeEach(() => {
     // Reset CSRF token before each test
     setCsrfToken(null)
-  })
-
-  afterEach(() => {
-    vi.clearAllMocks()
+    mockClearUser.mockClear()
+    mockSetState.mockClear()
+    mockGetCsrfToken.mockClear()
+    mockGetCsrfToken.mockReturnValue('mock-csrf-token')
   })
 
   describe('base configuration', () => {
@@ -62,7 +82,25 @@ describe('axios client', () => {
       )
 
       const response = await apiClient.get('/test')
-      expect(response.data.csrfToken).toBe('test-csrf-token')
+      // The token from getCsrfToken() in the store is used first
+      expect(response.data.csrfToken).toBe('mock-csrf-token')
+    })
+
+    it('should use setCsrfToken when store token is not available', async () => {
+      // Make store return null
+      mockGetCsrfToken.mockReturnValue(null)
+      setCsrfToken('fallback-csrf-token')
+
+      // Mock a request handler
+      server.use(
+        http.get('/api/v1/test', ({ request }) => {
+          const csrfToken = request.headers.get('X-CSRF-Token')
+          return HttpResponse.json({ csrfToken })
+        })
+      )
+
+      const response = await apiClient.get('/test')
+      expect(response.data.csrfToken).toBe('fallback-csrf-token')
     })
   })
 
@@ -78,11 +116,19 @@ describe('axios client', () => {
       expect(response.data).toEqual({ message: 'success' })
     })
 
-    it('should handle token expired error (401)', async () => {
+    it('should handle token expired error (401) with refresh failure', async () => {
       server.use(
+        // First request returns TOKEN_EXPIRED
         http.get('/api/v1/test', () => {
           return HttpResponse.json(
             { error: { code: 'TOKEN_EXPIRED', message: 'Token expired' } },
+            { status: 401 }
+          )
+        }),
+        // Refresh endpoint also fails
+        http.post('/api/v1/auth/refresh', () => {
+          return HttpResponse.json(
+            { error: { code: 'REFRESH_FAILED', message: 'Refresh token expired' } },
             { status: 401 }
           )
         })
@@ -91,14 +137,40 @@ describe('axios client', () => {
       await expect(apiClient.get('/test')).rejects.toMatchObject({
         response: {
           status: 401,
-          data: {
-            error: {
-              code: 'TOKEN_EXPIRED',
-              message: 'Token expired',
-            },
-          },
         },
       })
+
+      // Verify that clearUser was called when refresh failed
+      expect(mockClearUser).toHaveBeenCalled()
+    })
+
+    it('should retry request after successful token refresh', async () => {
+      let requestCount = 0
+
+      server.use(
+        // First request returns TOKEN_EXPIRED, second succeeds
+        http.get('/api/v1/test', () => {
+          requestCount++
+          if (requestCount === 1) {
+            return HttpResponse.json(
+              { error: { code: 'TOKEN_EXPIRED', message: 'Token expired' } },
+              { status: 401 }
+            )
+          }
+          return HttpResponse.json({ message: 'success after refresh' })
+        }),
+        // Refresh endpoint succeeds
+        http.post('/api/v1/auth/refresh', () => {
+          return HttpResponse.json({ csrf_token: 'new-csrf-token' })
+        })
+      )
+
+      const response = await apiClient.get('/test')
+      expect(response.data).toEqual({ message: 'success after refresh' })
+      expect(requestCount).toBe(2) // Initial request + retry after refresh
+
+      // Verify CSRF token was updated
+      expect(mockSetState).toHaveBeenCalledWith({ csrfToken: 'new-csrf-token' })
     })
 
     it('should handle unauthorized error (401)', async () => {
@@ -248,24 +320,16 @@ describe('axios client', () => {
   })
 
   describe('network errors', () => {
-    it('should handle network timeout', async () => {
-      // Mock a timeout by not responding
+    it('should handle network error', async () => {
+      // Mock a network error by returning an error response
       server.use(
-        http.get('/api/v1/test', async () => {
-          // Never resolve
-          await new Promise(() => {})
-          return HttpResponse.json({})
+        http.get('/api/v1/test', () => {
+          // Simulate a network error
+          return HttpResponse.error()
         })
       )
 
-      // Configure short timeout for this test
-      const originalTimeout = apiClient.defaults.timeout
-      apiClient.defaults.timeout = 100
-
       await expect(apiClient.get('/test')).rejects.toThrow()
-
-      // Restore original timeout
-      apiClient.defaults.timeout = originalTimeout
     })
   })
 })
