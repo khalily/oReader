@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Sidebar } from '../Sidebar'
-import type { UserFeed } from '@/types/feed'
+import type { UserFeed, StatsResponse } from '@/types/feed'
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
@@ -14,7 +14,16 @@ vi.mock('lucide-react', () => ({
   X: () => <div data-testid="x-icon" />,
   RefreshCw: () => <div data-testid="refresh-icon" />,
   Trash2: () => <div data-testid="trash-icon" />,
+  Calendar: () => <div data-testid="calendar-icon" />,
 }))
+
+// Mock stats data
+const mockStats: StatsResponse = {
+  total: 100,
+  unread: 25,
+  starred: 10,
+  today: 5,
+}
 
 const mockFeeds: UserFeed[] = [
   {
@@ -65,7 +74,7 @@ describe('Sidebar component', () => {
       { wrapper }
     )
 
-    expect(screen.getByText('All Items')).toBeInTheDocument()
+    expect(screen.getByText('All')).toBeInTheDocument()
     expect(screen.getByText('Unread')).toBeInTheDocument()
     expect(screen.getByText('Starred')).toBeInTheDocument()
   })
@@ -177,5 +186,196 @@ describe('Sidebar component', () => {
 
     // Should also show unread count in feed card
     expect(screen.getByText('Example Feed')).toBeInTheDocument()
+  })
+
+  describe('Today filter', () => {
+    it('should render Today filter button', () => {
+      const wrapper = createWrapper()
+      const handleFilterChange = vi.fn()
+
+      render(
+        <Sidebar
+          feeds={mockFeeds}
+          selectedFeedId={null}
+          onFeedClick={vi.fn()}
+          onAddFeed={vi.fn()}
+          onDeleteFeed={vi.fn()}
+          onRefreshFeed={vi.fn()}
+          refreshingFeedIds={new Set()}
+          filterType="all"
+          onFilterChange={handleFilterChange}
+        />,
+        { wrapper }
+      )
+
+      expect(screen.getByText('Today')).toBeInTheDocument()
+      expect(screen.getByTestId('calendar-icon')).toBeInTheDocument()
+    })
+
+    it('should highlight Today filter when active', () => {
+      const wrapper = createWrapper()
+      const handleFilterChange = vi.fn()
+
+      render(
+        <Sidebar
+          feeds={mockFeeds}
+          selectedFeedId={null}
+          onFeedClick={vi.fn()}
+          onAddFeed={vi.fn()}
+          onDeleteFeed={vi.fn()}
+          onRefreshFeed={vi.fn()}
+          refreshingFeedIds={new Set()}
+          filterType="today"
+          onFilterChange={handleFilterChange}
+        />,
+        { wrapper }
+      )
+
+      const todayButton = screen.getByText('Today').closest('button')
+      expect(todayButton).toHaveClass('bg-accent')
+    })
+
+    it('should call onFilterChange with "today" when Today is clicked', () => {
+      const wrapper = createWrapper()
+      const handleFilterChange = vi.fn()
+
+      render(
+        <Sidebar
+          feeds={mockFeeds}
+          selectedFeedId={null}
+          onFeedClick={vi.fn()}
+          onAddFeed={vi.fn()}
+          onDeleteFeed={vi.fn()}
+          onRefreshFeed={vi.fn()}
+          refreshingFeedIds={new Set()}
+          filterType="all"
+          onFilterChange={handleFilterChange}
+        />,
+        { wrapper }
+      )
+
+      fireEvent.click(screen.getByText('Today'))
+      expect(handleFilterChange).toHaveBeenCalledWith('today')
+    })
+  })
+
+  describe('Stats display', () => {
+    it('should display stats counts when stats prop is provided', () => {
+      const wrapper = createWrapper()
+
+      render(
+        <Sidebar
+          feeds={mockFeeds}
+          selectedFeedId={null}
+          onFeedClick={vi.fn()}
+          onAddFeed={vi.fn()}
+          onDeleteFeed={vi.fn()}
+          onRefreshFeed={vi.fn()}
+          refreshingFeedIds={new Set()}
+          filterType="all"
+          onFilterChange={vi.fn()}
+          stats={mockStats}
+        />,
+        { wrapper }
+      )
+
+      // Check that all filter buttons are rendered with stats
+      expect(screen.getByText('All')).toBeInTheDocument()
+      expect(screen.getByText('Unread')).toBeInTheDocument()
+      expect(screen.getByText('Starred')).toBeInTheDocument()
+      expect(screen.getByText('Today')).toBeInTheDocument()
+    })
+
+    it('should display total count for All filter', () => {
+      const wrapper = createWrapper()
+
+      render(
+        <Sidebar
+          feeds={mockFeeds}
+          selectedFeedId={null}
+          onFeedClick={vi.fn()}
+          onAddFeed={vi.fn()}
+          onDeleteFeed={vi.fn()}
+          onRefreshFeed={vi.fn()}
+          refreshingFeedIds={new Set()}
+          filterType="all"
+          onFilterChange={vi.fn()}
+          stats={mockStats}
+        />,
+        { wrapper }
+      )
+
+      const allButton = screen.getByText('All').closest('button')
+      expect(allButton?.textContent).toContain('100')
+    })
+
+    it('should display unread count for Unread filter', () => {
+      const wrapper = createWrapper()
+
+      render(
+        <Sidebar
+          feeds={mockFeeds}
+          selectedFeedId={null}
+          onFeedClick={vi.fn()}
+          onAddFeed={vi.fn()}
+          onDeleteFeed={vi.fn()}
+          onRefreshFeed={vi.fn()}
+          refreshingFeedIds={new Set()}
+          filterType="all"
+          onFilterChange={vi.fn()}
+          stats={mockStats}
+        />,
+        { wrapper }
+      )
+
+      const unreadButton = screen.getByText('Unread').closest('button')
+      expect(unreadButton?.textContent).toContain('25')
+    })
+
+    it('should display starred count for Starred filter', () => {
+      const wrapper = createWrapper()
+
+      render(
+        <Sidebar
+          feeds={mockFeeds}
+          selectedFeedId={null}
+          onFeedClick={vi.fn()}
+          onAddFeed={vi.fn()}
+          onDeleteFeed={vi.fn()}
+          onRefreshFeed={vi.fn()}
+          refreshingFeedIds={new Set()}
+          filterType="all"
+          onFilterChange={vi.fn()}
+          stats={mockStats}
+        />,
+        { wrapper }
+      )
+
+      const starredButton = screen.getByText('Starred').closest('button')
+      expect(starredButton?.textContent).toContain('10')
+    })
+
+    it('should display today count for Today filter', () => {
+      const wrapper = createWrapper()
+
+      render(
+        <Sidebar
+          feeds={mockFeeds}
+          selectedFeedId={null}
+          onFeedClick={vi.fn()}
+          onAddFeed={vi.fn()}
+          onDeleteFeed={vi.fn()}
+          onRefreshFeed={vi.fn()}
+          refreshingFeedIds={new Set()}
+          filterType="all"
+          onFilterChange={vi.fn()}
+          stats={mockStats}
+        />,
+        { wrapper }
+      )
+
+      const todayButton = screen.getByText('Today').closest('button')
+      expect(todayButton?.textContent).toContain('5')
+    })
   })
 })

@@ -58,7 +58,7 @@
 - Create: `internal/repository/stats_repository.go`
 - Create: `internal/repository/stats_repository_test.go`
 
-- [ ] **Step 1.1: Write the failing test**
+- [x] **Step 1.1: Write the failing test**
 
 ```go
 // internal/repository/stats_repository_test.go
@@ -134,12 +134,12 @@ func ptrTime(t time.Time) *time.Time {
 }
 ```
 
-- [ ] **Step 1.2: Run test to verify it fails**
+- [x] **Step 1.2: Run test to verify it fails**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui && go test ./internal/repository/... -run TestStatsRepository -v`
 Expected: FAIL - "stats_repository.go: no such file"
 
-- [ ] **Step 1.3: Write the implementation**
+- [x] **Step 1.3: Write the implementation**
 
 ```go
 // internal/repository/stats_repository.go
@@ -201,12 +201,12 @@ func (r *statsRepository) GetUserStats(ctx context.Context, userID string) (*Use
 }
 ```
 
-- [ ] **Step 1.4: Run test to verify it passes**
+- [x] **Step 1.4: Run test to verify it passes**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui && go test ./internal/repository/... -run TestStatsRepository -v`
 Expected: PASS
 
-- [ ] **Step 1.5: Commit**
+- [x] **Step 1.5: Commit**
 
 ```bash
 git add internal/repository/stats_repository.go internal/repository/stats_repository_test.go
@@ -221,7 +221,7 @@ git commit -m "feat(stats): add stats repository with GetUserStats method"
 - Create: `internal/service/stats_service.go`
 - Create: `internal/service/stats_service_test.go`
 
-- [ ] **Step 2.1: Add StatsService interface to interfaces.go**
+- [x] **Step 2.1: Add StatsService interface to interfaces.go**
 
 ```go
 // Add to internal/service/interfaces.go after ItemService interface
@@ -241,7 +241,7 @@ type UserStatsResponse struct {
 }
 ```
 
-- [ ] **Step 2.2: Write the failing test**
+- [x] **Step 2.2: Write the failing test**
 
 ```go
 // internal/service/stats_service_test.go
@@ -283,12 +283,12 @@ func TestStatsService_GetUserStats(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2.3: Run test to verify it fails**
+- [x] **Step 2.3: Run test to verify it fails**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui && go test ./internal/service/... -run TestStatsService -v`
 Expected: FAIL
 
-- [ ] **Step 2.4: Write the implementation**
+- [x] **Step 2.4: Write the implementation**
 
 ```go
 // internal/service/stats_service.go
@@ -325,19 +325,19 @@ func (s *statsService) GetUserStats(ctx context.Context, userID string) (*UserSt
 }
 ```
 
-- [ ] **Step 2.5: Add mock to repository interface**
+- [x] **Step 2.5: Add mock to repository interface**
 
 ```go
 // Add to internal/repository/stats_repository.go if needed for mock generation
 // Or use moq to generate: moq -out stats_repository_mock.go . StatsRepository
 ```
 
-- [ ] **Step 2.6: Run test to verify it passes**
+- [x] **Step 2.6: Run test to verify it passes**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui && go test ./internal/service/... -run TestStatsService -v`
 Expected: PASS
 
-- [ ] **Step 2.7: Commit**
+- [x] **Step 2.7: Commit**
 
 ```bash
 git add internal/service/stats_service.go internal/service/stats_service_test.go internal/service/interfaces.go
@@ -352,7 +352,7 @@ git commit -m "feat(stats): add stats service with GetUserStats method"
 - Create: `internal/handler/stats_handler.go`
 - Create: `internal/handler/stats_handler_test.go`
 
-- [ ] **Step 3.1: Write the failing test**
+- [x] **Step 3.1: Write the failing test**
 
 ```go
 // internal/handler/stats_handler_test.go
@@ -418,12 +418,12 @@ func TestStatsHandler_GetStats(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3.2: Run test to verify it fails**
+- [x] **Step 3.2: Run test to verify it fails**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui && go test ./internal/handler/... -run TestStatsHandler -v`
 Expected: FAIL
 
-- [ ] **Step 3.3: Write the implementation**
+- [x] **Step 3.3: Write the implementation**
 
 ```go
 // internal/handler/stats_handler.go
@@ -467,12 +467,12 @@ func (h *StatsHandler) GetStats(c *gin.Context) {
 }
 ```
 
-- [ ] **Step 3.4: Run test to verify it passes**
+- [x] **Step 3.4: Run test to verify it passes**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui && go test ./internal/handler/... -run TestStatsHandler -v`
 Expected: PASS
 
-- [ ] **Step 3.5: Commit**
+- [x] **Step 3.5: Commit**
 
 ```bash
 git add internal/handler/stats_handler.go internal/handler/stats_handler_test.go
@@ -486,7 +486,7 @@ git commit -m "feat(stats): add stats handler with GET /api/v1/stats endpoint"
 **Files:**
 - Modify: `cmd/server/main.go`
 
-- [ ] **Step 4.1: Add stats service and handler initialization**
+- [x] **Step 4.1: Add stats service and handler initialization**
 
 Find the section with other service/handler initializations in `cmd/server/main.go` and add:
 
@@ -498,7 +498,7 @@ statsService := service.NewStatsService(repository.NewStatsRepository(db))
 statsHandler := handler.NewStatsHandler(statsService)
 ```
 
-- [ ] **Step 4.2: Register the route**
+- [x] **Step 4.2: Register the route**
 
 Find the API routes section and add:
 
@@ -507,13 +507,13 @@ Find the API routes section and add:
 api.GET("/stats", statsHandler.GetStats)
 ```
 
-- [ ] **Step 4.3: Verify with manual test**
+- [x] **Step 4.3: Verify with manual test**
 
 Run: `./dev.sh`
 Then: `curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/stats`
 Expected: `{"total":X,"unread":X,"starred":X,"today":X}`
 
-- [ ] **Step 4.4: Commit**
+- [x] **Step 4.4: Commit**
 
 ```bash
 git add cmd/server/main.go
@@ -529,7 +529,7 @@ git commit -m "feat(stats): register GET /api/v1/stats route"
 - Modify: `internal/repository/item_repository.go`
 - Modify: `internal/handler/item_handler.go`
 
-- [ ] **Step 5.1: Add PublishedToday to ListItemOptions**
+- [x] **Step 5.1: Add PublishedToday to ListItemOptions**
 
 ```go
 // In internal/service/interfaces.go, update ListItemOptions struct
@@ -543,7 +543,7 @@ type ListItemOptions struct {
 }
 ```
 
-- [ ] **Step 5.2: Add today filter to item repository**
+- [x] **Step 5.2: Add today filter to item repository**
 
 Find the `ListItems` method in `internal/repository/item_repository.go` and add:
 
@@ -555,7 +555,7 @@ if opts.PublishedToday != nil && *opts.PublishedToday {
 }
 ```
 
-- [ ] **Step 5.3: Parse published_today param in handler**
+- [x] **Step 5.3: Parse published_today param in handler**
 
 Find `ListItems` function in `internal/handler/item_handler.go` and add after the `read` param parsing:
 
@@ -577,7 +577,7 @@ opts := service.ListItemOptions{
 }
 ```
 
-- [ ] **Step 5.4: Write test for today filter**
+- [x] **Step 5.4: Write test for today filter**
 
 ```go
 // Add to internal/handler/item_handler_test.go
@@ -586,12 +586,12 @@ t.Run("filters by published_today", func(t *testing.T) {
 })
 ```
 
-- [ ] **Step 5.5: Run all backend tests**
+- [x] **Step 5.5: Run all backend tests**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui && go test ./internal/... -v`
 Expected: All PASS
 
-- [ ] **Step 5.6: Commit**
+- [x] **Step 5.6: Commit**
 
 ```bash
 git add internal/service/interfaces.go internal/repository/item_repository.go internal/handler/item_handler.go
@@ -605,7 +605,7 @@ git commit -m "feat(items): add published_today filter parameter"
 **Files:**
 - Modify: `web/src/types/feed.ts`
 
-- [ ] **Step 6.1: Add StatsResponse and update ListItemsOptions**
+- [x] **Step 6.1: Add StatsResponse and update ListItemsOptions**
 
 ```typescript
 // Add to web/src/types/feed.ts
@@ -629,7 +629,7 @@ export interface ListItemsOptions {
 }
 ```
 
-- [ ] **Step 6.2: Commit**
+- [x] **Step 6.2: Commit**
 
 ```bash
 git add web/src/types/feed.ts
@@ -644,7 +644,7 @@ git commit -m "feat(types): add StatsResponse and published_today to ListItemsOp
 - Create: `web/src/hooks/useStats.ts`
 - Create: `web/src/hooks/__tests__/useStats.test.tsx`
 
-- [ ] **Step 7.1: Write the failing test**
+- [x] **Step 7.1: Write the failing test**
 
 ```typescript
 // web/src/hooks/__tests__/useStats.test.tsx
@@ -709,12 +709,12 @@ describe('useStats', () => {
 })
 ```
 
-- [ ] **Step 7.2: Run test to verify it fails**
+- [x] **Step 7.2: Run test to verify it fails**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui/web && npm test -- --run useStats`
 Expected: FAIL - module not found
 
-- [ ] **Step 7.3: Write the implementation**
+- [x] **Step 7.3: Write the implementation**
 
 ```typescript
 // web/src/hooks/useStats.ts
@@ -746,12 +746,12 @@ export function useStats() {
 }
 ```
 
-- [ ] **Step 7.4: Run test to verify it passes**
+- [x] **Step 7.4: Run test to verify it passes**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui/web && npm test -- --run useStats`
 Expected: PASS
 
-- [ ] **Step 7.5: Commit**
+- [x] **Step 7.5: Commit**
 
 ```bash
 git add web/src/hooks/useStats.ts web/src/hooks/__tests__/useStats.test.tsx
@@ -766,7 +766,7 @@ git commit -m "feat(hooks): add useStats hook with React Query"
 - Create: `web/src/components/items/ArticlePanel.tsx`
 - Create: `web/src/components/items/__tests__/ArticlePanel.test.tsx`
 
-- [ ] **Step 8.1: Write the failing test**
+- [x] **Step 8.1: Write the failing test**
 
 ```typescript
 // web/src/components/items/__tests__/ArticlePanel.test.tsx
@@ -830,12 +830,12 @@ describe('ArticlePanel', () => {
 })
 ```
 
-- [ ] **Step 8.2: Run test to verify it fails**
+- [x] **Step 8.2: Run test to verify it fails**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui/web && npm test -- --run ArticlePanel`
 Expected: FAIL
 
-- [ ] **Step 8.3: Write the implementation**
+- [x] **Step 8.3: Write the implementation**
 
 ```typescript
 // web/src/components/items/ArticlePanel.tsx
@@ -999,12 +999,12 @@ export function ArticlePanel({
 }
 ```
 
-- [ ] **Step 8.4: Run test to verify it passes**
+- [x] **Step 8.4: Run test to verify it passes**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui/web && npm test -- --run ArticlePanel`
 Expected: PASS
 
-- [ ] **Step 8.5: Commit**
+- [x] **Step 8.5: Commit**
 
 ```bash
 git add web/src/components/items/ArticlePanel.tsx web/src/components/items/__tests__/ArticlePanel.test.tsx
@@ -1018,7 +1018,7 @@ git commit -m "feat(components): add ArticlePanel component for three-column lay
 **Files:**
 - Modify: `web/src/components/feed/Sidebar.tsx`
 
-- [ ] **Step 9.1: Add 'today' to FilterType and update filters**
+- [x] **Step 9.1: Add 'today' to FilterType and update filters**
 
 ```typescript
 // In web/src/components/feed/Sidebar.tsx
@@ -1037,7 +1037,7 @@ const filters = [
 ]
 ```
 
-- [ ] **Step 9.2: Add stats prop and display counts**
+- [x] **Step 9.2: Add stats prop and display counts**
 
 ```typescript
 // Update SidebarProps interface
@@ -1077,16 +1077,16 @@ interface SidebarProps {
 })}
 ```
 
-- [ ] **Step 9.3: Update tests**
+- [x] **Step 9.3: Update tests**
 
 Add test case for Today filter and stats display.
 
-- [ ] **Step 9.4: Run tests**
+- [x] **Step 9.4: Run tests**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui/web && npm test -- --run Sidebar`
 Expected: PASS
 
-- [ ] **Step 9.5: Commit**
+- [x] **Step 9.5: Commit**
 
 ```bash
 git add web/src/components/feed/Sidebar.tsx web/src/components/feed/__tests__/Sidebar.test.tsx
@@ -1100,7 +1100,7 @@ git commit -m "feat(sidebar): add Today filter and stats count display"
 **Files:**
 - Modify: `web/src/components/items/ItemList.tsx`
 
-- [ ] **Step 10.1: Add selectedItemId prop**
+- [x] **Step 10.1: Add selectedItemId prop**
 
 ```typescript
 // In web/src/components/items/ItemList.tsx
@@ -1122,12 +1122,12 @@ interface ItemListProps {
 >
 ```
 
-- [ ] **Step 10.2: Run tests**
+- [x] **Step 10.2: Run tests**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui/web && npm test -- --run ItemList`
 Expected: PASS
 
-- [ ] **Step 10.3: Commit**
+- [x] **Step 10.3: Commit**
 
 ```bash
 git add web/src/components/items/ItemList.tsx
@@ -1141,7 +1141,7 @@ git commit -m "feat(item-list): add selectedItemId prop for visual highlight"
 **Files:**
 - Modify: `web/src/pages/items/ItemsPage.tsx`
 
-- [ ] **Step 11.1: Add selectedItemId state and URL sync**
+- [x] **Step 11.1: Add selectedItemId state and URL sync**
 
 ```typescript
 // In ItemsPage.tsx
@@ -1175,7 +1175,7 @@ const handleItemClick = useCallback((itemId: string) => {
 }, [items, handleToggleRead])
 ```
 
-- [ ] **Step 11.2: Add today filter support**
+- [x] **Step 11.2: Add today filter support**
 
 ```typescript
 // Update listOptions
@@ -1187,7 +1187,7 @@ if (filterType === 'today') listOptions.published_today = true  // NEW
 listOptions.limit = 20
 ```
 
-- [ ] **Step 11.3: Refactor to three-column layout**
+- [x] **Step 11.3: Refactor to three-column layout**
 
 ```tsx
 // Replace the return statement with three-column layout
@@ -1252,16 +1252,16 @@ return (
 )
 ```
 
-- [ ] **Step 11.4: Update tests**
+- [x] **Step 11.4: Update tests**
 
 Update ItemsPage tests to handle new layout and state.
 
-- [ ] **Step 11.5: Run tests**
+- [x] **Step 11.5: Run tests**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui/web && npm test`
 Expected: All PASS
 
-- [ ] **Step 11.6: Commit**
+- [x] **Step 11.6: Commit**
 
 ```bash
 git add web/src/pages/items/ItemsPage.tsx web/src/pages/items/__tests__/ItemsPage.test.tsx
@@ -1272,29 +1272,29 @@ git commit -m "feat(items-page): refactor to three-column layout with URL sync"
 
 ## Task 12: Integration & Verification
 
-- [ ] **Step 12.1: Run all backend tests**
+- [x] **Step 12.1: Run all backend tests**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui && go test ./internal/... -v -cover`
 Expected: All PASS
 
-- [ ] **Step 12.2: Run all frontend tests**
+- [x] **Step 12.2: Run all frontend tests**
 
 Run: `cd /data00/home/wangyang.backend/work/oReader-ui/web && npm test -- --coverage`
 Expected: All PASS
 
-- [ ] **Step 12.3: Start development server**
+- [x] **Step 12.3: Start development server**
 
 Run: `./dev.sh`
 
-- [ ] **Step 12.4: Manual: Verify three-column layout on desktop (>=1024px)**
-- [ ] **Step 12.5: Manual: Verify two-column layout on tablet (768-1023px)**
-- [ ] **Step 12.6: Manual: Verify single-column layout on mobile (<768px)**
-- [ ] **Step 12.7: Manual: Verify all filter counts display correctly**
-- [ ] **Step 12.8: Manual: Verify Today filter shows today's articles only**
-- [ ] **Step 12.9: Manual: Verify URL updates on article selection**
-- [ ] **Step 12.10: Manual: Verify browser back/forward works**
+- [x] **Step 12.4: Manual: Verify three-column layout on desktop (>=1024px)**
+- [x] **Step 12.5: Manual: Verify two-column layout on tablet (768-1023px)**
+- [x] **Step 12.6: Manual: Verify single-column layout on mobile (<768px)**
+- [x] **Step 12.7: Manual: Verify all filter counts display correctly**
+- [x] **Step 12.8: Manual: Verify Today filter shows today's articles only**
+- [x] **Step 12.9: Manual: Verify URL updates on article selection**
+- [x] **Step 12.10: Manual: Verify browser back/forward works**
 
-- [ ] **Step 12.11: Final commit**
+- [x] **Step 12.11: Final commit**
 
 ```bash
 git add -A

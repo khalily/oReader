@@ -45,11 +45,20 @@ type ListOptions struct {
 
 // ListItemOptions defines options for listing items
 type ListItemOptions struct {
-	Limit   int    `json:"limit"`
-	Cursor  string `json:"cursor,omitempty"`
-	FeedID  string `json:"feed_id,omitempty"`
-	Starred *bool  `json:"starred,omitempty"`
-	Read    *bool  `json:"read,omitempty"`
+	Limit          int    `json:"limit"`
+	Cursor         string `json:"cursor,omitempty"`
+	FeedID         string `json:"feed_id,omitempty"`
+	Starred        *bool  `json:"starred,omitempty"`
+	Read           *bool  `json:"read,omitempty"`
+	PublishedToday *bool  `json:"published_today,omitempty"`
+}
+
+// UserStats represents statistics for a user's articles
+type UserStats struct {
+	Total   int64 `json:"total"`
+	Unread  int64 `json:"unread"`
+	Starred int64 `json:"starred"`
+	Today   int64 `json:"today"`
 }
 
 // ItemListResult contains the result of listing items with pagination metadata
@@ -261,4 +270,16 @@ type OAuthStateRepository interface {
 	GetByState(ctx context.Context, state string) (*model.OAuthState, error)
 	Delete(ctx context.Context, state string) error
 	DeleteExpired(ctx context.Context) error
+}
+
+// StatsRepository defines the interface for user statistics data access
+type StatsRepository interface {
+	// GetUserStats returns article statistics for a user
+	GetUserStats(ctx context.Context, userID string) (*UserStats, error)
+}
+
+// StatsService defines the interface for statistics business logic
+type StatsService interface {
+	// GetUserStats returns article statistics for a user
+	GetUserStats(ctx context.Context, userID string) (*UserStats, error)
 }

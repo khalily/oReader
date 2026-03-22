@@ -67,17 +67,29 @@ func (h *ItemHandler) ListItems(c *gin.Context) {
 		}
 	}
 
+	var publishedToday *bool
+	if publishedTodayStr := c.Query("published_today"); publishedTodayStr != "" {
+		if publishedTodayStr == "true" {
+			val := true
+			publishedToday = &val
+		} else if publishedTodayStr == "false" {
+			val := false
+			publishedToday = &val
+		}
+	}
+
 	// Validate limit
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
 
 	opts := service.ListItemOptions{
-		Limit:   limit,
-		Cursor:  cursor,
-		FeedID:  feedID,
-		Starred: starred,
-		Read:    read,
+		Limit:          limit,
+		Cursor:         cursor,
+		FeedID:         feedID,
+		Starred:        starred,
+		Read:           read,
+		PublishedToday: publishedToday,
 	}
 
 	result, err := h.itemService.ListItems(c.Request.Context(), userID.(string), opts)
