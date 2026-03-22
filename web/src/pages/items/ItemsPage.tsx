@@ -2,12 +2,14 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useItems } from '@/hooks/useItems'
 import { useFeeds } from '@/hooks/useFeeds'
+import { useStats } from '@/hooks/useStats'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useToast } from '@/components/ui/toast'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
 import { KeyboardShortcutsModal } from '@/components/ui/keyboard-shortcuts-modal'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { ItemList } from '@/components/items/ItemList'
+import { ArticlePanel } from '@/components/items/ArticlePanel'
 import { Sidebar, SidebarContent, MobileMenuButton, type FilterType } from '@/components/feed/Sidebar'
 import { AddFeedDialog } from '@/components/feed/AddFeedDialog'
 import { useItemsStore } from '@/stores/itemsStore'
@@ -20,7 +22,8 @@ interface ItemsPageProps {
 
 export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
   const navigate = useNavigate()
-  const [, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedItemId = searchParams.get('id') // 从 URL 读取选中的文章 ID
   const [isAddFeedOpen, setIsAddFeedOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false)
@@ -32,12 +35,17 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
 
   const { useListFeeds, useRefreshFeed, useDeleteFeed } = useFeeds()
   const { useListItems, useToggleStar, useToggleRead, useMarkAllRead } = useItems()
+  const { useGetStats } = useStats()
+
+  // Fetch stats for sidebar badges
+  const { data: statsData } = useGetStats()
 
   // Query items based on filter and feed
   const listOptions: ListItemsOptions = {}
   if (feedId) listOptions.feed_id = feedId
   if (filterType === 'unread') listOptions.read = false
   if (filterType === 'starred') listOptions.starred = true
+  if (filterType === 'today') listOptions.published_today = true
   listOptions.limit = 20
 
   const { data: itemsData, isLoading: itemsLoading, refetch } = useListItems(listOptions)
@@ -67,13 +75,24 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
     }
   }, [items, setItems])
 
-  // Handle item click
+  // Handle item click - update URL to show article in third column
   const handleItemClick = useCallback(
     (itemId: string) => {
-      navigate(`/items/${itemId}`)
+      setSearchParams((prev) => {
+        prev.set('id', itemId)
+        return prev
+      })
     },
-    [navigate]
+    [setSearchParams]
   )
+
+  // Handle closing article panel on mobile
+  const handleCloseArticle = useCallback(() => {
+    setSearchParams((prev) => {
+      prev.delete('id')
+      return prev
+    })
+  }, [setSearchParams])
 
   // Handle star toggle
   const handleToggleStar = useCallback(
@@ -310,11 +329,12 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
       },
       {
         key: 'Escape',
-        description: 'Close modals',
+        description: 'Close modals and article',
         action: () => {
           if (isShortcutsModalOpen) setIsShortcutsModalOpen(false)
           if (isMobileMenuOpen) setIsMobileMenuOpen(false)
           if (isAddFeedOpen) setIsAddFeedOpen(false)
+          if (selectedItemId) handleCloseArticle()
         },
       },
     ],
@@ -334,6 +354,7 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         filterType={filterType}
         onFilterChange={handleFilterChange}
         totalUnread={totalUnread}
+        stats={statsData}
       />
 
       {/* Mobile Drawer */}
@@ -352,40 +373,41 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           filterType={filterType}
           onFilterChange={handleFilterChange}
           totalUnread={totalUnread}
+          stats={statsData}
         />
       </MobileDrawer>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto py-6 px-4">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <MobileMenuButton
-                onClick={() => setIsMobileMenuOpen(true)}
-                unreadCount={filterType === 'unread' ? totalUnread : 0}
-              />
-              <h1 className="text-xl sm:text-2xl font-bold">
-                {filterType === 'starred' && 'Starred Articles'}
-                {filterType === 'unread' && 'Unread Articles'}
-                {filterType === 'all' && !feedId && 'All Articles'}
-                {feedId && feeds.find((f) => f.id === feedId)?.title}
-              </h1>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-              {feedId && (
-                <button
-                  onClick={() => handleMarkAllRead(feedId)}
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Mark all as read
-                </button>
-              )}
-            </div>
+      {/* 第二栏：ItemList */}
+      <div className="hidden md:flex w-80 lg:w-96 border-r flex-shrink-0 flex-col bg-background">
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <MobileMenuButton
+              onClick={() => setIsMobileMenuOpen(true)}
+              unreadCount={filterType === 'unread' ? totalUnread : 0}
+            />
+            <h1 className="text-lg font-bold truncate">
+              {filterType === 'starred' && 'Starred'}
+              {filterType === 'unread' && 'Unread'}
+              {filterType === 'all' && !feedId && 'All Articles'}
+              {feedId && feeds.find((f) => f.id === feedId)?.title}
+            </h1>
           </div>
-
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {feedId && (
+              <button
+                onClick={() => handleMarkAllRead(feedId)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
           <ItemList
             articles={items}
+            selectedItemId={selectedItemId}
             onItemClick={handleItemClick}
             onToggleStar={handleToggleStar}
             onToggleRead={handleToggleRead}
@@ -399,6 +421,57 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* 第三栏：ArticlePanel (桌面端) */}
+      <div className="flex-1 overflow-hidden hidden lg:flex">
+        <ArticlePanel
+          itemId={selectedItemId}
+          showBackButton={false}
+        />
+      </div>
+
+      {/* 移动端：全屏显示 ArticlePanel */}
+      {selectedItemId && (
+        <div className="fixed inset-0 bg-background z-50 md:hidden">
+          <ArticlePanel
+            itemId={selectedItemId}
+            showBackButton={true}
+            onClose={handleCloseArticle}
+          />
+        </div>
+      )}
+
+      {/* 移动端：ItemList 全屏显示 (无选中文章时) */}
+      <main className="flex-1 overflow-y-auto md:hidden">
+        <div className="py-4 px-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <MobileMenuButton
+                onClick={() => setIsMobileMenuOpen(true)}
+                unreadCount={filterType === 'unread' ? totalUnread : 0}
+              />
+              <h1 className="text-lg font-bold">
+                {filterType === 'starred' && 'Starred Articles'}
+                {filterType === 'unread' && 'Unread Articles'}
+                {filterType === 'all' && !feedId && 'All Articles'}
+                {feedId && feeds.find((f) => f.id === feedId)?.title}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+            </div>
+          </div>
+
+          <ItemList
+            articles={items}
+            selectedItemId={selectedItemId}
+            onItemClick={handleItemClick}
+            onToggleStar={handleToggleStar}
+            onToggleRead={handleToggleRead}
+            isLoading={itemsLoading}
+          />
         </div>
       </main>
 

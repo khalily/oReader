@@ -15,6 +15,7 @@ async function listItems(options?: ListItemsOptions): Promise<ListItemsResponse>
   if (options?.feed_id) queryParams.append('feed_id', options.feed_id)
   if (options?.starred !== undefined) queryParams.append('starred', options.starred.toString())
   if (options?.read !== undefined) queryParams.append('read', options.read.toString())
+  if (options?.published_today !== undefined) queryParams.append('published_today', options.published_today.toString())
 
   const url = queryParams.toString() ? `/items?${queryParams.toString()}` : '/items'
   const response = await apiClient.get<ListItemsResponse>(url)

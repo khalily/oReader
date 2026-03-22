@@ -7,6 +7,7 @@ import type { Article } from '@/types/feed'
 
 interface ItemListProps {
   articles: Article[]
+  selectedItemId?: string | null
   onItemClick: (itemId: string) => void
   onToggleStar: (itemId: string, starred: boolean) => void
   onToggleRead: (itemId: string, read: boolean) => void
@@ -44,6 +45,7 @@ function formatDate(dateString: string | null): string {
 
 export function ItemList({
   articles,
+  selectedItemId,
   onItemClick,
   onToggleStar,
   onToggleRead,
@@ -87,9 +89,11 @@ export function ItemList({
         return (
           <Card
             key={article.id}
+            data-item-id={article.id}
             className={cn(
               "cursor-pointer transition-colors hover:bg-accent/50",
-              isRead && "bg-muted/30"
+              isRead && "bg-muted/30",
+              selectedItemId === article.id && "ring-2 ring-primary bg-accent"
             )}
             onClick={() => handleCardClick(article.id)}
           >

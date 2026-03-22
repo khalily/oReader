@@ -6,9 +6,13 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
-    environment: 'happy-dom',
+    environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    exclude: [
+      'tests/e2e/**',
+      '**/*.spec.ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -20,6 +24,8 @@ export default defineConfig({
         '**/mockData.ts',
         'src/main.tsx',
       ],
+      // Only include src tests, exclude node_modules tests
+      include: ['src/**/*.{test,spec}.{ts,tsx}'],
     },
   },
   resolve: {

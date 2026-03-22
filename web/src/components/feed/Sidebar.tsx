@@ -1,11 +1,18 @@
-import { Home, Star, Rss, Menu } from 'lucide-react'
+import { Home, Star, Rss, Menu, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FeedList } from './FeedList'
 import { cn } from '@/lib/utils'
-import type { UserFeed } from '@/types/feed'
+import type { UserFeed, StatsResponse } from '@/types/feed'
 
-export type FilterType = 'all' | 'unread' | 'starred'
+export type FilterType = 'all' | 'unread' | 'starred' | 'today'
+
+const filterConfig = [
+  { type: 'all' as FilterType, label: 'All', icon: Home },
+  { type: 'unread' as FilterType, label: 'Unread', icon: Rss },
+  { type: 'starred' as FilterType, label: 'Starred', icon: Star },
+  { type: 'today' as FilterType, label: 'Today', icon: Calendar },
+]
 
 interface SidebarProps {
   feeds: UserFeed[]
@@ -18,15 +25,10 @@ interface SidebarProps {
   filterType: FilterType
   onFilterChange: (filter: FilterType) => void
   totalUnread?: number
+  stats?: StatsResponse
   isMobileOpen?: boolean
   onMobileClose?: () => void
 }
-
-const filters = [
-  { type: 'all' as FilterType, label: 'All Items', icon: Home },
-  { type: 'unread' as FilterType, label: 'Unread', icon: Rss },
-  { type: 'starred' as FilterType, label: 'Starred', icon: Star },
-]
 
 /**
  * Sidebar content - can be used in desktop sidebar or mobile drawer
@@ -42,7 +44,8 @@ export function SidebarContent({
   filterType,
   onFilterChange,
   totalUnread = 0,
-}: Omit<SidebarProps, 'isMobileOpen' | 'onMobileClose'>) {
+  stats,
+}: Omit<SidebarProps, 'isMobileOpen' | 'onMobileClose' | 'stats'>) {
   const handleDelete = (feedId: string) => {
     if (confirm('Are you sure you want to delete this feed?')) {
       onDeleteFeed(feedId)
@@ -55,11 +58,18 @@ export function SidebarContent({
         <h2 className="text-lg font-semibold mb-4">oReader</h2>
 
         <nav className="space-y-1">
-          {filters.map((filter) => {
+          {filterConfig.map((filter) => {
             const Icon = filter.icon
             const isActive = filterType === filter.type
-            const unreadCount =
-              filter.type === 'unread'
+            const count = stats
+              ? filter.type === 'all'
+                ? stats.total
+                : filter.type === 'unread'
+                ? stats.unread
+                : filter.type === 'starred'
+                ? stats.starred
+                : stats.today
+              : filter.type === 'unread'
                 ? totalUnread
                 : feeds.reduce((sum, f) => sum + f.unread_count, 0)
 
@@ -78,9 +88,9 @@ export function SidebarContent({
               >
                 <Icon className="w-4 h-4 mr-2" />
                 {filter.label}
-                {filter.type === 'unread' && unreadCount > 0 && (
+                {count > 0 && (
                   <Badge variant="default" className="ml-auto text-xs">
-                    {unreadCount}
+                    {count}
                   </Badge>
                 )}
               </Button>
@@ -125,6 +135,7 @@ export function Sidebar({
   filterType,
   onFilterChange,
   totalUnread = 0,
+  stats,
   isMobileOpen: _isMobileOpen = false,
   onMobileClose: _onMobileClose,
 }: SidebarProps) {
@@ -143,6 +154,7 @@ export function Sidebar({
           filterType={filterType}
           onFilterChange={onFilterChange}
           totalUnread={totalUnread}
+          stats={stats}
         />
       </aside>
 

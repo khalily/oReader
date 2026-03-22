@@ -200,7 +200,9 @@ describe('ItemList component', () => {
       { wrapper }
     )
 
-    expect(screen.getByTestId('loader-icon')).toBeInTheDocument()
+    // ItemListSkeleton renders skeleton cards with animate-pulse class
+    const skeletonCards = document.querySelectorAll('.animate-pulse')
+    expect(skeletonCards.length).toBeGreaterThan(0)
   })
 
   it('should show empty state when no articles', () => {
@@ -365,6 +367,102 @@ describe('ItemList component', () => {
       // Should show formatted date (e.g., "Jan 15, 2024")
       expect(screen.getByText('Jan 15, 2024')).toBeInTheDocument()
       expect(screen.getByText('Jan 14, 2024')).toBeInTheDocument()
+    })
+  })
+
+  // Selection state tests
+  it('should highlight selected item with special styling', async () => {
+    const wrapper = createWrapper()
+    render(
+      <ItemList
+        articles={mockArticles}
+        selectedItemId="item-1"
+        onItemClick={vi.fn()}
+        onToggleStar={vi.fn()}
+        onToggleRead={vi.fn()}
+        isLoading={false}
+      />,
+      { wrapper }
+    )
+
+    await waitFor(() => {
+      const selectedCard = screen.getByText('First Article').closest('[data-item-id]')
+      expect(selectedCard).toBeInTheDocument()
+      expect(selectedCard).toHaveClass('ring-2')
+      expect(selectedCard).toHaveClass('ring-primary')
+      expect(selectedCard).toHaveClass('bg-accent')
+    })
+  })
+
+  it('should not highlight non-selected items', async () => {
+    const wrapper = createWrapper()
+    render(
+      <ItemList
+        articles={mockArticles}
+        selectedItemId="item-1"  // Only first item selected
+        onItemClick={vi.fn()}
+        onToggleStar={vi.fn()}
+        onToggleRead={vi.fn()}
+        isLoading={false}
+      />,
+      { wrapper }
+    )
+
+    await waitFor(() => {
+      const secondCard = screen.getByText('Second Article').closest('[data-item-id]')
+      expect(secondCard).toBeInTheDocument()
+      expect(secondCard).not.toHaveClass('ring-2')
+      expect(secondCard).not.toHaveClass('ring-primary')
+      expect(secondCard).not.toHaveClass('bg-accent')
+    })
+  })
+
+  it('should allow selecting different items', async () => {
+    const wrapper = createWrapper()
+    const onItemClick = vi.fn()
+
+    // Start with first item selected
+    const { rerender } = render(
+      <ItemList
+        articles={mockArticles}
+        selectedItemId="item-1"
+        onItemClick={onItemClick}
+        onToggleStar={vi.fn()}
+        onToggleRead={vi.fn()}
+        isLoading={false}
+      />,
+      { wrapper }
+    )
+
+    await waitFor(() => {
+      const firstCard = screen.getByText('First Article').closest('[data-item-id]')
+      expect(firstCard).toHaveClass('ring-2')
+    })
+
+    // Change selection to second item
+    rerender(
+      <ItemList
+        articles={mockArticles}
+        selectedItemId="item-2"
+        onItemClick={onItemClick}
+        onToggleStar={vi.fn()}
+        onToggleRead={vi.fn()}
+        isLoading={false}
+      />
+    )
+
+    await waitFor(() => {
+      const firstCard = screen.getByText('First Article').closest('[data-item-id]')
+      const secondCard = screen.getByText('Second Article').closest('[data-item-id]')
+
+      // First item should no longer be highlighted
+      expect(firstCard).not.toHaveClass('ring-2')
+      expect(firstCard).not.toHaveClass('ring-primary')
+
+      // Second item should now be highlighted
+      expect(secondCard).toHaveClass('ring-2')
+      expect(secondCard).toHaveClass('ring-primary')
+      expect(secondCard).toHaveClass('bg-accent')
     })
   })
 })

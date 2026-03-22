@@ -170,6 +170,19 @@ func (s *itemService) ListItems(ctx context.Context, userID string, opts ListIte
 		}
 	}
 
+	// Apply today filter if requested
+	if opts.PublishedToday != nil && *opts.PublishedToday {
+		todayStart := time.Now().UTC().Truncate(24 * time.Hour)
+		filtered := make([]*ItemWithState, 0, len(items))
+		for _, item := range items {
+			if item.PubDate != nil && !item.PubDate.Before(todayStart) {
+				filtered = append(filtered, item)
+			}
+		}
+		items = filtered
+		total = int64(len(items))
+	}
+
 	// Calculate pagination metadata
 	hasMore := opts.Limit > 0 && int64(len(items)) < total
 	nextCursor := ""

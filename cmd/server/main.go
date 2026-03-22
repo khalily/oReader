@@ -79,6 +79,7 @@ func main() {
 	tokenRepo := repository.NewRefreshTokenRepository(db)
 	importJobRepo := repository.NewImportJobRepository(db)
 	oauthStateRepo := repository.NewOAuthStateRepository(db)
+	statsRepo := repository.NewStatsRepository(db)
 
 	// Initialize services
 	accessTTL, err := cfg.GetAccessTTL()
@@ -102,6 +103,7 @@ func main() {
 	itemService := service.NewItemService(itemRepo, userItemStateRepo, userFeedRepo)
 	importService := service.NewImportService(feedService, importJobRepo, userFeedRepo, feedRepo)
 	refreshWorkerService := service.NewRefreshWorkerService(feedRepo, itemRepo, userFeedRepo)
+	statsService := service.NewStatsService(statsRepo)
 
 	// Initialize rate limiter
 	rateLimiter := ratelimit.NewMemoryLimiter()
@@ -124,6 +126,7 @@ func main() {
 	itemHandler := handler.NewItemHandler(itemService)
 	importHandler := handler.NewImportHandler(feedService, importService, feedRepo)
 	oauthHandler := handler.NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, oauthStateRepo, "")
+	statsHandler := handler.NewStatsHandler(statsService)
 
 	// Setup Gin
 	if cfg.IsProduction() {
@@ -201,6 +204,9 @@ func main() {
 				items.PUT("/:id/star", itemHandler.SetStar)
 				items.PUT("/:id/read", itemHandler.SetRead)
 			}
+
+			// Stats routes
+			protected.GET("/stats", statsHandler.GetStats)
 
 			// OPML import
 			opml := protected.Group("/opml")

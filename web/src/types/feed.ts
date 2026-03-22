@@ -74,6 +74,15 @@ export interface ListItemsOptions {
   feed_id?: string
   starred?: boolean
   read?: boolean
+  published_today?: boolean
+}
+
+// Stats types
+export interface StatsResponse {
+  total: number
+  unread: number
+  starred: number
+  today: number
 }
 
 export interface ListItemsResponse {
