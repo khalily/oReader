@@ -547,6 +547,53 @@ describe('ArticlePanel component', () => {
         { timeout: 1000 }
       )
     })
+
+    it('should only trigger auto-mark read API once (no duplicate requests)', async () => {
+      // Track the number of times the read API is called
+      let readApiCallCount = 0
+
+      server.use(
+        http.get(`${API_BASE_URL}/items/:id`, () => {
+          return HttpResponse.json({ item: mockArticle })
+        }),
+        http.put(`${API_BASE_URL}/items/:id/read`, async ({ request }) => {
+          readApiCallCount++
+          const body = await request.json() as { read: boolean }
+          return HttpResponse.json({
+            item: {
+              ...mockArticle,
+              user_state: {
+                ...mockArticle.user_state!,
+                is_read: body.read,
+                read_at: body.read ? new Date().toISOString() : null,
+              },
+            },
+          })
+        })
+      )
+
+      const wrapper = createWrapper()
+      render(<ArticlePanel itemId="item-1" />, { wrapper })
+
+      // Wait for article to load and auto-mark to complete
+      await waitFor(() => {
+        expect(screen.getByText('Test Article Title')).toBeInTheDocument()
+      })
+
+      // Wait for the API call to be made
+      await waitFor(
+        () => {
+          expect(readApiCallCount).toBeGreaterThanOrEqual(1)
+        },
+        { timeout: 3000 }
+      )
+
+      // Wait additional time to ensure no duplicate calls
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      // Should have exactly 1 call, not multiple
+      expect(readApiCallCount).toBe(1)
+    })
   })
 
   describe('Badges', () => {

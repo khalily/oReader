@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useItems } from '@/hooks/useItems'
 import type { Article } from '@/types/feed'
@@ -31,6 +31,10 @@ export function ArticlePanel({ itemId, onClose, showBackButton = false }: Articl
   // Summary collapse state
   const [summaryExpanded, setSummaryExpanded] = useState(true)
 
+  // Track if we've already triggered auto-mark-as-read for this item
+  // Using ref to avoid triggering re-renders and useEffect loops
+  const hasAutoMarkedRead = useRef(false)
+
   const item = data?.item
     ? optimisticState
       ? { ...data.item, user_state: { ...data.item.user_state, ...optimisticState } }
@@ -42,19 +46,36 @@ export function ArticlePanel({ itemId, onClose, showBackButton = false }: Articl
     setOptimisticState(null)
   }, [itemId])
 
-  // Auto-mark as read when viewing (only once)
+  // Reset auto-mark flag when item changes
   useEffect(() => {
-    if (data?.item && data.item.user_state && !data.item.user_state.is_read && !optimisticState?.is_read) {
+    hasAutoMarkedRead.current = false
+  }, [itemId])
+
+  // Auto-mark as read when viewing (only once per item)
+  useEffect(() => {
+    if (
+      data?.item &&
+      data.item.user_state &&
+      !data.item.user_state.is_read &&
+      !hasAutoMarkedRead.current
+    ) {
+      // Set flag immediately to prevent duplicate requests
+      hasAutoMarkedRead.current = true
+
       toggleRead.mutate(
         { itemId: data.item.id, read: true },
         {
           onSuccess: (response) => {
             setOptimisticState({ is_starred: response.item.user_state?.is_starred ?? false, is_read: true })
           },
+          onError: () => {
+            // Reset flag on error to allow retry
+            hasAutoMarkedRead.current = false
+          },
         }
       )
     }
-  }, [data?.item, optimisticState, toggleRead])
+  }, [data?.item])
 
   const handleToggleStar = () => {
     if (data?.item) {
