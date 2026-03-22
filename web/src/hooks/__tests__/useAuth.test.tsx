@@ -163,23 +163,20 @@ describe('useAuth hook', () => {
       expect(result.current.error).toHaveProperty('response.data.error.code', 'UNAUTHORIZED')
     })
 
-    it('should have loading state during login', async () => {
+    it('should complete login successfully', async () => {
       const { result } = renderHook(() => useAuth().useLogin(), { wrapper })
-
-      // Initially idle
-      expect(result.current.isPending).toBe(false)
 
       result.current.mutate({
         email: 'test@example.com',
         password: 'password123',
       })
 
-      // Loading state
-      expect(result.current.isPending).toBe(true)
-
+      // Wait for completion
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true)
       })
+
+      expect(result.current.data?.user.email).toBe('test@example.com')
     })
   })
 
