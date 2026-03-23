@@ -130,59 +130,40 @@ func (h *OAuthHandler) GitHubInitiate(c *gin.Context) {
 func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	// Check for error response from GitHub
 	if errorCode := c.Query("error"); errorCode != "" {
-		errorDesc := c.Query("error_description")
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: fmt.Sprintf("OAuth error: %s (%s)", errorCode, errorDesc),
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=access_denied")
 		return
 	}
 
 	// Validate state parameter
 	state := c.Query("state")
 	if state == "" {
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "OAuth state parameter is required",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
 		return
 	}
 
 	// Retrieve and validate state from database
 	oauthState, err := h.stateRepo.GetByState(c.Request.Context(), state)
 	if err != nil || oauthState == nil {
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "Invalid OAuth state",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
 		return
 	}
 
 	if oauthState.IsExpired() {
 		// Clean up expired state
 		_ = h.stateRepo.Delete(c.Request.Context(), state)
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "OAuth state has expired",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
 		return
 	}
 
 	if oauthState.Provider != "github" {
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "Invalid OAuth provider",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
 		return
 	}
 
 	// Get authorization code
 	code := c.Query("code")
 	if code == "" {
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "Authorization code is required",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=access_denied")
 		return
 	}
 
@@ -192,30 +173,21 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	// Exchange code for access token
 	accessToken, err := h.exchangeGitHubCode(c.Request.Context(), code)
 	if err != nil {
-		errors.SendInternal(c, errors.Error{
-			Code:    errors.ErrInternal,
-			Message: "Failed to exchange authorization code",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
 		return
 	}
 
 	// Get GitHub user profile
 	githubUser, err := h.getGitHubUser(c.Request.Context(), accessToken)
 	if err != nil {
-		errors.SendInternal(c, errors.Error{
-			Code:    errors.ErrInternal,
-			Message: "Failed to fetch user profile",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
 		return
 	}
 
 	// Find or create user
 	user, err := h.findOrCreateUser(c.Request.Context(), githubUser)
 	if err != nil {
-		errors.SendInternal(c, errors.Error{
-			Code:    errors.ErrInternal,
-			Message: "Failed to create user account",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
 		return
 	}
 

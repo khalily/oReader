@@ -226,21 +226,16 @@ func TestOAuthHandler_GitHubCallback_InvalidState(t *testing.T) {
 	h := createOAuthHandler(t, db, cfg, nil)
 	router := createOAuthTestRouter(h)
 
-	t.Run("callback with invalid state returns 400", func(t *testing.T) {
+	t.Run("callback with invalid state redirects with error", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/v1/auth/github/callback?code=test_code&state=invalid_state", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-
-		var resp map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		assert.NoError(t, err)
-		errObj := resp["error"].(map[string]interface{})
-		assert.Contains(t, errObj["message"], "Invalid OAuth state")
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Equal(t, "/login?oauth_error=invalid_state", w.Header().Get("Location"))
 	})
 
-	t.Run("callback with expired state returns 400", func(t *testing.T) {
+	t.Run("callback with expired state redirects with error", func(t *testing.T) {
 		stateRepo := repository.NewOAuthStateRepository(db)
 		state := &model.OAuthState{
 			State:     "expired_state",
@@ -256,15 +251,17 @@ func TestOAuthHandler_GitHubCallback_InvalidState(t *testing.T) {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Equal(t, "/login?oauth_error=invalid_state", w.Header().Get("Location"))
 	})
 
-	t.Run("callback with missing state returns 400", func(t *testing.T) {
+	t.Run("callback with missing state redirects with error", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/v1/auth/github/callback?code=test_code", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Equal(t, "/login?oauth_error=invalid_state", w.Header().Get("Location"))
 	})
 }
 
@@ -286,18 +283,13 @@ func TestOAuthHandler_GitHubCallback_MissingCode(t *testing.T) {
 	err = stateRepo.Create(context.Background(), state)
 	require.NoError(t, err)
 
-	t.Run("callback without code returns 400", func(t *testing.T) {
+	t.Run("callback without code redirects with error", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/v1/auth/github/callback?state=test_state_no_code", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-
-		var resp map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		assert.NoError(t, err)
-		errObj := resp["error"].(map[string]interface{})
-		assert.Contains(t, errObj["message"], "Authorization code is required")
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Equal(t, "/login?oauth_error=access_denied", w.Header().Get("Location"))
 	})
 }
 
@@ -515,19 +507,14 @@ func TestOAuthHandler_GitHubError(t *testing.T) {
 	err = stateRepo.Create(context.Background(), state)
 	require.NoError(t, err)
 
-	t.Run("callback with error parameter returns error", func(t *testing.T) {
+	t.Run("callback with error parameter redirects with error", func(t *testing.T) {
 		callbackURL := fmt.Sprintf("/api/v1/auth/github/callback?error=access_denied&error_description=user+denied+access&state=%s", state.State)
 		req, _ := http.NewRequest("GET", callbackURL, nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-
-		var resp map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		assert.NoError(t, err)
-		errObj := resp["error"].(map[string]interface{})
-		assert.Contains(t, errObj["message"], "access_denied")
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Equal(t, "/login?oauth_error=access_denied", w.Header().Get("Location"))
 	})
 }
 
