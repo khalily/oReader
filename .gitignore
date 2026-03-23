@@ -1,6 +1,9 @@
 # IDE
 .idea/
 
+# Worktrees
+.worktrees/
+
 # Python
 *.pyc
 *.pyo
