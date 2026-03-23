@@ -76,7 +76,8 @@ describe('LoginPage', () => {
 
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
+    // More specific selector to avoid matching "Sign in with GitHub"
+    expect(screen.getByRole('button', { name: /^sign in$/i })).toBeInTheDocument()
   })
 
   it('should have link to register page', () => {
@@ -93,7 +94,7 @@ describe('LoginPage', () => {
 
     const emailInput = screen.getByLabelText(/email/i)
     const passwordInput = screen.getByLabelText(/^password$/i)
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
+    const submitButton = screen.getByRole('button', { name: /^sign in$/i })
 
     await user.type(emailInput, 'test@example.com')
     await user.type(passwordInput, 'wrongpassword')
@@ -132,7 +133,7 @@ describe('LoginPage', () => {
 
     const emailInput = screen.getByLabelText(/email/i)
     const passwordInput = screen.getByLabelText(/^password$/i)
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
+    const submitButton = screen.getByRole('button', { name: /^sign in$/i })
 
     await user.type(emailInput, 'test@example.com')
     await user.type(passwordInput, 'password123')
@@ -147,5 +148,54 @@ describe('LoginPage', () => {
       // After successful login, should navigate away or show success
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
+  })
+
+  it('should render GitHub login button', () => {
+    render(<LoginPage />, { wrapper })
+
+    expect(screen.getByRole('button', { name: /sign in with github/i })).toBeInTheDocument()
+  })
+
+  it('should render divider between OAuth and email login', () => {
+    render(<LoginPage />, { wrapper })
+
+    expect(screen.getByText(/or continue with/i)).toBeInTheDocument()
+  })
+
+  it('should display OAuth error message from URL params (access_denied)', () => {
+    // Mock URL with oauth_error param
+    const wrapperWithLocation = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/login?oauth_error=access_denied']}>{children}</MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    render(<LoginPage />, { wrapper: wrapperWithLocation })
+
+    expect(screen.getByText(/github login cancelled/i)).toBeInTheDocument()
+  })
+
+  it('should display OAuth error message (invalid_state)', () => {
+    const wrapperWithLocation = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/login?oauth_error=invalid_state']}>{children}</MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    render(<LoginPage />, { wrapper: wrapperWithLocation })
+
+    expect(screen.getByText(/login expired, please try again/i)).toBeInTheDocument()
+  })
+
+  it('should display OAuth error message (github_error)', () => {
+    const wrapperWithLocation = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/login?oauth_error=github_error']}>{children}</MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    render(<LoginPage />, { wrapper: wrapperWithLocation })
+
+    expect(screen.getByText(/github service temporarily unavailable/i)).toBeInTheDocument()
   })
 })
