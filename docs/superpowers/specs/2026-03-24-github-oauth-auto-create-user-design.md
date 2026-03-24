@@ -13,7 +13,7 @@
 |------|------|
 | A. 无 Email 处理 | 调用 `/user/emails` API 获取邮箱；仍无则让用户输入 |
 | B. 账户关联策略 | Email 匹配时跳转确认页，用户验证原账户密码后确认关联 |
-| C. 额外字段 | User 表添加 `GitHubLogin` 字段 |
+| C. 额外字段 | User 表添加 `GitHubLogin` 字段（GitHub 用户名，用于展示和未来功能） |
 
 ## 架构
 
@@ -181,6 +181,8 @@ CREATE TABLE pending_oauths (
 
 #### GET /api/v1/auth/oauth/pending
 
+> **注意：** 此 API 无需认证（用户尚未登录）。
+
 **请求参数：**
 - `token` (query): PendingOAuth token
 
@@ -211,13 +213,19 @@ CREATE TABLE pending_oauths (
 
 #### POST /api/v1/auth/oauth/complete
 
+> **注意：** 此 API 无需认证（用户尚未登录）。
+
 **请求体：**
 ```json
 {
     "token": "xxx",
-    "email": "user@example.com"   // 如果 GitHub 无邮箱，必须填写
+    "email": "user@example.com"   // 如果 GitHub 无邮箱，必须填写；否则可选
 }
 ```
+
+**Email 校验规则：**
+- 格式：符合标准邮箱格式
+- 唯一性：不能与现有用户邮箱重复
 
 **成功响应：**
 - 设置 auth cookie
@@ -229,14 +237,21 @@ CREATE TABLE pending_oauths (
 
 #### POST /api/v1/auth/oauth/link
 
+> **注意：** 此 API 无需认证（用户尚未登录）。后端从 `PendingOAuth.ExistingEmail` 获取要关联的邮箱，**忽略请求中的 `email` 字段**，防止账户劫持攻击。
+
 **请求体：**
 ```json
 {
     "token": "xxx",
-    "email": "existing@example.com",
     "password": "xxx"
 }
 ```
+
+**后端处理逻辑：**
+1. 验证 token 有效且未过期
+2. 从 `PendingOAuth.ExistingEmail` 获取目标邮箱
+3. 验证该邮箱对应的用户密码
+4. 关联 GitHub 账户
 
 **成功响应：**
 - 设置 auth cookie
@@ -244,7 +259,7 @@ CREATE TABLE pending_oauths (
 
 **错误响应：**
 - `400`: token 无效/过期
-- `401`: 邮箱或密码错误
+- `401`: 密码错误
 
 ## 后端处理流程
 
@@ -371,10 +386,7 @@ func getBestEmail(emails []GitHubEmail) string {
 │  GitHub: @octocat                                        │
 │  关联邮箱: existing@example.com                          │
 │                                                          │
-│  请验证原账户以完成关联：                                 │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ 邮箱 (预填 existing@example.com)                   │  │
-│  └───────────────────────────────────────────────────┘  │
+│  请输入原账户密码以完成关联：                             │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │ 密码                                               │  │
 │  └───────────────────────────────────────────────────┘  │
@@ -382,6 +394,8 @@ func getBestEmail(emails []GitHubEmail) string {
 │                 [ 确认关联 ]                              │
 └─────────────────────────────────────────────────────────┘
 ```
+
+> **安全说明**：邮箱从后端 `PendingOAuth.ExistingEmail` 获取，前端只收集密码验证，防止邮箱篡改攻击。
 
 ### 组件结构
 
@@ -407,7 +421,8 @@ export const oauthApi = {
   complete: (data: { token: string; email?: string }) =>
     api.post('/api/v1/auth/oauth/complete', data),
 
-  link: (data: { token: string; email: string; password: string }) =>
+  // link 不需要传 email，后端从 PendingOAuth 获取
+  link: (data: { token: string; password: string }) =>
     api.post('/api/v1/auth/oauth/link', data),
 };
 ```
@@ -471,9 +486,22 @@ export const oauthApi = {
 
 1. **State 参数** - 已实现，防止 CSRF 攻击
 2. **PendingOAuth 过期** - 5 分钟有效期，防止 token 被滥用
-3. **关联验证** - 必须验证原账户密码，防止账户劫持
+3. **关联验证** - 必须验证原账户密码；后端从 `PendingOAuth.ExistingEmail` 获取邮箱，**不信任用户输入**，防止账户劫持
 4. **HttpOnly Cookie** - 防止 XSS 窃取 token
 5. **Email 唯一性** - 数据库约束保证，防止重复注册
+6. **Token 机密性** - URL 中的 token 不应被分享，前端应清理 URL 历史
+
+## 数据清理策略
+
+### PendingOAuth 过期清理
+
+| 策略 | 实现方式 |
+|------|----------|
+| **懒清理** | 查询时检查 `expires_at`，过期则返回 404（不自动删除） |
+| **定时清理** | 可选：每日定时任务删除 `expires_at < NOW()` 的记录 |
+| **用户触发清理** | 使用后立即删除（无论成功或失败） |
+
+**推荐实现**：懒清理 + 使用后立即删除，无需额外定时任务。
 
 ## 扩展性
 
