@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -242,20 +243,104 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	}
 	log.Debug().Str("github_id", fmt.Sprintf("%d", githubUser.ID)).Str("email", githubUser.Email).Msg("GitHub user profile fetched")
 
-	// Find or create user
-	log.Debug().Msg("Finding or creating user")
-	user, err := h.findOrCreateUser(c.Request.Context(), githubUser)
+	// 1. Get email - if not in profile, fetch from /user/emails API
+	email := githubUser.Email
+	if email == "" {
+		emails, err := h.fetchGitHubEmails(c.Request.Context(), accessToken)
+		if err == nil && len(emails) > 0 {
+			email = getBestEmail(emails)
+		}
+	}
+	log.Debug().Str("email", email).Msg("Resolved email for GitHub user")
+
+	// 2. Try to find existing user by GitHub ID
+	githubIDStr := fmt.Sprintf("%d", githubUser.ID)
+	user, err := h.userRepo.GetByGitHubID(c.Request.Context(), githubIDStr)
+	if err == nil && user != nil {
+		// Update GitHubLogin if changed
+		if user.GitHubLogin != githubUser.Login {
+			user.GitHubLogin = githubUser.Login
+			_ = h.userRepo.Update(c.Request.Context(), user)
+		}
+		h.setAuthCookies(c, user)
+		c.Redirect(http.StatusFound, "/")
+		return
+	}
+
+	// 3. Not found by GitHub ID, check email for account linking or new user
+	if email != "" {
+		user, err := h.userRepo.GetByEmail(c.Request.Context(), email)
+		if err == nil && user != nil {
+			// Auto-link: connect GitHub to existing account
+			user.GitHubID = githubIDStr
+			user.GitHubLogin = githubUser.Login
+			if user.AvatarURL == "" {
+				user.AvatarURL = githubUser.AvatarURL
+			}
+			_ = h.userRepo.Update(c.Request.Context(), user)
+			h.setAuthCookies(c, user)
+			c.Redirect(http.StatusFound, "/")
+			return
+		}
+
+		// Create new user with email
+		newUser := &model.User{
+			Email:        email,
+			Nickname:     getNickname(githubUser),
+			AvatarURL:    githubUser.AvatarURL,
+			AuthProvider: "github",
+			GitHubID:     githubIDStr,
+			GitHubLogin:  githubUser.Login,
+		}
+		if err := newUser.GenerateID(); err != nil {
+			log.Error().Err(err).Msg("Failed to generate user ID")
+			c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+			return
+		}
+		if err := h.userRepo.Create(c.Request.Context(), newUser); err != nil {
+			log.Error().Err(err).Msg("Failed to create user")
+			c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+			return
+		}
+		h.setAuthCookies(c, newUser)
+		c.Redirect(http.StatusFound, "/")
+		return
+	}
+
+	// 4. No email available - create PendingOAuth and redirect to pending page
+	token, err := generateState()
 	if err != nil {
-		log.Error().Err(err).Str("github_id", fmt.Sprintf("%d", githubUser.ID)).Msg("Failed to find or create user")
+		log.Error().Err(err).Msg("Failed to generate pending token")
 		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
 		return
 	}
 
-	// Set auth cookies
-	h.setAuthCookies(c, user)
+	pending := &model.PendingOAuth{
+		Token:       token,
+		GitHubID:    githubIDStr,
+		GitHubLogin: githubUser.Login,
+		Nickname:    getNickname(githubUser),
+		AvatarURL:   githubUser.AvatarURL,
+		ExpiresAt:   time.Now().Add(5 * time.Minute),
+	}
+	if err := pending.GenerateID(); err != nil {
+		log.Error().Err(err).Msg("Failed to generate pending OAuth ID")
+		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+		return
+	}
 
-	// Redirect to frontend
-	c.Redirect(http.StatusFound, "/")
+	if err := h.pendingOAuthRepo.Create(c.Request.Context(), pending); err != nil {
+		log.Error().Err(err).Msg("Failed to create pending OAuth")
+		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+		return
+	}
+
+	// Redirect to frontend pending page
+	callbackHost := os.Getenv("GITHUB_CALLBACK_HOST")
+	if callbackHost == "" {
+		callbackHost = h.cfg.Server.FrontendURL
+	}
+	c.Redirect(http.StatusFound, callbackHost+"/oauth/pending?token="+token)
 }
 
 // exchangeGitHubCode exchanges the authorization code for an access token
@@ -663,4 +748,12 @@ func isValidEmail(email string) bool {
 		return false
 	}
 	return strings.Contains(email, "@") && strings.Contains(email, ".")
+}
+
+// getNickname returns the best nickname from GitHub user profile
+func getNickname(user *GitHubUser) string {
+	if user.Name != "" {
+		return user.Name
+	}
+	return user.Login
 }
