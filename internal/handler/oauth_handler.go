@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,13 +25,14 @@ import (
 
 // OAuthHandler handles OAuth authentication endpoints
 type OAuthHandler struct {
-	cfg            *config.Config
-	jwtService     *jwt.Service
-	userRepo       service.UserRepository
-	tokenRepo      service.RefreshTokenRepository
-	stateRepo      service.OAuthStateRepository
-	githubBaseURL  string // For OAuth web flow (https://github.com)
-	githubAPIURL   string // For REST API calls (https://api.github.com)
+	cfg              *config.Config
+	jwtService       *jwt.Service
+	userRepo         service.UserRepository
+	tokenRepo        service.RefreshTokenRepository
+	stateRepo        service.OAuthStateRepository
+	pendingOAuthRepo service.PendingOAuthRepository // For pending OAuth sessions
+	githubBaseURL    string                         // For OAuth web flow (https://github.com)
+	githubAPIURL     string                         // For REST API calls (https://api.github.com)
 }
 
 // NewOAuthHandler creates a new OAuth handler
@@ -40,6 +42,7 @@ func NewOAuthHandler(
 	userRepo service.UserRepository,
 	tokenRepo service.RefreshTokenRepository,
 	stateRepo service.OAuthStateRepository,
+	pendingOAuthRepo service.PendingOAuthRepository,
 	githubBaseURL string,
 ) *OAuthHandler {
 	// Use default GitHub URL if not provided (for testing)
@@ -57,13 +60,14 @@ func NewOAuthHandler(
 	}
 
 	return &OAuthHandler{
-		cfg:           cfg,
-		jwtService:    jwtService,
-		userRepo:      userRepo,
-		tokenRepo:     tokenRepo,
-		stateRepo:     stateRepo,
-		githubBaseURL: githubBaseURL,
-		githubAPIURL:  githubAPIURL,
+		cfg:              cfg,
+		jwtService:       jwtService,
+		userRepo:         userRepo,
+		tokenRepo:        tokenRepo,
+		stateRepo:        stateRepo,
+		pendingOAuthRepo: pendingOAuthRepo,
+		githubBaseURL:    githubBaseURL,
+		githubAPIURL:     githubAPIURL,
 	}
 }
 
@@ -328,6 +332,37 @@ func (h *OAuthHandler) getGitHubUser(ctx context.Context, accessToken string) (*
 	return &user, nil
 }
 
+// fetchGitHubEmails fetches the user's email list from GitHub /user/emails API
+func (h *OAuthHandler) fetchGitHubEmails(ctx context.Context, accessToken string) ([]GitHubEmail, error) {
+	url := h.githubAPIURL + "/user/emails"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Error().Int("status", resp.StatusCode).Str("body", string(body)).Msg("GitHub emails fetch failed")
+		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+	}
+
+	var emails []GitHubEmail
+	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
+		return nil, err
+	}
+
+	return emails, nil
+}
+
 // findOrCreateUser finds an existing user or creates a new one from GitHub profile
 func (h *OAuthHandler) findOrCreateUser(ctx context.Context, githubUser *GitHubUser) (*model.User, error) {
 	githubID := fmt.Sprintf("%d", githubUser.ID)
@@ -502,4 +537,130 @@ func (h *OAuthHandler) AppleCallback(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{
 		"error": "Apple OAuth is not yet implemented",
 	})
+}
+
+// GetPendingOAuth handles GET /api/v1/auth/oauth/pending
+// Returns pending OAuth information for email completion flow
+func (h *OAuthHandler) GetPendingOAuth(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "token is required",
+		})
+		return
+	}
+
+	pending, err := h.pendingOAuthRepo.GetByToken(c.Request.Context(), token)
+	if err != nil || pending == nil || pending.IsExpired() {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "token not found or expired",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"github_login": pending.GitHubLogin,
+		"nickname":     pending.Nickname,
+		"avatar_url":   pending.AvatarURL,
+	})
+}
+
+// CompleteOAuthRequest represents the request body for CompleteOAuth
+type CompleteOAuthRequest struct {
+	Token string `json:"token"`
+	Email string `json:"email"`
+}
+
+// CompleteOAuth handles POST /api/v1/auth/oauth/complete
+// Completes user registration with email for OAuth users without public email
+func (h *OAuthHandler) CompleteOAuth(c *gin.Context) {
+	var req CompleteOAuthRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request body",
+		})
+		return
+	}
+
+	// Validate token
+	if req.Token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "token is required",
+		})
+		return
+	}
+
+	// Validate email format
+	if req.Email == "" || !isValidEmail(req.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "valid email is required",
+		})
+		return
+	}
+
+	// Get pending OAuth data
+	pending, err := h.pendingOAuthRepo.GetByToken(c.Request.Context(), req.Token)
+	if err != nil || pending == nil || pending.IsExpired() {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "token not found or expired",
+		})
+		return
+	}
+
+	// Check if email is already used
+	existingUser, _ := h.userRepo.GetByEmail(c.Request.Context(), req.Email)
+	if existingUser != nil {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": gin.H{
+				"code":    "EMAIL_ALREADY_USED",
+				"message": "该邮箱已被注册，请使用其他邮箱",
+			},
+		})
+		return
+	}
+
+	// Create new user
+	user := &model.User{
+		Email:        req.Email,
+		Nickname:     pending.Nickname,
+		AvatarURL:    pending.AvatarURL,
+		AuthProvider: "github",
+		GitHubID:     pending.GitHubID,
+		GitHubLogin:  pending.GitHubLogin,
+	}
+	if err := user.GenerateID(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to create user",
+		})
+		return
+	}
+
+	if err := h.userRepo.Create(c.Request.Context(), user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to create user",
+		})
+		return
+	}
+
+	// Delete pending record
+	_ = h.pendingOAuthRepo.Delete(c.Request.Context(), req.Token)
+
+	// Set auth cookies (same flow as existing OAuth login)
+	h.setAuthCookies(c, user)
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":            user.ID,
+		"email":         user.Email,
+		"nickname":      user.Nickname,
+		"avatar_url":    user.AvatarURL,
+		"auth_provider": user.AuthProvider,
+	})
+}
+
+// isValidEmail validates email format
+func isValidEmail(email string) bool {
+	if len(email) > 255 {
+		return false
+	}
+	return strings.Contains(email, "@") && strings.Contains(email, ".")
 }
