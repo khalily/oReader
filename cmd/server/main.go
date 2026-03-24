@@ -274,7 +274,11 @@ func main() {
 
 		// Development mode without static files: redirect to Vite dev server
 		if staticFS == nil && cfg.IsDevelopment() {
-			viteURL := "http://localhost:5173" + c.Request.URL.Path
+			frontendURL := cfg.Server.FrontendURL
+			if frontendURL == "" {
+				frontendURL = "http://localhost:5173" // Default fallback
+			}
+			viteURL := frontendURL + c.Request.URL.Path
 			c.Redirect(http.StatusTemporaryRedirect, viteURL)
 			return
 		}

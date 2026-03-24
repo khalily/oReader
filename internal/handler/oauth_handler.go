@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 
 	"oreader/internal/config"
 	"oreader/internal/infra/cookie"
@@ -23,12 +24,13 @@ import (
 
 // OAuthHandler handles OAuth authentication endpoints
 type OAuthHandler struct {
-	cfg         *config.Config
-	jwtService  *jwt.Service
-	userRepo    service.UserRepository
-	tokenRepo   service.RefreshTokenRepository
-	stateRepo   service.OAuthStateRepository
-	githubBaseURL string
+	cfg            *config.Config
+	jwtService     *jwt.Service
+	userRepo       service.UserRepository
+	tokenRepo      service.RefreshTokenRepository
+	stateRepo      service.OAuthStateRepository
+	githubBaseURL  string // For OAuth web flow (https://github.com)
+	githubAPIURL   string // For REST API calls (https://api.github.com)
 }
 
 // NewOAuthHandler creates a new OAuth handler
@@ -45,6 +47,15 @@ func NewOAuthHandler(
 		githubBaseURL = "https://github.com"
 	}
 
+	// GitHub API uses a different base URL than OAuth
+	// In production: OAuth uses github.com, API uses api.github.com
+	// In testing: both use the same mock server URL
+	githubAPIURL := "https://api.github.com"
+	if githubBaseURL != "https://github.com" {
+		// Testing mode: use same URL for both
+		githubAPIURL = githubBaseURL
+	}
+
 	return &OAuthHandler{
 		cfg:           cfg,
 		jwtService:    jwtService,
@@ -52,6 +63,7 @@ func NewOAuthHandler(
 		tokenRepo:     tokenRepo,
 		stateRepo:     stateRepo,
 		githubBaseURL: githubBaseURL,
+		githubAPIURL:  githubAPIURL,
 	}
 }
 
@@ -130,92 +142,74 @@ func (h *OAuthHandler) GitHubInitiate(c *gin.Context) {
 func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	// Check for error response from GitHub
 	if errorCode := c.Query("error"); errorCode != "" {
-		errorDesc := c.Query("error_description")
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: fmt.Sprintf("OAuth error: %s (%s)", errorCode, errorDesc),
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=access_denied")
 		return
 	}
 
 	// Validate state parameter
 	state := c.Query("state")
 	if state == "" {
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "OAuth state parameter is required",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
 		return
 	}
 
 	// Retrieve and validate state from database
 	oauthState, err := h.stateRepo.GetByState(c.Request.Context(), state)
 	if err != nil || oauthState == nil {
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "Invalid OAuth state",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
 		return
 	}
 
 	if oauthState.IsExpired() {
 		// Clean up expired state
 		_ = h.stateRepo.Delete(c.Request.Context(), state)
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "OAuth state has expired",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
 		return
 	}
 
 	if oauthState.Provider != "github" {
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "Invalid OAuth provider",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
 		return
 	}
 
 	// Get authorization code
 	code := c.Query("code")
 	if code == "" {
-		errors.SendBadRequest(c, errors.Error{
-			Code:    errors.ErrValidation,
-			Message: "Authorization code is required",
-		})
+		c.Redirect(http.StatusFound, "/login?oauth_error=access_denied")
 		return
 	}
 
 	// Clean up used state
 	_ = h.stateRepo.Delete(c.Request.Context(), state)
 
+	// Get redirect URI for token exchange (must match the one used in authorization)
+	redirectURI := h.getRedirectURI(c, "github")
+	log.Debug().Str("redirect_uri", redirectURI).Msg("GitHub OAuth callback - exchanging code for token")
+
 	// Exchange code for access token
-	accessToken, err := h.exchangeGitHubCode(c.Request.Context(), code)
+	accessToken, err := h.exchangeGitHubCode(c.Request.Context(), code, redirectURI)
 	if err != nil {
-		errors.SendInternal(c, errors.Error{
-			Code:    errors.ErrInternal,
-			Message: "Failed to exchange authorization code",
-		})
+		log.Error().Err(err).Msg("GitHub token exchange failed")
+		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
 		return
 	}
 
 	// Get GitHub user profile
+	log.Debug().Msg("Fetching GitHub user profile")
 	githubUser, err := h.getGitHubUser(c.Request.Context(), accessToken)
 	if err != nil {
-		errors.SendInternal(c, errors.Error{
-			Code:    errors.ErrInternal,
-			Message: "Failed to fetch user profile",
-		})
+		log.Error().Err(err).Msg("Failed to fetch GitHub user profile")
+		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
 		return
 	}
+	log.Debug().Str("github_id", fmt.Sprintf("%d", githubUser.ID)).Str("email", githubUser.Email).Msg("GitHub user profile fetched")
 
 	// Find or create user
+	log.Debug().Msg("Finding or creating user")
 	user, err := h.findOrCreateUser(c.Request.Context(), githubUser)
 	if err != nil {
-		errors.SendInternal(c, errors.Error{
-			Code:    errors.ErrInternal,
-			Message: "Failed to create user account",
-		})
+		log.Error().Err(err).Str("github_id", fmt.Sprintf("%d", githubUser.ID)).Msg("Failed to find or create user")
+		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
 		return
 	}
 
@@ -227,13 +221,16 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 }
 
 // exchangeGitHubCode exchanges the authorization code for an access token
-func (h *OAuthHandler) exchangeGitHubCode(ctx context.Context, code string) (string, error) {
+func (h *OAuthHandler) exchangeGitHubCode(ctx context.Context, code string, redirectURI string) (string, error) {
 	tokenURL := fmt.Sprintf("%s/login/oauth/access_token", h.githubBaseURL)
 
 	data := url.Values{}
 	data.Set("client_id", h.cfg.OAuth.GitHubClientID)
 	data.Set("client_secret", h.cfg.OAuth.GitHubClientSecret)
 	data.Set("code", code)
+	data.Set("redirect_uri", redirectURI) // Required: must match the redirect_uri used in authorization
+
+	log.Debug().Str("url", tokenURL).Str("client_id", h.cfg.OAuth.GitHubClientID).Msg("Exchanging GitHub code for token")
 
 	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, nil)
 	if err != nil {
@@ -251,6 +248,7 @@ func (h *OAuthHandler) exchangeGitHubCode(ctx context.Context, code string) (str
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		log.Error().Int("status", resp.StatusCode).Str("body", string(body)).Msg("GitHub token exchange failed")
 		return "", fmt.Errorf("GitHub token exchange failed: %s", string(body))
 	}
 
@@ -259,12 +257,14 @@ func (h *OAuthHandler) exchangeGitHubCode(ctx context.Context, code string) (str
 		return "", err
 	}
 
+	log.Debug().Msg("GitHub token exchange successful")
 	return tokenResp.AccessToken, nil
 }
 
 // getGitHubUser fetches the user profile from GitHub
 func (h *OAuthHandler) getGitHubUser(ctx context.Context, accessToken string) (*GitHubUser, error) {
-	userURL := fmt.Sprintf("%s/user", h.githubBaseURL)
+	// Use GitHub API URL (api.github.com), not OAuth URL (github.com)
+	userURL := fmt.Sprintf("%s/user", h.githubAPIURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", userURL, nil)
 	if err != nil {
@@ -282,6 +282,7 @@ func (h *OAuthHandler) getGitHubUser(ctx context.Context, accessToken string) (*
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		log.Error().Int("status", resp.StatusCode).Str("body", string(body)).Msg("GitHub user fetch failed")
 		return nil, fmt.Errorf("GitHub user fetch failed: %d - %s", resp.StatusCode, string(body))
 	}
 
@@ -432,7 +433,12 @@ func (h *OAuthHandler) getRedirectURI(c *gin.Context, provider string) string {
 		scheme = "https"
 	}
 
-	host := c.Request.Host
+	// Prefer configured callback host (useful when behind proxy with changeOrigin)
+	host := h.cfg.OAuth.GitHubCallbackHost
+	if host == "" {
+		host = c.Request.Host // Fallback to request Host header
+	}
+
 	return fmt.Sprintf("%s://%s/api/v1/auth/%s/callback", scheme, host, provider)
 }
 

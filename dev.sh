@@ -13,6 +13,12 @@ export DATABASE_URL=oreader.db
 export JWT_SECRET_KEY=dev-secret-key-min-32-chars-change-in-prod
 export ENV=development
 export PORT=8080
+export FRONTEND_URL=http://10.37.126.68:5173
+export LOG_LEVEL=debug
+export GITHUB_CLIENT_ID=Ov23lioGHWXTYNnrwADJ
+export GITHUB_CLIENT_SECRET=d333de867462b7afa421715476c02c0cafbe7606
+export GITHUB_CALLBACK_HOST=10.37.126.68:8080
+
 
 echo "🚀 Starting Full Development Environment..."
 echo "  Backend API:  http://localhost:$PORT"

@@ -21,8 +21,9 @@ type Config struct {
 
 // ServerConfig holds server-related configuration
 type ServerConfig struct {
-	Env  string
-	Port int
+	Env         string
+	Port        int
+	FrontendURL string // Frontend URL for dev mode redirects (e.g., "http://localhost:5173")
 }
 
 // DatabaseConfig holds database configuration
@@ -57,6 +58,7 @@ type LoggingConfig struct {
 type OAuthConfig struct {
 	GitHubClientID     string
 	GitHubClientSecret string
+	GitHubCallbackHost string // OAuth callback host (e.g., "10.37.126.68:8080") - used when behind proxy
 }
 
 // Load reads configuration from environment variables
@@ -70,6 +72,7 @@ func Load() (*Config, error) {
 	// Set defaults
 	v.SetDefault("ENV", "development")
 	v.SetDefault("PORT", 8080)
+	v.SetDefault("FRONTEND_URL", "http://localhost:5173")
 	v.SetDefault("JWT_ACCESS_TTL", "15m")
 	v.SetDefault("JWT_REFRESH_TTL", "168h")
 	v.SetDefault("REFRESH_INTERVAL", "15m")
@@ -81,6 +84,7 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("JWT_SECRET_KEY")
 	_ = v.BindEnv("ENV")
 	_ = v.BindEnv("PORT")
+	_ = v.BindEnv("FRONTEND_URL")
 	_ = v.BindEnv("JWT_ACCESS_TTL")
 	_ = v.BindEnv("JWT_REFRESH_TTL")
 	_ = v.BindEnv("REFRESH_INTERVAL")
@@ -89,11 +93,13 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("LOG_LEVEL")
 	_ = v.BindEnv("GITHUB_CLIENT_ID")
 	_ = v.BindEnv("GITHUB_CLIENT_SECRET")
+	_ = v.BindEnv("GITHUB_CALLBACK_HOST")
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Env:  v.GetString("ENV"),
-			Port: v.GetInt("PORT"),
+			Env:         v.GetString("ENV"),
+			Port:        v.GetInt("PORT"),
+			FrontendURL: v.GetString("FRONTEND_URL"),
 		},
 		Database: DatabaseConfig{
 			URL: v.GetString("DATABASE_URL"),
@@ -116,6 +122,7 @@ func Load() (*Config, error) {
 		OAuth: OAuthConfig{
 			GitHubClientID:     v.GetString("GITHUB_CLIENT_ID"),
 			GitHubClientSecret: v.GetString("GITHUB_CLIENT_SECRET"),
+			GitHubCallbackHost: v.GetString("GITHUB_CALLBACK_HOST"),
 		},
 	}
 

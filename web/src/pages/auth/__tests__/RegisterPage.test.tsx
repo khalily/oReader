@@ -167,4 +167,16 @@ describe('RegisterPage', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
   })
+
+  it('should render GitHub login button', () => {
+    render(<RegisterPage />, { wrapper })
+
+    expect(screen.getByRole('button', { name: /sign in with github/i })).toBeInTheDocument()
+  })
+
+  it('should render divider between OAuth and email registration', () => {
+    render(<RegisterPage />, { wrapper })
+
+    expect(screen.getByText(/or continue with/i)).toBeInTheDocument()
+  })
 })

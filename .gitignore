@@ -1,6 +1,9 @@
 # IDE
 .idea/
 
+# Worktrees
+.worktrees/
+
 # Python
 *.pyc
 *.pyo
@@ -25,6 +28,7 @@ go.work.sum
 build/
 dist/
 server
+cmd/server/server
 
 # Coverage
 coverage/
