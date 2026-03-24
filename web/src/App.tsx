@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
+import { OAuthPendingPage } from '@/pages/oauth/OAuthPendingPage'
 import ItemsPage from '@/pages/items/ItemsPage'
 import ItemViewPage from '@/pages/items/ItemViewPage'
 import { useAuthStore } from '@/stores/authStore'
@@ -60,6 +61,16 @@ function AppRoutes() {
             <Navigate to="/items" replace />
           ) : (
             <RegisterPage />
+          )
+        }
+      />
+      <Route
+        path="/oauth/pending"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/items" replace />
+          ) : (
+            <OAuthPendingPage />
           )
         }
       />
