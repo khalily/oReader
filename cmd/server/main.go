@@ -64,6 +64,7 @@ func main() {
 		&model.RefreshToken{},
 		&model.ImportJob{},
 		&model.OAuthState{},
+		&model.PendingOAuth{},
 	); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto-migrate database")
 		os.Exit(1)
@@ -79,6 +80,7 @@ func main() {
 	tokenRepo := repository.NewRefreshTokenRepository(db)
 	importJobRepo := repository.NewImportJobRepository(db)
 	oauthStateRepo := repository.NewOAuthStateRepository(db)
+	pendingOAuthRepo := repository.NewPendingOAuthRepository(db)
 	statsRepo := repository.NewStatsRepository(db)
 
 	// Initialize services
@@ -125,7 +127,7 @@ func main() {
 	feedHandler := handler.NewFeedHandler(feedService)
 	itemHandler := handler.NewItemHandler(itemService)
 	importHandler := handler.NewImportHandler(feedService, importService, feedRepo)
-	oauthHandler := handler.NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, oauthStateRepo, "")
+	oauthHandler := handler.NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, oauthStateRepo, pendingOAuthRepo, "")
 	statsHandler := handler.NewStatsHandler(statsService)
 
 	// Setup Gin
@@ -171,6 +173,8 @@ func main() {
 			auth.POST("/logout", authHandler.Logout)
 			auth.GET("/github", oauthHandler.GitHubInitiate)
 			auth.GET("/github/callback", oauthHandler.GitHubCallback)
+			auth.GET("/oauth/pending", oauthHandler.GetPendingOAuth)
+			auth.POST("/oauth/complete", oauthHandler.CompleteOAuth)
 
 			// Protected auth routes
 			authProtected := auth.Group("")
