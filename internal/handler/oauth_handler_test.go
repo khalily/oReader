@@ -518,6 +518,61 @@ func TestOAuthHandler_GitHubError(t *testing.T) {
 	})
 }
 
+// TestGetBestEmail tests the getBestEmail helper function
+func TestGetBestEmail(t *testing.T) {
+	tests := []struct {
+		name     string
+		emails   []GitHubEmail
+		expected string
+	}{
+		{
+			name:     "empty emails",
+			emails:   []GitHubEmail{},
+			expected: "",
+		},
+		{
+			name: "primary and verified is best",
+			emails: []GitHubEmail{
+				{Email: "a@example.com", Primary: false, Verified: true},
+				{Email: "b@example.com", Primary: true, Verified: true},
+				{Email: "c@example.com", Primary: true, Verified: false},
+			},
+			expected: "b@example.com",
+		},
+		{
+			name: "verified without primary",
+			emails: []GitHubEmail{
+				{Email: "a@example.com", Primary: false, Verified: false},
+				{Email: "b@example.com", Primary: false, Verified: true},
+			},
+			expected: "b@example.com",
+		},
+		{
+			name: "primary without verified",
+			emails: []GitHubEmail{
+				{Email: "a@example.com", Primary: false, Verified: true},
+				{Email: "b@example.com", Primary: true, Verified: false},
+			},
+			expected: "a@example.com", // verified has higher priority than primary
+		},
+		{
+			name: "first email as fallback",
+			emails: []GitHubEmail{
+				{Email: "a@example.com", Primary: false, Verified: false},
+				{Email: "b@example.com", Primary: false, Verified: false},
+			},
+			expected: "a@example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getBestEmail(tt.emails)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // Helper function to extract state parameter from URL
 func extractStateFromURL(t *testing.T, redirectURL string) string {
 	u, err := url.Parse(redirectURL)

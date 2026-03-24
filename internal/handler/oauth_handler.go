@@ -85,6 +85,40 @@ type GitHubUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
+// GitHubEmail represents an email item from /user/emails
+type GitHubEmail struct {
+	Email    string `json:"email"`
+	Primary  bool   `json:"primary"`
+	Verified bool   `json:"verified"`
+}
+
+// getBestEmail selects the best email from a list
+// Priority: primary && verified > verified > primary > first
+func getBestEmail(emails []GitHubEmail) string {
+	var verified, primary string
+	for _, e := range emails {
+		if e.Primary && e.Verified {
+			return e.Email // Best choice
+		}
+		if e.Verified && verified == "" {
+			verified = e.Email
+		}
+		if e.Primary && primary == "" {
+			primary = e.Email
+		}
+	}
+	if verified != "" {
+		return verified
+	}
+	if primary != "" {
+		return primary
+	}
+	if len(emails) > 0 {
+		return emails[0].Email
+	}
+	return ""
+}
+
 // GitHubTokenResponse represents GitHub's token response
 type GitHubTokenResponse struct {
 	AccessToken string `json:"access_token"`
