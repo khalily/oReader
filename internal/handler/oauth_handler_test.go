@@ -32,9 +32,9 @@ func setupOAuthTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 
 	// Drop tables to ensure clean schema with latest model changes
-	_ = db.Migrator().DropTable(&model.User{}, &model.RefreshToken{}, &model.OAuthState{})
+	_ = db.Migrator().DropTable(&model.User{}, &model.RefreshToken{}, &model.OAuthState{}, &model.PendingOAuth{})
 
-	err = db.AutoMigrate(&model.User{}, &model.RefreshToken{}, &model.OAuthState{})
+	err = db.AutoMigrate(&model.User{}, &model.RefreshToken{}, &model.OAuthState{}, &model.PendingOAuth{})
 	require.NoError(t, err)
 	return db
 }
@@ -59,13 +59,14 @@ func createOAuthHandler(t *testing.T, db *gorm.DB, cfg *config.Config, githubSer
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewRefreshTokenRepository(db)
 	stateRepo := repository.NewOAuthStateRepository(db)
+	pendingOAuthRepo := repository.NewPendingOAuthRepository(db)
 
 	baseURL := ""
 	if githubServer != nil {
 		baseURL = githubServer.URL
 	}
 
-	return NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, stateRepo, baseURL)
+	return NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, stateRepo, pendingOAuthRepo, baseURL)
 }
 
 func createOAuthTestRouter(h *OAuthHandler) *gin.Engine {
@@ -106,6 +107,47 @@ func mockGitHubServer(t *testing.T, userJSON string, tokenJSON string) *httptest
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, userJSON)
+	})
+
+	return httptest.NewServer(mux)
+}
+
+// mockGitHubServerWithEmails creates a mock GitHub server with email endpoint support
+func mockGitHubServerWithEmails(t *testing.T, userJSON string, tokenJSON string, emailsJSON string) *httptest.Server {
+	mux := http.NewServeMux()
+
+	// Mock access token endpoint
+	mux.HandleFunc("/login/oauth/access_token", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST request, got %s", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, tokenJSON)
+	})
+
+	// Mock user endpoint
+	mux.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, userJSON)
+	})
+
+	// Mock user emails endpoint
+	mux.HandleFunc("/user/emails", func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, emailsJSON)
 	})
 
 	return httptest.NewServer(mux)
@@ -636,4 +678,235 @@ func TestOAuthHandler_GitHubCallbackHost(t *testing.T) {
 		// Should use request host when not configured
 		assert.Contains(t, location, "redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fv1%2Fauth%2Fgithub%2Fcallback")
 	})
+}
+
+// TestGitHubCallback_NoEmail_CreatesPendingOAuth tests the pending OAuth flow
+// when a GitHub user has no public email and no emails accessible via API
+func TestGitHubCallback_NoEmail_CreatesPendingOAuth(t *testing.T) {
+	db := setupOAuthTestDB(t)
+	cfg := setupOAuthTestConfig(t)
+
+	// GitHub user with no public email
+	userJSON := `{
+		"id": 99999,
+		"login": "noemailuser",
+		"name": "No Email User",
+		"email": "",
+		"avatar_url": "https://example.com/noemail-avatar.png"
+	}`
+
+	tokenJSON := `{
+		"access_token": "gh_test_noemail_token",
+		"token_type": "bearer",
+		"scope": "read:user,user:email"
+	}`
+
+	// Empty emails list - no emails accessible
+	emailsJSON := `[]`
+
+	githubServer := mockGitHubServerWithEmails(t, userJSON, tokenJSON, emailsJSON)
+	defer githubServer.Close()
+
+	h := createOAuthHandler(t, db, cfg, githubServer)
+	router := createOAuthTestRouter(h)
+
+	// Create OAuth state
+	stateRepo := repository.NewOAuthStateRepository(db)
+	state := &model.OAuthState{
+		State:     "test_noemail_state",
+		Provider:  "github",
+		ExpiresAt: time.Now().Add(10 * time.Minute),
+	}
+	err := state.GenerateID()
+	require.NoError(t, err)
+	err = stateRepo.Create(context.Background(), state)
+	require.NoError(t, err)
+
+	t.Run("oauth without email creates pending oauth and redirects", func(t *testing.T) {
+		callbackURL := fmt.Sprintf("/api/v1/auth/github/callback?code=test_code&state=%s", state.State)
+		req, _ := http.NewRequest("GET", callbackURL, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Should redirect to pending page
+		assert.Equal(t, http.StatusFound, w.Code)
+
+		location := w.Header().Get("Location")
+		assert.Contains(t, location, "/oauth/pending?token=")
+
+		// Extract token from location
+		token := extractTokenFromLocation(t, location)
+		assert.NotEmpty(t, token)
+
+		// Verify PendingOAuth was created
+		pendingOAuthRepo := repository.NewPendingOAuthRepository(db)
+		pending, err := pendingOAuthRepo.GetByToken(context.Background(), token)
+		require.NoError(t, err)
+		assert.NotNil(t, pending)
+		assert.Equal(t, "99999", pending.GitHubID)
+		assert.Equal(t, "noemailuser", pending.GitHubLogin)
+		assert.Equal(t, "No Email User", pending.Nickname)
+		assert.Equal(t, "https://example.com/noemail-avatar.png", pending.AvatarURL)
+		assert.False(t, pending.IsExpired())
+
+		// Verify no user was created
+		userRepo := repository.NewUserRepository(db)
+		user, err := userRepo.GetByGitHubID(context.Background(), "99999")
+		require.NoError(t, err) // Should not error, just return nil
+		assert.Nil(t, user)     // Should not find user
+	})
+}
+
+// TestGitHubCallback_FetchesEmailFromAPI tests fetching email from /user/emails API
+func TestGitHubCallback_FetchesEmailFromAPI(t *testing.T) {
+	db := setupOAuthTestDB(t)
+	cfg := setupOAuthTestConfig(t)
+
+	// GitHub user with no public email
+	userJSON := `{
+		"id": 88888,
+		"login": "privateemail",
+		"name": "Private Email User",
+		"email": "",
+		"avatar_url": "https://example.com/private-avatar.png"
+	}`
+
+	tokenJSON := `{
+		"access_token": "gh_test_private_token",
+		"token_type": "bearer",
+		"scope": "read:user,user:email"
+	}`
+
+	// Emails from API - one verified and primary
+	emailsJSON := `[
+		{
+			"email": "verified@example.com",
+			"primary": true,
+			"verified": true
+		},
+		{
+			"email": "unverified@example.com",
+			"primary": false,
+			"verified": false
+		}
+	]`
+
+	githubServer := mockGitHubServerWithEmails(t, userJSON, tokenJSON, emailsJSON)
+	defer githubServer.Close()
+
+	h := createOAuthHandler(t, db, cfg, githubServer)
+	router := createOAuthTestRouter(h)
+
+	// Create OAuth state
+	stateRepo := repository.NewOAuthStateRepository(db)
+	state := &model.OAuthState{
+		State:     "test_fetch_email_state",
+		Provider:  "github",
+		ExpiresAt: time.Now().Add(10 * time.Minute),
+	}
+	err := state.GenerateID()
+	require.NoError(t, err)
+	err = stateRepo.Create(context.Background(), state)
+	require.NoError(t, err)
+
+	t.Run("oauth fetches email from API and creates user", func(t *testing.T) {
+		callbackURL := fmt.Sprintf("/api/v1/auth/github/callback?code=test_code&state=%s", state.State)
+		req, _ := http.NewRequest("GET", callbackURL, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Should redirect after successful OAuth
+		assert.Equal(t, http.StatusFound, w.Code)
+
+		location := w.Header().Get("Location")
+		assert.Contains(t, location, "/")
+
+		// Verify user was created with correct email
+		userRepo := repository.NewUserRepository(db)
+		user, err := userRepo.GetByGitHubID(context.Background(), "88888")
+		require.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, "verified@example.com", user.Email) // Email from API
+		assert.Equal(t, "88888", user.GitHubID)
+		assert.Equal(t, "Private Email User", user.Nickname)
+		assert.Equal(t, "github", user.AuthProvider)
+		assert.Equal(t, "https://example.com/private-avatar.png", user.AvatarURL)
+
+		// No PendingOAuth should be created when email is successfully fetched
+		// User was created successfully, which means no pending OAuth was needed
+	})
+}
+
+// TestGitHubCallback_FetchesNonPrimaryEmailFromAPI tests fetching non-primary but verified email
+func TestGitHubCallback_FetchesNonPrimaryEmailFromAPI(t *testing.T) {
+	db := setupOAuthTestDB(t)
+	cfg := setupOAuthTestConfig(t)
+
+	// GitHub user with no public email
+	userJSON := `{
+		"id": 77777,
+		"login": "nonprimary",
+		"name": "Non Primary User",
+		"email": "",
+		"avatar_url": "https://example.com/nonprimary-avatar.png"
+	}`
+
+	tokenJSON := `{
+		"access_token": "gh_test_nonprimary_token",
+		"token_type": "bearer",
+		"scope": "read:user,user:email"
+	}`
+
+	// Emails from API - verified but not primary
+	emailsJSON := `[
+		{
+			"email": "nonprimary@example.com",
+			"primary": false,
+			"verified": true
+		}
+	]`
+
+	githubServer := mockGitHubServerWithEmails(t, userJSON, tokenJSON, emailsJSON)
+	defer githubServer.Close()
+
+	h := createOAuthHandler(t, db, cfg, githubServer)
+	router := createOAuthTestRouter(h)
+
+	// Create OAuth state
+	stateRepo := repository.NewOAuthStateRepository(db)
+	state := &model.OAuthState{
+		State:     "test_nonprimary_state",
+		Provider:  "github",
+		ExpiresAt: time.Now().Add(10 * time.Minute),
+	}
+	err := state.GenerateID()
+	require.NoError(t, err)
+	err = stateRepo.Create(context.Background(), state)
+	require.NoError(t, err)
+
+	t.Run("oauth fetches verified non-primary email", func(t *testing.T) {
+		callbackURL := fmt.Sprintf("/api/v1/auth/github/callback?code=test_code&state=%s", state.State)
+		req, _ := http.NewRequest("GET", callbackURL, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// Should redirect after successful OAuth
+		assert.Equal(t, http.StatusFound, w.Code)
+
+		// Verify user was created with verified email
+		userRepo := repository.NewUserRepository(db)
+		user, err := userRepo.GetByGitHubID(context.Background(), "77777")
+		require.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, "nonprimary@example.com", user.Email)
+	})
+}
+
+// extractTokenFromLocation extracts the token parameter from a location URL
+func extractTokenFromLocation(t *testing.T, location string) string {
+	u, err := url.Parse(location)
+	require.NoError(t, err)
+
+	token := u.Query().Get("token")
+	return token
 }
