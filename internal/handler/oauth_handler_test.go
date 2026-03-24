@@ -529,3 +529,56 @@ func extractStateFromURL(t *testing.T, redirectURL string) string {
 	}
 	return stateValues[0]
 }
+
+// TestOAuthHandler_GitHubCallbackHost tests that the configured callback host
+// is used instead of the request Host header when GITHUB_CALLBACK_HOST is set
+func TestOAuthHandler_GitHubCallbackHost(t *testing.T) {
+	db := setupOAuthTestDB(t)
+
+	// Set callback host to test that it's used in redirect_uri
+	t.Setenv("GITHUB_CALLBACK_HOST", "10.37.126.68:8080")
+	cfg := setupOAuthTestConfig(t)
+
+	// Verify config loaded correctly
+	assert.Equal(t, "10.37.126.68:8080", cfg.OAuth.GitHubCallbackHost)
+
+	h := createOAuthHandler(t, db, cfg, nil)
+	router := createOAuthTestRouter(h)
+
+	t.Run("uses configured callback host in redirect_uri", func(t *testing.T) {
+		// Send request with different Host header (simulating proxy)
+		req, _ := http.NewRequest("GET", "/api/v1/auth/github", nil)
+		req.Host = "localhost:8080" // This should be ignored
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusFound, w.Code)
+
+		location := w.Header().Get("Location")
+		// Should use configured host, not request host
+		assert.Contains(t, location, "redirect_uri=http%3A%2F%2F10.37.126.68%3A8080%2Fapi%2Fv1%2Fauth%2Fgithub%2Fcallback")
+		assert.NotContains(t, location, "localhost")
+	})
+
+	t.Run("falls back to request host when callback host not configured", func(t *testing.T) {
+		// Create new config without callback host
+		t.Setenv("GITHUB_CALLBACK_HOST", "")
+		cfgNoHost, err := config.Load()
+		require.NoError(t, err)
+		assert.Empty(t, cfgNoHost.OAuth.GitHubCallbackHost)
+
+		hNoHost := createOAuthHandler(t, db, cfgNoHost, nil)
+		routerNoHost := createOAuthTestRouter(hNoHost)
+
+		req, _ := http.NewRequest("GET", "/api/v1/auth/github", nil)
+		req.Host = "localhost:3000"
+		w := httptest.NewRecorder()
+		routerNoHost.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusFound, w.Code)
+
+		location := w.Header().Get("Location")
+		// Should use request host when not configured
+		assert.Contains(t, location, "redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fv1%2Fauth%2Fgithub%2Fcallback")
+	})
+}
