@@ -34,6 +34,7 @@ type User struct {
 	AvatarURL    string `gorm:"type:varchar(500)" json:"avatar_url"`
 	AuthProvider string `gorm:"type:varchar(50);default:'email'" json:"auth_provider"`
 	GitHubID     string `gorm:"type:varchar(100)" json:"github_id,omitempty"`
+	GitHubLogin  string `gorm:"type:varchar(100)" json:"github_login,omitempty"`
 }
 
 // Feed represents an RSS feed (shared among users)
@@ -138,4 +139,20 @@ type OAuthState struct {
 // IsExpired returns true if the OAuth state has expired
 func (s *OAuthState) IsExpired() bool {
 	return time.Now().After(s.ExpiresAt)
+}
+
+// PendingOAuth 存储待确认的 OAuth 数据（5分钟过期）
+type PendingOAuth struct {
+	Base
+	Token       string    `gorm:"type:varchar(64);not null;uniqueIndex" json:"token"`
+	GitHubID    string    `gorm:"type:varchar(100);not null" json:"github_id"`
+	GitHubLogin string    `gorm:"type:varchar(100);not null" json:"github_login"`
+	Nickname    string    `gorm:"type:varchar(100)" json:"nickname"`
+	AvatarURL   string    `gorm:"type:varchar(500)" json:"avatar_url"`
+	ExpiresAt   time.Time `gorm:"not null" json:"expires_at"`
+}
+
+// IsExpired 判断是否过期
+func (p *PendingOAuth) IsExpired() bool {
+	return time.Now().After(p.ExpiresAt)
 }
