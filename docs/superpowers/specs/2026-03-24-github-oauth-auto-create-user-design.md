@@ -72,6 +72,35 @@ func (p *PendingOAuth) IsExpired() bool {
 }
 ```
 
+### PendingOAuthRepository 接口
+
+```go
+// PendingOAuthRepository 定义待确认 OAuth 数据访问接口
+type PendingOAuthRepository interface {
+    Create(ctx context.Context, pending *model.PendingOAuth) error
+    GetByToken(ctx context.Context, token string) (*model.PendingOAuth, error)
+    Delete(ctx context.Context, token string) error
+}
+```
+
+### Token 生成
+
+复用现有的 `generateState()` 函数生成 32 字节随机数（64 字符 hex）：
+
+```go
+// 在 OAuthHandler 中使用
+token, err := generateState()
+if err != nil {
+    // 错误处理
+}
+```
+
+### 数据清理策略
+
+- **使用后删除**：`/oauth/complete` 成功后立即删除记录
+- **懒清理**：查询时检查过期，过期则返回 404
+- **无需定时任务**：5 分钟有效期足够短，不会累积大量数据
+
 ## API 端点
 
 ### 新增端点
@@ -111,13 +140,34 @@ func (p *PendingOAuth) IsExpired() bool {
 }
 ```
 
+**Email 验证规则：**
+- 格式：符合 RFC 5322 标准邮箱格式
+- 长度：最大 255 字符
+- 使用现有 `validation.ts` 中的邮箱正则
+
 **成功响应：**
-- 设置 auth cookie
-- 返回用户信息
+```json
+{
+    "id": "01234567-89ab-cdef-0123-456789abcdef",
+    "email": "user@example.com",
+    "nickname": "The Octocat",
+    "avatar_url": "https://avatars.githubusercontent.com/u/...",
+    "auth_provider": "github"
+}
+```
+- 设置 auth cookie（access_token, refresh_token, csrf_token）
 
 **错误响应：**
 - `400`: token 无效/过期、email 格式错误
-- `409`: email 已被使用
+- `409 Conflict`: email 已被使用
+  ```json
+  {
+      "error": {
+          "code": "EMAIL_ALREADY_USED",
+          "message": "该邮箱已被注册，请使用其他邮箱"
+      }
+  }
+  ```
 
 ## 后端处理流程
 
@@ -221,12 +271,26 @@ func getBestEmail(emails []GitHubEmail) string {
 | 文件 | 变更 |
 |------|------|
 | `internal/model/models.go` | User 添加 `GitHubLogin` 字段；新增 `PendingOAuth` 模型 |
-| `internal/handler/oauth_handler.go` | 添加 `/user/emails` 调用；添加 `/oauth/pending`、`/oauth/complete` 端点 |
+| `internal/handler/oauth_handler.go` | 添加 `/user/emails` 调用；添加 `pendingOAuthRepo` 依赖；添加 `/oauth/pending`、`/oauth/complete` 端点 |
 | `internal/handler/oauth_handler_test.go` | 更新测试 |
 | `internal/service/interfaces.go` | 添加 `PendingOAuthRepository` 接口 |
-| `cmd/server/main.go` | 添加新路由 |
+| `cmd/server/main.go` | 初始化 `PendingOAuthRepository`；更新 `NewOAuthHandler` 调用；添加新路由 |
 | `web/src/pages/oauth/OAuthPendingPage.tsx` | 邮箱输入页面 |
 | `web/src/App.tsx` | 添加 `/oauth/pending` 路由 |
+
+### OAuthHandler 构造函数变更
+
+```go
+func NewOAuthHandler(
+    cfg *config.Config,
+    jwtService *jwt.Service,
+    userRepo service.UserRepository,
+    tokenRepo service.RefreshTokenRepository,
+    stateRepo service.OAuthStateRepository,
+    pendingOAuthRepo service.PendingOAuthRepository, // 新增
+    githubBaseURL string,
+) *OAuthHandler
+```
 
 ## 测试策略
 
