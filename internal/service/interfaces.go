@@ -287,6 +287,13 @@ type OAuthStateRepository interface {
 	DeleteExpired(ctx context.Context) error
 }
 
+// PendingOAuthRepository 定义待确认 OAuth 数据访问接口
+type PendingOAuthRepository interface {
+	Create(ctx context.Context, pending *model.PendingOAuth) error
+	GetByToken(ctx context.Context, token string) (*model.PendingOAuth, error)
+	Delete(ctx context.Context, token string) error
+}
+
 // StatsRepository defines the interface for user statistics data access
 type StatsRepository interface {
 	// GetUserStats returns article statistics for a user
