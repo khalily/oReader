@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -336,7 +335,7 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	}
 
 	// Redirect to frontend pending page
-	callbackHost := os.Getenv("GITHUB_CALLBACK_HOST")
+	callbackHost := h.cfg.OAuth.GitHubCallbackHost
 	if callbackHost == "" {
 		callbackHost = h.cfg.Server.FrontendURL
 	}
