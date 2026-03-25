@@ -31,7 +31,7 @@ const mockArticle: Article = {
   title: 'Test Article Title',
   link: 'https://example.com/article1',
   description: 'This is a brief description of the article',
-  content: '<p>This is the full article content.</p><p>It contains multiple paragraphs.</p>',
+  content: 'This is the full article content.\n\nIt contains multiple paragraphs.',
   pub_date: '2024-01-15T10:30:00Z',
   creator: 'John Doe',
   created_at: '2024-01-15T10:30:00Z',
@@ -341,8 +341,8 @@ describe('ArticlePanel component', () => {
     it('should not show summary when description equals content', async () => {
       const articleWithSameContent: Article = {
         ...mockArticle,
-        description: '<p>This is the full article content.</p><p>It contains multiple paragraphs.</p>',
-        content: '<p>This is the full article content.</p><p>It contains multiple paragraphs.</p>',
+        description: 'This is the full article content.\n\nIt contains multiple paragraphs.',
+        content: 'This is the full article content.\n\nIt contains multiple paragraphs.',
       }
 
       server.use(

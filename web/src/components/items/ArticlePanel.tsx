@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useItems } from '@/hooks/useItems'
-import { processArticleContent } from '@/lib/syntax-highlight'
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
 
 interface ArticlePanelProps {
   itemId: string | null
@@ -30,9 +30,6 @@ export function ArticlePanel({ itemId, onClose, showBackButton = false }: Articl
 
   // Summary collapse state
   const [summaryExpanded, setSummaryExpanded] = useState(true)
-
-  // Article content ref for post-processing
-  const articleRef = useRef<HTMLElement>(null)
 
   // Track if we've already triggered auto-mark-as-read for this item
   // Using ref to avoid triggering re-renders and useEffect loops
@@ -79,14 +76,6 @@ export function ArticlePanel({ itemId, onClose, showBackButton = false }: Articl
       )
     }
   }, [data?.item])
-
-  // Process article content after render (code highlighting, image handling)
-  useEffect(() => {
-    if (!articleRef.current || !item?.content) return
-
-    // Process content: syntax highlighting + image handling
-    processArticleContent(articleRef.current)
-  }, [item?.content])
 
   const handleToggleStar = () => {
     if (data?.item) {
@@ -152,16 +141,6 @@ export function ArticlePanel({ itemId, onClose, showBackButton = false }: Articl
       hour: '2-digit',
       minute: '2-digit',
     })
-  }
-
-  const createSafeHTML = (html: string | null) => {
-    if (!html) return { __html: '' }
-    const sanitized = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      .replace(/on\w+="[^"]*"/gi, '')
-      .replace(/javascript:/gi, '')
-    return { __html: sanitized }
   }
 
   // Empty state - no item selected
@@ -321,11 +300,7 @@ export function ArticlePanel({ itemId, onClose, showBackButton = false }: Articl
         {item.content ? (
           <Card>
             <CardContent className="p-6">
-              <article
-                ref={articleRef}
-                className="prose prose-slate max-w-none dark:prose-invert prose-sm"
-                dangerouslySetInnerHTML={createSafeHTML(item.content)}
-              />
+              <MarkdownRenderer content={item.content} className="prose-sm" />
             </CardContent>
           </Card>
         ) : (
