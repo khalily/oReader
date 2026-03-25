@@ -17,7 +17,7 @@ export FRONTEND_URL=http://10.37.126.68:5173
 export LOG_LEVEL=debug
 export GITHUB_CLIENT_ID=Ov23lioGHWXTYNnrwADJ
 export GITHUB_CLIENT_SECRET=d333de867462b7afa421715476c02c0cafbe7606
-export GITHUB_CALLBACK_HOST=10.37.126.68:8080
+export GITHUB_CALLBACK_HOST=10.37.126.68:5173
 
 
 echo "🚀 Starting Full Development Environment..."

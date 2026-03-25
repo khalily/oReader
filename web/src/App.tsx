@@ -7,6 +7,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 import { OAuthPendingPage } from '@/pages/oauth/OAuthPendingPage'
+import { OAuthCallbackPage } from '@/pages/oauth/OAuthCallbackPage'
 import ItemsPage from '@/pages/items/ItemsPage'
 import ItemViewPage from '@/pages/items/ItemViewPage'
 import { useAuthStore } from '@/stores/authStore'
@@ -73,6 +74,11 @@ function AppRoutes() {
             <OAuthPendingPage />
           )
         }
+      />
+      {/* OAuth callback - handles GitHub OAuth redirect */}
+      <Route
+        path="/api/v1/auth/github/callback"
+        element={<OAuthCallbackPage />}
       />
 
       {/* Protected routes */}

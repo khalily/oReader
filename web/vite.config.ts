@@ -4,7 +4,24 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Plugin to handle OAuth callback route - serve SPA for /api/v1/auth/github/callback
+    {
+      name: 'oauth-callback-spa',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          // Check if this is the OAuth callback route (browser navigation, not XHR)
+          if (req.url?.startsWith('/api/v1/auth/github/callback?') &&
+              !req.headers.accept?.includes('application/json')) {
+            // Rewrite URL to root so SPA can handle it
+            req.url = '/'
+          }
+          next()
+        })
+      }
+    }
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -14,18 +31,20 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0', // Allow external access
     proxy: {
-      // Proxy API requests to backend
       '/auth': {
         target: 'http://localhost:8080',
-        changeOrigin: true,
+        changeOrigin: false,
+        secure: false,
       },
       '/api': {
         target: 'http://localhost:8080',
-        changeOrigin: true,
+        changeOrigin: false,
+        secure: false,
       },
       '/health': {
         target: 'http://localhost:8080',
-        changeOrigin: true,
+        changeOrigin: false,
+        secure: false,
       },
     },
   },

@@ -177,43 +177,90 @@ func (h *OAuthHandler) GitHubInitiate(c *gin.Context) {
 }
 
 // GitHubCallback handles the GitHub OAuth callback
+// Supports format=json query parameter to return JSON instead of 302 redirect
 func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
+	// Check if client wants JSON response (for AJAX-based OAuth flow)
+	wantJSON := c.Query("format") == "json"
+
+	// Helper functions for response
+	respondError := func(errorCode string) {
+		if wantJSON {
+			c.JSON(http.StatusBadRequest, gin.H{"error": errorCode})
+		} else {
+			c.Redirect(http.StatusFound, "/login?oauth_error="+errorCode)
+		}
+	}
+
+	respondSuccess := func(user *model.User, csrfToken string) {
+		if wantJSON {
+			c.JSON(http.StatusOK, gin.H{
+				"user": gin.H{
+					"id":            user.ID,
+					"email":         user.Email,
+					"nickname":      user.Nickname,
+					"avatar_url":    user.AvatarURL,
+					"auth_provider": user.AuthProvider,
+					"created_at":    user.CreatedAt,
+					"updated_at":    user.UpdatedAt,
+				},
+				"csrf_token": csrfToken,
+			})
+		} else {
+			c.Redirect(http.StatusFound, "/")
+		}
+	}
+
+	respondPending := func(token string) {
+		if wantJSON {
+			c.JSON(http.StatusOK, gin.H{
+				"redirect":      "pending",
+				"pending_token": token,
+			})
+		} else {
+			callbackHost := h.cfg.OAuth.GitHubCallbackHost
+			if callbackHost == "" {
+				callbackHost = h.cfg.Server.FrontendURL
+			}
+			c.Redirect(http.StatusFound, callbackHost+"/oauth/pending?token="+token)
+		}
+	}
+
 	// Check for error response from GitHub
 	if errorCode := c.Query("error"); errorCode != "" {
-		c.Redirect(http.StatusFound, "/login?oauth_error=access_denied")
+		respondError("access_denied")
 		return
 	}
 
 	// Validate state parameter
 	state := c.Query("state")
 	if state == "" {
-		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
+		respondError("invalid_state")
 		return
 	}
 
 	// Retrieve and validate state from database
 	oauthState, err := h.stateRepo.GetByState(c.Request.Context(), state)
 	if err != nil || oauthState == nil {
-		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
+		respondError("invalid_state")
 		return
 	}
 
 	if oauthState.IsExpired() {
 		// Clean up expired state
 		_ = h.stateRepo.Delete(c.Request.Context(), state)
-		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
+		respondError("invalid_state")
 		return
 	}
 
 	if oauthState.Provider != "github" {
-		c.Redirect(http.StatusFound, "/login?oauth_error=invalid_state")
+		respondError("invalid_state")
 		return
 	}
 
 	// Get authorization code
 	code := c.Query("code")
 	if code == "" {
-		c.Redirect(http.StatusFound, "/login?oauth_error=access_denied")
+		respondError("access_denied")
 		return
 	}
 
@@ -228,7 +275,7 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	accessToken, err := h.exchangeGitHubCode(c.Request.Context(), code, redirectURI)
 	if err != nil {
 		log.Error().Err(err).Msg("GitHub token exchange failed")
-		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+		respondError("github_error")
 		return
 	}
 
@@ -237,7 +284,7 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	githubUser, err := h.getGitHubUser(c.Request.Context(), accessToken)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to fetch GitHub user profile")
-		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+		respondError("github_error")
 		return
 	}
 	log.Debug().Str("github_id", fmt.Sprintf("%d", githubUser.ID)).Str("email", githubUser.Email).Msg("GitHub user profile fetched")
@@ -261,8 +308,12 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 			user.GitHubLogin = githubUser.Login
 			_ = h.userRepo.Update(c.Request.Context(), user)
 		}
-		h.setAuthCookies(c, user)
-		c.Redirect(http.StatusFound, "/")
+		csrfToken, success := h.setAuthCookiesAndGetCSRF(c, user)
+		if !success {
+			respondError("github_error")
+			return
+		}
+		respondSuccess(user, csrfToken)
 		return
 	}
 
@@ -277,8 +328,12 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 				user.AvatarURL = githubUser.AvatarURL
 			}
 			_ = h.userRepo.Update(c.Request.Context(), user)
-			h.setAuthCookies(c, user)
-			c.Redirect(http.StatusFound, "/")
+			csrfToken, success := h.setAuthCookiesAndGetCSRF(c, user)
+			if !success {
+				respondError("github_error")
+				return
+			}
+			respondSuccess(user, csrfToken)
 			return
 		}
 
@@ -293,16 +348,20 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 		}
 		if err := newUser.GenerateID(); err != nil {
 			log.Error().Err(err).Msg("Failed to generate user ID")
-			c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+			respondError("github_error")
 			return
 		}
 		if err := h.userRepo.Create(c.Request.Context(), newUser); err != nil {
 			log.Error().Err(err).Msg("Failed to create user")
-			c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+			respondError("github_error")
 			return
 		}
-		h.setAuthCookies(c, newUser)
-		c.Redirect(http.StatusFound, "/")
+		csrfToken, success := h.setAuthCookiesAndGetCSRF(c, newUser)
+		if !success {
+			respondError("github_error")
+			return
+		}
+		respondSuccess(newUser, csrfToken)
 		return
 	}
 
@@ -310,7 +369,7 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	token, err := generateState()
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to generate pending token")
-		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+		respondError("github_error")
 		return
 	}
 
@@ -324,22 +383,17 @@ func (h *OAuthHandler) GitHubCallback(c *gin.Context) {
 	}
 	if err := pending.GenerateID(); err != nil {
 		log.Error().Err(err).Msg("Failed to generate pending OAuth ID")
-		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+		respondError("github_error")
 		return
 	}
 
 	if err := h.pendingOAuthRepo.Create(c.Request.Context(), pending); err != nil {
 		log.Error().Err(err).Msg("Failed to create pending OAuth")
-		c.Redirect(http.StatusFound, "/login?oauth_error=github_error")
+		respondError("github_error")
 		return
 	}
 
-	// Redirect to frontend pending page
-	callbackHost := h.cfg.OAuth.GitHubCallbackHost
-	if callbackHost == "" {
-		callbackHost = h.cfg.Server.FrontendURL
-	}
-	c.Redirect(http.StatusFound, callbackHost+"/oauth/pending?token="+token)
+	respondPending(token)
 }
 
 // exchangeGitHubCode exchanges the authorization code for an access token
@@ -577,6 +631,50 @@ func (h *OAuthHandler) setAuthCookies(c *gin.Context, user *model.User) {
 	cookieCfg := cookie.DefaultConfig(h.cfg.IsProduction())
 	cookie.SetAccessToken(c.Writer, accessToken, csrfToken, cookieCfg)
 	cookie.SetRefreshToken(c.Writer, refreshToken, cookieCfg)
+}
+
+// setAuthCookiesAndGetCSRF generates tokens, sets auth cookies, and returns the CSRF token
+// This is used for JSON-based OAuth flow where we need to return the CSRF token in the response
+// Returns (csrfToken, success) - caller must check success before proceeding
+func (h *OAuthHandler) setAuthCookiesAndGetCSRF(c *gin.Context, user *model.User) (csrfToken string, success bool) {
+	accessToken, csrfToken, err := h.jwtService.GenerateAccessToken(user.ID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to generate access token")
+		return "", false
+	}
+
+	refreshToken, tokenHash, err := h.jwtService.GenerateRefreshToken(user.ID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to generate refresh token")
+		return "", false
+	}
+
+	refreshTTL, err := h.cfg.GetRefreshTTL()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to parse refresh TTL")
+		return "", false
+	}
+
+	refreshModel := &model.RefreshToken{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(refreshTTL),
+	}
+	if err := refreshModel.GenerateID(); err != nil {
+		log.Error().Err(err).Msg("Failed to generate refresh token ID")
+		return "", false
+	}
+
+	if err := h.tokenRepo.Create(c.Request.Context(), refreshModel); err != nil {
+		log.Error().Err(err).Msg("Failed to store refresh token")
+		return "", false
+	}
+
+	cookieCfg := cookie.DefaultConfig(h.cfg.IsProduction())
+	cookie.SetAccessToken(c.Writer, accessToken, csrfToken, cookieCfg)
+	cookie.SetRefreshToken(c.Writer, refreshToken, cookieCfg)
+
+	return csrfToken, true
 }
 
 // getRedirectURI constructs the redirect URI for OAuth callbacks
