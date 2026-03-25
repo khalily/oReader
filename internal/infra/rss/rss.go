@@ -192,8 +192,16 @@ func SanitizeFeed(feed *ParsedFeed) {
 	feed.Description = sanitize.SanitizeFeedTitle(feed.Description)
 
 	for _, item := range feed.Items {
-		item.Title = sanitize.SanitizeFeedTitle(item.Title)
+		// 1. Fix relative image URLs before sanitization (using feed.Link as baseURL)
+		if item.Content != "" && feed.Link != "" {
+			item.Content = FixRelativeImageURLs(item.Content, feed.Link)
+		}
+
+		// 2. Generate description from content
 		item.Description = sanitize.GenerateDescription(item.Content)
+
+		// 3. Sanitize content
+		item.Title = sanitize.SanitizeFeedTitle(item.Title)
 		item.Content = sanitize.SanitizeArticleContent(item.Content)
 	}
 }
