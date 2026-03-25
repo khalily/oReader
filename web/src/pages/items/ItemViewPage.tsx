@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { processArticleContent } from '@/lib/syntax-highlight'
 
 export default function ItemViewPage() {
   const { id } = useParams<{ id: string }>()
@@ -23,6 +24,9 @@ export default function ItemViewPage() {
     is_starred: boolean
     is_read: boolean
   } | null>(null)
+
+  // Article content ref for post-processing
+  const articleRef = useRef<HTMLElement>(null)
 
   const item = data?.item
     ? optimisticState
@@ -43,6 +47,12 @@ export default function ItemViewPage() {
       )
     }
   }, [data?.item, optimisticState, toggleRead])
+
+  // Process article content after render
+  useEffect(() => {
+    if (!articleRef.current || !item?.content) return
+    processArticleContent(articleRef.current)
+  }, [item?.content])
 
   const handleToggleStar = () => {
     if (data?.item) {
@@ -246,6 +256,7 @@ export default function ItemViewPage() {
         <Card>
           <CardContent className="p-6">
             <article
+              ref={articleRef}
               className="prose prose-slate max-w-none dark:prose-invert"
               dangerouslySetInnerHTML={createSafeHTML(item.content)}
             />
