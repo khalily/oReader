@@ -7,7 +7,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useItems } from '@/hooks/useItems'
 import { processArticleContent } from '@/lib/syntax-highlight'
-import type { Article } from '@/types/feed'
 
 interface ArticlePanelProps {
   itemId: string | null
