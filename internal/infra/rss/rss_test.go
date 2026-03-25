@@ -2,6 +2,7 @@ package rss
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -576,5 +577,30 @@ func TestRSSParser_XSSInContent(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSanitizeFeed_ConvertsToMarkdown(t *testing.T) {
+	feed := &ParsedFeed{
+		Title: "Test Feed",
+		Link:  "https://example.com",
+		Items: []*ParsedItem{
+			{
+				Title:   "<script>alert('xss')</script>Test Item",
+				Content: "<p>This is <strong>bold</strong> content.</p>",
+			},
+		},
+	}
+
+	SanitizeFeed(feed)
+
+	// Verify content was converted to markdown
+	if !strings.Contains(feed.Items[0].Content, "**bold**") {
+		t.Errorf("Expected content to be converted to markdown, got: %s", feed.Items[0].Content)
+	}
+
+	// Verify title was sanitized (script tag removed)
+	if strings.Contains(feed.Items[0].Title, "<script>") {
+		t.Errorf("Expected script tag to be removed from title, got: %s", feed.Items[0].Title)
 	}
 }

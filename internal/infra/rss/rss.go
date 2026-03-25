@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/mmcdole/gofeed"
 	"oreader/internal/infra/logger"
+	"oreader/internal/infra/markdown"
 	"oreader/internal/infra/sanitize"
 	"oreader/internal/infra/validation"
 )
@@ -186,23 +188,33 @@ func (p *Parser) Parse(ctx context.Context, feedURL string) (*ParsedFeed, error)
 	return parsedFeed, nil
 }
 
-// SanitizeFeed sanitizes all feed and item content
+// SanitizeFeed sanitizes all feed and item content, converting HTML to Markdown
 func SanitizeFeed(feed *ParsedFeed) {
+	converter := markdown.NewConverter()
+
 	feed.Title = sanitize.SanitizeFeedTitle(feed.Title)
 	feed.Description = sanitize.SanitizeFeedTitle(feed.Description)
 
 	for _, item := range feed.Items {
-		// 1. Fix relative image URLs before sanitization (using feed.Link as baseURL)
+		// 1. Fix relative image URLs before conversion
 		if item.Content != "" && feed.Link != "" {
 			item.Content = FixRelativeImageURLs(item.Content, feed.Link)
 		}
 
-		// 2. Generate description from content
-		item.Description = sanitize.GenerateDescription(item.Content)
+		// 2. Convert HTML content to Markdown
+		if item.Content != "" {
+			mdContent, err := converter.Convert(item.Content)
+			if err != nil {
+				// Fallback: sanitize as HTML if conversion fails
+				item.Content = sanitize.SanitizeArticleContent(item.Content)
+			} else {
+				item.Content = mdContent
+			}
+		}
 
-		// 3. Sanitize content
+		// 3. Generate description from Markdown content
+		item.Description = generateMarkdownDescription(item.Content)
 		item.Title = sanitize.SanitizeFeedTitle(item.Title)
-		item.Content = sanitize.SanitizeArticleContent(item.Content)
 	}
 }
 
@@ -255,6 +267,51 @@ func truncateContent(content string, maxLen int64) string {
 		return content
 	}
 	return content[:maxLen]
+}
+
+// generateMarkdownDescription extracts plain text from Markdown for description
+func generateMarkdownDescription(mdContent string) string {
+	if mdContent == "" {
+		return ""
+	}
+	text := stripMarkdownSyntax(mdContent)
+	return truncateContent(text, 200)
+}
+
+// markdownSyntaxRegex matches common Markdown syntax elements
+var markdownSyntaxRegex = regexp.MustCompile(`(?m)\s*` +
+	`(?:#{1,6}\s+|` + // Headings
+	`[*_]{1,3}|` + // Emphasis/strong
+	`~~|` + // Strikethrough
+	`!\[.*?\]\(.*?\)|` + // Images
+	`\[([^\]]+)\]\(.*?\)|` + // Links (capture text)
+	"`{1,3}" + `|` + // Inline code
+	`>\s+|` + // Blockquotes
+	`[-*+]\s+|` + // Unordered lists
+	`\d+\.\s+|` + // Ordered lists
+	`[-*_]{3,}|` + // Horizontal rules
+	`[*_]{2}[^*_]+[*_]{2})`) // Strong text
+
+// linkTextRegex extracts text from Markdown links
+var linkTextRegex = regexp.MustCompile(`\[([^\]]+)\]\([^)]*\)`)
+
+// whitespaceRegex matches multiple consecutive whitespace characters
+var whitespaceRegex = regexp.MustCompile(`\s+`)
+
+// stripMarkdownSyntax removes common Markdown syntax characters
+func stripMarkdownSyntax(md string) string {
+	// Replace links with just their text content
+	result := linkTextRegex.ReplaceAllString(md, "$1")
+
+	// Remove remaining Markdown syntax
+	result = markdownSyntaxRegex.ReplaceAllString(result, " ")
+
+	// Clean up extra whitespace
+	result = strings.TrimSpace(result)
+	// Replace multiple spaces with single space
+	result = whitespaceRegex.ReplaceAllString(result, " ")
+
+	return result
 }
 
 // TryGetFavicon attempts to get the favicon URL for a feed
