@@ -1,0 +1,84 @@
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { cn } from '@/lib/utils'
+
+interface MarkdownRendererProps {
+  content: string
+  className?: string
+}
+
+/**
+ * MarkdownRenderer renders Markdown content with:
+ * - GitHub Flavored Markdown support (tables, strikethrough, etc.)
+ * - Syntax highlighting for code blocks
+ * - Lazy loading for images
+ * - Secure external links (target="_blank", rel="noopener noreferrer")
+ */
+export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+  return (
+    <div className={cn('prose prose-slate dark:prose-invert max-w-none', className)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ className: codeClassName, children, ...props }) {
+            const match = /language-(\w+)/.exec(codeClassName || '')
+            const language = match ? match[1] : 'text'
+            const isInline = !match
+
+            if (isInline) {
+              return (
+                <code className={codeClassName} {...props}>
+                  {children}
+                </code>
+              )
+            }
+
+            return (
+              <SyntaxHighlighter
+                style={oneDark}
+                language={language}
+                PreTag="div"
+                {...props}
+              >
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
+            )
+          },
+          img({ src, alt, title, ...props }) {
+            return (
+              <img
+                src={src}
+                alt={alt || ''}
+                title={title}
+                loading="lazy"
+                className="rounded-lg max-w-full h-auto"
+                onError={(e) => {
+                  e.currentTarget.src = '/image-placeholder.svg'
+                  e.currentTarget.style.opacity = '0.5'
+                }}
+                {...props}
+              />
+            )
+          },
+          a({ href, children, ...props }) {
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+                {...props}
+              >
+                {children}
+              </a>
+            )
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  )
+}
