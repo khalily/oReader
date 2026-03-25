@@ -134,11 +134,22 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ node, inline, className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || '')
+          // Note: In react-markdown v9+, `node` and `inline` props are deprecated.
+          // Detect inline code by checking for language class absence.
+          code({ className: codeClassName, children, ...props }) {
+            const match = /language-(\w+)/.exec(codeClassName || '')
             const language = match ? match[1] : 'text'
+            const isInline = !match
 
-            return !inline ? (
+            if (isInline) {
+              return (
+                <code className={codeClassName} {...props}>
+                  {children}
+                </code>
+              )
+            }
+
+            return (
               <SyntaxHighlighter
                 style={oneDark}
                 language={language}
@@ -147,13 +158,9 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
               >
                 {String(children).replace(/\n$/, '')}
               </SyntaxHighlighter>
-            ) : (
-              <code className={className} {...props}>
-                {children}
-              </code>
             )
           },
-          img({ node, src, alt, title, ...props }) {
+          img({ src, alt, title, ...props }) {
             return (
               <img
                 src={src}
@@ -169,7 +176,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
               />
             )
           },
-          a({ node, href, children, ...props }) {
+          a({ href, children, ...props }) {
             return (
               <a
                 href={href}
