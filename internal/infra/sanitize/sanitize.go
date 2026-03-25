@@ -18,6 +18,14 @@ var strictpolicy *bluemonday.Policy
 // regexpSafeRel is a simple pattern for safe rel attribute values
 var regexpSafeRel = regexp.MustCompile(`(?i)^nofollow\s*(noopener\s*noreferrer?|noopener|noreferrer?)?$|^noopener\s*(noreferrer?|nofollow)?$|^noreferrer?$`)
 
+// regexpSafeClass matches safe CSS class names for syntax highlighting and prose styling
+// Security: Uses a whitelist approach to prevent CSS injection attacks
+// Allows common syntax highlighting classes and prose styling classes
+// Pattern matches: language-*, token, keyword, string, comment, number, operator, punctuation,
+// function, class-name, builtin, variable, constant, property, tag, attr-name, attr-value,
+// selector, regex, important, highlight-*, prose*, and combinations with hyphens
+var regexpSafeClass = regexp.MustCompile(`^(language-[a-z0-9-]+|token|keyword|string|comment|number|operator|punctuation|function|class-name|builtin|variable|constant|property|tag|attr-name|attr-value|selector|regex|important|highlight-[a-z]+|prose[a-z0-9-]*|[a-z]+)(\s+(language-[a-z0-9-]+|token|keyword|string|comment|number|operator|punctuation|function|class-name|builtin|variable|constant|property|tag|attr-name|attr-value|selector|regex|important|highlight-[a-z]+|prose[a-z0-9-]*|[a-z]+))*$`)
+
 func init() {
 	// Create UGC policy for article content
 	ugcpolicy = bluemonday.UGCPolicy()
@@ -34,10 +42,26 @@ func init() {
 	ugcpolicy.AllowAttrs("href").OnElements("a")
 	ugcpolicy.AllowAttrs("rel").Matching(regexpSafeRel).OnElements("a")
 
-	// Allow images with source and alt
+	// Allow images with additional attributes
 	ugcpolicy.AllowAttrs("src").OnElements("img")
 	ugcpolicy.AllowAttrs("alt").OnElements("img")
 	ugcpolicy.AllowAttrs("width", "height").OnElements("img")
+	ugcpolicy.AllowAttrs("loading").OnElements("img")           // Lazy loading
+	ugcpolicy.AllowAttrs("referrerpolicy").OnElements("img")   // Privacy protection
+	ugcpolicy.AllowAttrs("class").OnElements("img")            // Styling
+
+	// Allow class attributes for code highlighting
+	// Security: Only allow whitelisted class names via regex
+	ugcpolicy.AllowAttrs("class").Matching(regexpSafeClass).OnElements(
+		"pre", "code", "span", "div",
+		"p", "h1", "h2", "h3", "h4", "h5", "h6",
+		"table", "thead", "tbody", "tr", "th", "td",
+		"blockquote", "ul", "ol", "li",
+	)
+
+	// Allow data-* attributes (used by some syntax highlighters)
+	ugcpolicy.AllowDataAttributes()
+	ugcpolicy.AllowElements("span") // Allow span for syntax highlighting
 
 	// Create strict policy for titles/descriptions (removes all HTML)
 	strictpolicy = bluemonday.StrictPolicy()
