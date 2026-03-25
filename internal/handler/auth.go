@@ -14,6 +14,7 @@ import (
 	"oreader/internal/infra/cookie"
 	"oreader/internal/infra/errors"
 	"oreader/internal/infra/jwt"
+	"oreader/internal/infra/logger"
 	"oreader/internal/infra/password"
 	"oreader/internal/model"
 	"oreader/internal/service"
@@ -79,6 +80,10 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
+	logger.Info().
+		Str("email", maskEmail(req.Email)).
+		Msg("Register request received")
+
 	// Check if user already exists
 	existing, err := h.userRepo.GetByEmail(c.Request.Context(), req.Email)
 	if err != nil {
@@ -89,6 +94,9 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 	if existing != nil {
+		logger.Warn().
+			Str("email", maskEmail(req.Email)).
+			Msg("Registration failed: user already exists")
 		errors.SendConflict(c, errors.Error{
 			Code:    errors.ErrConflict,
 			Message: "User already exists",
@@ -128,6 +136,11 @@ func (h *Handler) Register(c *gin.Context) {
 		})
 		return
 	}
+
+	logger.Info().
+		Str("user_id", user.ID).
+		Str("email", maskEmail(user.Email)).
+		Msg("User registered successfully")
 
 	// Generate tokens for the new user
 	accessToken, csrfToken, err := h.jwtService.GenerateAccessToken(user.ID)
@@ -444,4 +457,16 @@ func (h *Handler) Me(c *gin.Context) {
 			"auth_provider": user.AuthProvider,
 		},
 	})
+}
+
+// maskEmail masks email for logging (e.g., "test@example.com" -> "te***@example.com")
+func maskEmail(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return "***"
+	}
+	if len(parts[0]) <= 2 {
+		return parts[0][:1] + "***@" + parts[1]
+	}
+	return parts[0][:2] + "***@" + parts[1]
 }

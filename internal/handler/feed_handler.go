@@ -2,12 +2,12 @@ package handler
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	apperrors "oreader/internal/infra/errors"
+	"oreader/internal/infra/logger"
 	"oreader/internal/service"
 )
 
@@ -42,8 +42,18 @@ func (h *FeedHandler) CreateFeed(c *gin.Context) {
 		return
 	}
 
+	logger.Info().
+		Str("user_id", userID.(string)).
+		Str("feed_url", req.FeedURL).
+		Msg("CreateFeed request received")
+
 	result, err := h.feedService.Subscribe(c.Request.Context(), userID.(string), req.FeedURL)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("user_id", userID.(string)).
+			Str("feed_url", req.FeedURL).
+			Msg("CreateFeed failed")
 		if errors.Is(err, service.ErrInvalidFeedURL) || errors.Is(err, service.ErrFeedFetchFailed) || errors.Is(err, service.ErrFeedParseFailed) {
 			apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, err.Error(), nil)
 			return
@@ -55,6 +65,12 @@ func (h *FeedHandler) CreateFeed(c *gin.Context) {
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to subscribe to feed", nil)
 		return
 	}
+
+	logger.Info().
+		Str("user_id", userID.(string)).
+		Str("feed_id", result.Feed.ID).
+		Int("new_item_count", result.NewItemCount).
+		Msg("CreateFeed completed successfully")
 
 	c.JSON(http.StatusCreated, gin.H{
 		"feed":           result.Feed,
@@ -69,7 +85,10 @@ func (h *FeedHandler) ListFeeds(c *gin.Context) {
 		apperrors.SendError(c, http.StatusUnauthorized, apperrors.ErrUnauthorized, "User not authenticated", nil)
 		return
 	}
-	log.Printf("DEBUG ListFeeds handler: userID from context=%v", userID)
+
+	logger.Debug().
+		Str("user_id", userID.(string)).
+		Msg("ListFeeds request received")
 
 	// Parse pagination parameters
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
@@ -89,6 +108,10 @@ func (h *FeedHandler) ListFeeds(c *gin.Context) {
 
 	feeds, total, err := h.feedService.GetUserFeeds(c.Request.Context(), userID.(string), opts)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("user_id", userID.(string)).
+			Msg("ListFeeds failed")
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to retrieve feeds", nil)
 		return
 	}
@@ -134,10 +157,19 @@ func (h *FeedHandler) DeleteFeed(c *gin.Context) {
 	}
 
 	feedID := c.Param("id")
-	log.Printf("DEBUG DeleteFeed handler: userID from context=%v, feedID from URL=%s", userID, feedID)
+
+	logger.Info().
+		Str("user_id", userID.(string)).
+		Str("feed_id", feedID).
+		Msg("DeleteFeed request received")
 
 	err := h.feedService.DeleteFeed(c.Request.Context(), userID.(string), feedID)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("user_id", userID.(string)).
+			Str("feed_id", feedID).
+			Msg("DeleteFeed failed")
 		if errors.Is(err, service.ErrFeedNotFound) {
 			apperrors.SendError(c, http.StatusNotFound, apperrors.ErrNotFound, "Feed not found", nil)
 			return
@@ -149,6 +181,11 @@ func (h *FeedHandler) DeleteFeed(c *gin.Context) {
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to delete feed", nil)
 		return
 	}
+
+	logger.Info().
+		Str("user_id", userID.(string)).
+		Str("feed_id", feedID).
+		Msg("DeleteFeed completed successfully")
 
 	c.Status(http.StatusNoContent)
 }

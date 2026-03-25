@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	apperrors "oreader/internal/infra/errors"
+	"oreader/internal/infra/logger"
 	"oreader/internal/service"
 )
 
@@ -185,9 +186,20 @@ func (h *ItemHandler) SetStar(c *gin.Context) {
 		return
 	}
 
+	logger.Info().
+		Str("user_id", userID.(string)).
+		Str("item_id", itemID).
+		Bool("starred", req.Starred).
+		Msg("SetStar request received")
+
 	// Set star status to the value from request body (spec-compliant)
 	item, err := h.itemService.SetStar(c.Request.Context(), userID.(string), itemID, req.Starred)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("user_id", userID.(string)).
+			Str("item_id", itemID).
+			Msg("SetStar failed")
 		if errors.Is(err, service.ErrItemNotFound) {
 			apperrors.SendError(c, http.StatusNotFound, apperrors.ErrNotFound, "Item not found", nil)
 			return

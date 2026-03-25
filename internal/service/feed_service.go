@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
+	"oreader/internal/infra/logger"
 	"oreader/internal/infra/rss"
 	"oreader/internal/model"
 )
@@ -35,6 +35,11 @@ func NewFeedService(
 
 // Subscribe subscribes a user to a feed
 func (s *feedService) Subscribe(ctx context.Context, userID, feedURL string) (*SubscribeResult, error) {
+	logger.Info().
+		Str("user_id", userID).
+		Str("feed_url", feedURL).
+		Msg("Subscribing to feed")
+
 	// Check if user is already subscribed to this feed
 	existingFeed, err := s.feedRepo.GetByURL(ctx, feedURL)
 	if err == nil && existingFeed != nil {
@@ -50,6 +55,11 @@ func (s *feedService) Subscribe(ctx context.Context, userID, feedURL string) (*S
 	// Fetch and parse the feed
 	parsedFeed, err := s.parser.Parse(ctx, feedURL)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("user_id", userID).
+			Str("feed_url", feedURL).
+			Msg("Failed to fetch feed")
 		return nil, fmt.Errorf("%w: %v", ErrFeedFetchFailed, err)
 	}
 
@@ -118,6 +128,12 @@ func (s *feedService) Subscribe(ctx context.Context, userID, feedURL string) (*S
 	if err := s.userFeedRepo.Create(ctx, userFeed); err != nil {
 		return nil, err
 	}
+
+	logger.Info().
+		Str("user_id", userID).
+		Str("feed_id", feed.ID).
+		Int("new_item_count", len(items)).
+		Msg("Feed subscription created")
 
 	return &SubscribeResult{
 		Feed:         feed,
@@ -206,17 +222,27 @@ func (s *feedService) GetFeed(ctx context.Context, userID, feedID string) (*mode
 
 // DeleteFeed deletes a feed subscription for a user
 func (s *feedService) DeleteFeed(ctx context.Context, userID, feedID string) error {
-	log.Printf("DEBUG DeleteFeed: userID=%s, feedID=%s", userID, feedID)
+	logger.Debug().
+		Str("user_id", userID).
+		Str("feed_id", feedID).
+		Msg("Deleting feed subscription")
 
 	// Check if user is subscribed to this feed
 	userFeed, err := s.userFeedRepo.GetByUserAndFeed(ctx, userID, feedID)
 	if err != nil {
-		log.Printf("DEBUG DeleteFeed: GetByUserAndFeed error: %v", err)
+		logger.Debug().
+			Err(err).
+			Str("user_id", userID).
+			Str("feed_id", feedID).
+			Msg("Feed subscription not found")
 
 		// Check if the record exists but is soft-deleted
 		deletedUserFeed, deletedErr := s.userFeedRepo.GetByUserAndFeedIncludingDeleted(ctx, userID, feedID)
 		if deletedErr == nil && deletedUserFeed != nil && deletedUserFeed.DeletedAt.Valid {
-			log.Printf("DEBUG DeleteFeed: found soft-deleted record, returning ErrFeedAlreadyUnsubscribed")
+			logger.Debug().
+				Str("user_id", userID).
+				Str("feed_id", feedID).
+				Msg("Feed already unsubscribed")
 			return ErrFeedAlreadyUnsubscribed
 		}
 
@@ -228,6 +254,11 @@ func (s *feedService) DeleteFeed(ctx context.Context, userID, feedID string) err
 		return err
 	}
 	_ = userFeed // Used for future reference
+
+	logger.Info().
+		Str("user_id", userID).
+		Str("feed_id", feedID).
+		Msg("Feed subscription deleted")
 
 	// Check if any other users are subscribed to this feed
 	// If not, delete the feed and its items

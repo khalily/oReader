@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"oreader/internal/infra/logger"
 	"oreader/internal/infra/opml"
 	"oreader/internal/model"
 )
@@ -58,6 +59,11 @@ func (s *importService) ParseOPML(ctx context.Context, content string) ([]*FeedI
 
 // StartImport starts an async import job for the user
 func (s *importService) StartImport(ctx context.Context, userID string, feeds []*FeedInfo) (*model.ImportJob, error) {
+	logger.Info().
+		Str("user_id", userID).
+		Int("total_feeds", len(feeds)).
+		Msg("Starting import job")
+
 	// Create import job
 	job := &model.ImportJob{
 		UserID:     userID,
@@ -72,8 +78,18 @@ func (s *importService) StartImport(ctx context.Context, userID string, feeds []
 
 	// Save job to database
 	if err := s.importJobRepo.Create(ctx, job); err != nil {
+		logger.Error().
+			Err(err).
+			Str("user_id", userID).
+			Msg("Failed to create import job")
 		return nil, fmt.Errorf("failed to create import job: %w", err)
 	}
+
+	logger.Info().
+		Str("user_id", userID).
+		Str("job_id", job.ID).
+		Int("total_feeds", job.TotalFeeds).
+		Msg("Import job created")
 
 	// Start async processing
 	go s.processImportAsync(context.Background(), job.ID, userID, feeds)
@@ -111,6 +127,12 @@ func (s *importService) ProcessImport(ctx context.Context, jobID string) error {
 
 // processImportAsync processes an import job asynchronously
 func (s *importService) processImportAsync(ctx context.Context, jobID, userID string, feeds []*FeedInfo) {
+	logger.Info().
+		Str("job_id", jobID).
+		Str("user_id", userID).
+		Int("total_feeds", len(feeds)).
+		Msg("Processing import job")
+
 	// Create cancelable context for this job
 	jobCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -129,6 +151,10 @@ func (s *importService) processImportAsync(ctx context.Context, jobID, userID st
 	// Update job status to processing
 	job, err := s.importJobRepo.GetByID(jobCtx, jobID)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("job_id", jobID).
+			Msg("Failed to get import job")
 		return
 	}
 
@@ -136,6 +162,10 @@ func (s *importService) processImportAsync(ctx context.Context, jobID, userID st
 	job.Status = model.ImportJobStatusProcessing
 	job.StartedAt = &now
 	if err := s.importJobRepo.Update(jobCtx, job); err != nil {
+		logger.Error().
+			Err(err).
+			Str("job_id", jobID).
+			Msg("Failed to update job status to processing")
 		return
 	}
 
@@ -147,6 +177,9 @@ func (s *importService) processImportAsync(ctx context.Context, jobID, userID st
 		// Check if context is cancelled
 		select {
 		case <-jobCtx.Done():
+			logger.Info().
+				Str("job_id", jobID).
+				Msg("Import job cancelled")
 			return
 		default:
 		}
@@ -159,6 +192,11 @@ func (s *importService) processImportAsync(ctx context.Context, jobID, userID st
 			// Check if it's already subscribed (not an error for import)
 			if err != ErrFeedAlreadySubscribed {
 				failed++
+				logger.Warn().
+					Err(err).
+					Str("job_id", jobID).
+					Str("feed_url", feedInfo.FeedURL).
+					Msg("Failed to import feed")
 			}
 		}
 
@@ -182,6 +220,12 @@ func (s *importService) processImportAsync(ctx context.Context, jobID, userID st
 		endTime := time.Now()
 		job.EndedAt = &endTime
 		s.importJobRepo.Update(jobCtx, job)
+
+		logger.Info().
+			Str("job_id", jobID).
+			Int("processed", processed).
+			Int("failed", failed).
+			Msg("Import job completed")
 	}
 }
 

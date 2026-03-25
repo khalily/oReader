@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 	"errors"
-	"log"
 
 	"gorm.io/gorm"
+	"oreader/internal/infra/logger"
 	"oreader/internal/model"
 	"oreader/internal/service"
 )
@@ -27,14 +27,21 @@ func (r *userFeedRepository) Create(ctx context.Context, userFeed *model.UserFee
 
 // GetByUserAndFeed retrieves a user-feed relationship by user and feed IDs
 func (r *userFeedRepository) GetByUserAndFeed(ctx context.Context, userID, feedID string) (*model.UserFeed, error) {
-	log.Printf("DEBUG GetByUserAndFeed: userID=%s, feedID=%s", userID, feedID)
+	logger.Debug().
+		Str("user_id", userID).
+		Str("feed_id", feedID).
+		Msg("Querying user-feed relationship")
 
 	var userFeed model.UserFeed
 	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND feed_id = ?", userID, feedID).
 		First(&userFeed).Error
 	if err != nil {
-		log.Printf("DEBUG GetByUserAndFeed: query error: %v", err)
+		logger.Debug().
+			Err(err).
+			Str("user_id", userID).
+			Str("feed_id", feedID).
+			Msg("User-feed relationship not found")
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("user feed not found")
 		}

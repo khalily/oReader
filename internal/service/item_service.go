@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"oreader/internal/infra/logger"
 	"oreader/internal/model"
 )
 
@@ -252,6 +253,12 @@ func (s *itemService) ToggleRead(ctx context.Context, userID, itemID string) (*I
 
 // SetStar sets the star status for an item to the specified value (spec-compliant: sets, doesn't toggle)
 func (s *itemService) SetStar(ctx context.Context, userID, itemID string, starred bool) (*ItemWithState, error) {
+	logger.Info().
+		Str("user_id", userID).
+		Str("item_id", itemID).
+		Bool("starred", starred).
+		Msg("Setting item star status")
+
 	// Get the item
 	item, err := s.itemRepo.GetByID(ctx, itemID)
 	if err != nil {
@@ -300,6 +307,12 @@ func (s *itemService) SetStar(ctx context.Context, userID, itemID string, starre
 
 // SetRead sets the read status for an item to the specified value (spec-compliant: sets, doesn't toggle)
 func (s *itemService) SetRead(ctx context.Context, userID, itemID string, read bool) (*ItemWithState, error) {
+	logger.Info().
+		Str("user_id", userID).
+		Str("item_id", itemID).
+		Bool("read", read).
+		Msg("Setting item read status")
+
 	// Get the item
 	item, err := s.itemRepo.GetByID(ctx, itemID)
 	if err != nil {
@@ -357,6 +370,11 @@ func (s *itemService) SetRead(ctx context.Context, userID, itemID string, read b
 
 // MarkAllRead marks all items in a feed as read for a user
 func (s *itemService) MarkAllRead(ctx context.Context, userID, feedID string) (int, error) {
+	logger.Info().
+		Str("user_id", userID).
+		Str("feed_id", feedID).
+		Msg("Marking all items as read")
+
 	// Verify user has access to the feed
 	_, err := s.userFeedRepo.GetByUserAndFeed(ctx, userID, feedID)
 	if err != nil {
@@ -382,6 +400,12 @@ func (s *itemService) MarkAllRead(ctx context.Context, userID, feedID string) (i
 			return 0, err
 		}
 	}
+
+	logger.Info().
+		Str("user_id", userID).
+		Str("feed_id", feedID).
+		Int("count", int(total)).
+		Msg("All items marked as read")
 
 	return int(total), nil
 }

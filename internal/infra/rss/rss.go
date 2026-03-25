@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mmcdole/gofeed"
+	"oreader/internal/infra/logger"
 	"oreader/internal/infra/sanitize"
 	"oreader/internal/infra/validation"
 )
@@ -48,16 +49,33 @@ func NewHTTPFetcher(timeout time.Duration) *HTTPFetcher {
 func (f *HTTPFetcher) Fetch(url string) (string, error) {
 	// Validate URL before fetching (SSRF protection)
 	if err := validation.ValidateFeedURL(url); err != nil {
+		logger.Error().
+			Err(err).
+			Str("feed_url", url).
+			Msg("URL validation failed")
 		return "", fmt.Errorf("%w: %v", ErrFeedInvalidURL, err)
 	}
 
+	logger.Debug().
+		Str("feed_url", url).
+		Dur("timeout", f.timeout).
+		Msg("Fetching RSS feed")
+
 	resp, err := f.client.Get(url)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("feed_url", url).
+			Msg("HTTP request failed")
 		return "", fmt.Errorf("%w: %v", ErrFeedFetchFailed, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		logger.Error().
+			Int("status_code", resp.StatusCode).
+			Str("feed_url", url).
+			Msg("Non-OK HTTP status")
 		return "", fmt.Errorf("%w: HTTP %d", ErrFeedFetchFailed, resp.StatusCode)
 	}
 
@@ -65,8 +83,17 @@ func (f *HTTPFetcher) Fetch(url string) (string, error) {
 	limitedReader := io.LimitReader(resp.Body, 1*1024*1024)
 	content, err := io.ReadAll(limitedReader)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("feed_url", url).
+			Msg("Failed to read response body")
 		return "", fmt.Errorf("%w: %v", ErrFeedFetchFailed, err)
 	}
+
+	logger.Debug().
+		Str("feed_url", url).
+		Int("bytes", len(content)).
+		Msg("Successfully fetched RSS feed")
 
 	return string(content), nil
 }
