@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -30,7 +30,7 @@ const mockArticle: Article = {
   title: 'Test Article Title',
   link: 'https://example.com/article1',
   description: 'A brief description of the article',
-  content: '<p>This is the full article content with <strong>HTML formatting</strong>.</p><p>It has multiple paragraphs.</p>',
+  content: 'This is the full article content with **Markdown formatting**.\n\nIt has multiple paragraphs.',
   pub_date: '2024-01-15T10:30:00Z',
   creator: 'John Doe',
   created_at: '2024-01-15T10:30:00Z',
@@ -262,25 +262,29 @@ describe('ItemViewPage', () => {
     })
   })
 
-  it('should render HTML content safely', async () => {
-    const articleWithHtml: Article = {
+  it('should render Markdown content safely', async () => {
+    const articleWithMarkdown: Article = {
       ...mockArticle,
-      content: '<p>Safe content</p><script>alert("xss")</script>',
+      content: 'Safe **Markdown** content\n\n```javascript\nconsole.log("code")\n```',
     }
 
     server.use(
       http.get(`${API_BASE_URL}/items/:id`, () => {
-        return HttpResponse.json({ item: articleWithHtml })
+        return HttpResponse.json({ item: articleWithMarkdown })
       })
     )
 
     renderWithRouter(<ItemViewPage />)
 
     await waitFor(() => {
-      expect(screen.getByText('Safe content')).toBeInTheDocument()
+      // Markdown **Markdown** becomes <strong>Markdown</strong>, so we match "Safe" and "content"
+      expect(screen.getByText(/Safe/)).toBeInTheDocument()
+      expect(screen.getByText('Markdown')).toBeInTheDocument()
+      expect(screen.getByText(/content/)).toBeInTheDocument()
     })
 
-    // Script tags should be sanitized/stripped by our implementation
+    // MarkdownRenderer should render the content without executing any code
+    // ReactMarkdown handles sanitization automatically
     const scriptElements = document.querySelectorAll('script')
     expect(scriptElements.length).toBe(0)
   })

@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { processArticleContent } from '@/lib/syntax-highlight'
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
 
 export default function ItemViewPage() {
   const { id } = useParams<{ id: string }>()
@@ -24,9 +24,6 @@ export default function ItemViewPage() {
     is_starred: boolean
     is_read: boolean
   } | null>(null)
-
-  // Article content ref for post-processing
-  const articleRef = useRef<HTMLElement>(null)
 
   const item = data?.item
     ? optimisticState
@@ -47,12 +44,6 @@ export default function ItemViewPage() {
       )
     }
   }, [data?.item, optimisticState, toggleRead])
-
-  // Process article content after render
-  useEffect(() => {
-    if (!articleRef.current || !item?.content) return
-    processArticleContent(articleRef.current)
-  }, [item?.content])
 
   const handleToggleStar = () => {
     if (data?.item) {
@@ -122,19 +113,6 @@ export default function ItemViewPage() {
       hour: '2-digit',
       minute: '2-digit',
     })
-  }
-
-  // Sanitize HTML content (basic XSS prevention)
-  // For production, use a proper sanitizer like DOMPurify
-  const createSafeHTML = (html: string | null) => {
-    if (!html) return { __html: '' }
-    // Basic sanitization - remove script tags and style tags
-    const sanitized = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      .replace(/on\w+="[^"]*"/gi, '') // Remove inline event handlers
-      .replace(/javascript:/gi, '') // Remove javascript: protocol
-    return { __html: sanitized }
   }
 
   if (isLoading) {
@@ -255,11 +233,7 @@ export default function ItemViewPage() {
       {item.content ? (
         <Card>
           <CardContent className="p-6">
-            <article
-              ref={articleRef}
-              className="prose prose-slate max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={createSafeHTML(item.content)}
-            />
+            <MarkdownRenderer content={item.content} />
           </CardContent>
         </Card>
       ) : (
