@@ -62,7 +62,8 @@ RSS Feed (HTML 内容)
 ```bash
 cd web
 npm install @tailwindcss/typography
-npm install prismjs
+# 固定 Prism.js 版本，避免安全漏洞（1.29.0+ 修复了已知的 XSS 漏洞）
+npm install prismjs@1.29.0
 npm install -D @types/prismjs
 ```
 
@@ -93,14 +94,14 @@ module.exports = {
 **改动点**：
 
 1. 引入 Prism.js
-2. 移除前端二次净化（后端已增强处理）
+2. **保留前端简化净化**（防御深度原则，作为后端净化的备份防线）
 3. 添加 useEffect 处理代码高亮和图片
 4. 优化 prose 类配置
+5. 支持明暗主题代码高亮切换
 
 ```tsx
 // 新增 import
 import Prism from 'prismjs'
-import 'prismjs/themes/prism-tomorrow.min.css'
 // 按需加载语言
 import 'prismjs/components/prism-javascript'
 import 'prismjs/components/prism-typescript'
@@ -113,6 +114,19 @@ import 'prismjs/components/prism-css'
 // 新增 ref
 const articleRef = useRef<HTMLElement>(null)
 
+// 获取当前主题
+const { theme } = useThemeStore() // 假设有主题 store
+
+// 动态加载主题样式（避免同时加载两套主题）
+useEffect(() => {
+  const link = document.getElementById('prism-theme') as HTMLLinkElement
+  if (link) {
+    link.href = theme === 'dark'
+      ? '/prism-tomorrow.min.css'
+      : '/prism.min.css'
+  }
+}, [theme])
+
 // 新增 useEffect - 内容渲染后处理
 useEffect(() => {
   if (!articleRef.current || !item?.content) return
@@ -124,14 +138,24 @@ useEffect(() => {
   articleRef.current.querySelectorAll('img').forEach(img => {
     img.loading = 'lazy'
     img.onerror = () => {
-      img.style.display = 'none'
-      // 可选：显示占位图
+      // 显示占位图而不是完全隐藏，保持可访问性
+      img.src = '/image-placeholder.svg'
+      img.alt = '图片加载失败'
+      img.style.opacity = '0.5'
     }
   })
 }, [item?.content])
 
-// 简化 createSafeHTML 或直接移除
-// 后端已做净化，前端无需二次处理
+// 保留简化的前端净化（防御深度）
+const createSafeHTML = (html: string | null) => {
+  if (!html) return { __html: '' }
+  // 仅处理最危险的内容，后端已做主要净化
+  const sanitized = html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/javascript:/gi, '')
+  return { __html: sanitized }
+}
 ```
 
 #### 1.4 自定义 Prose 样式
@@ -261,7 +285,11 @@ func init() {
     ugcpolicy.AllowElements("table", "thead", "tbody", "tr", "th", "td")
 
     // ===== 新增：允许 class 属性（支持代码高亮等） =====
-    ugcpolicy.AllowAttrs("class").OnElements(
+    // 安全考虑：使用正则白名单限制允许的 class 名称，防止 CSS 注入攻击
+    // 仅允许：语言类（language-*）、高亮类（token、keyword 等）、Prism 类
+    var regexpSafeClass = regexp.MustCompile(`^(language-[a-z0-9-]+|token|keyword|string|comment|number|operator|punctuation|function|class-name|builtin|variable|constant|property|tag|attr-name|attr-value|selector|regex|important|bold|italic|underline|highlight-[a-z]+|prose.*)$`)
+
+    ugcpolicy.AllowAttrs("class").Matching(regexpSafeClass).OnElements(
         "pre", "code", "span", "div",
         "p", "h1", "h2", "h3", "h4", "h5", "h6",
         "table", "thead", "tbody", "tr", "th", "td",
@@ -294,7 +322,9 @@ func init() {
 
 ```go
 import (
+    "net/url"
     "strings"
+
     "github.com/PuerkitoBio/goquery"
 )
 
@@ -350,33 +380,29 @@ func FixRelativeImageURLs(htmlContent string, baseURL string) string {
 
 **文件**：`internal/infra/rss/rss.go`
 
-在 `Parse` 函数中，内容净化**之前**调用修复函数：
+在 `SanitizeFeed` 函数中调用修复函数（保持现有架构一致性）：
 
 ```go
-func (p *Parser) Parse(feedURL string) (*ParsedFeed, error) {
-    // ... 现有解析逻辑 ...
-
-    for i, item := range feed.Items {
-        content := item.Content
-        if content == "" {
-            content = item.Description
-        }
-
+// SanitizeFeed 净化 RSS feed 内容
+func SanitizeFeed(feed *ParsedFeed) {
+    for _, item := range feed.Items {
         // 1. 先修复相对路径图片（使用 feed.Link 作为 baseURL）
-        if content != "" && feed.Link != "" {
-            content = FixRelativeImageURLs(content, feed.Link)
+        if item.Content != "" && feed.Link != "" {
+            item.Content = FixRelativeImageURLs(item.Content, feed.Link)
+        }
+        if item.Description != "" && feed.Link != "" {
+            item.Description = FixRelativeImageURLs(item.Description, feed.Link)
         }
 
         // 2. 再进行 HTML 净化
-        content = sanitize.SanitizeArticleContent(content)
-
-        // 保存处理后的内容
-        parsedItems[i].Content = content
-        // ...
+        item.Content = sanitize.SanitizeArticleContent(item.Content)
+        item.Description = sanitize.SanitizeArticleContent(item.Description)
     }
 
-    // ...
+    // 净化 feed 标题
+    feed.Title = sanitize.SanitizeFeedTitle(feed.Title)
 }
+```
 ```
 
 #### 2.4 新增依赖
@@ -430,8 +456,49 @@ go get github.com/PuerkitoBio/goquery
 | 风险 | 影响 | 缓解措施 |
 |------|------|----------|
 | Prism.js 体积较大 | 首屏加载变慢 | 按需加载语言包，考虑异步加载 |
-| 放宽净化策略 | XSS 风险 | 仅允许特定元素的 class 属性，禁止 style 属性 |
-| goquery 性能 | RSS 解析变慢 | 仅处理有图片的内容，添加缓存 |
+| Prism.js 安全漏洞 | XSS 风险 | 固定版本 `1.29.0+`，避免使用有漏洞的插件 |
+| 放宽净化策略 | XSS 风险 | 使用正则白名单验证 class 属性，禁止 style 属性 |
+| goquery 性能 | RSS 解析变慢 | 仅处理有图片的内容，性能优化 |
+| 前端净化移除风险 | 防御深度不足 | **保留简化版前端净化作为备份防线** |
+
+## 回滚策略
+
+### 快速回滚
+
+如果生产环境出现严重问题，可按以下步骤快速回滚：
+
+1. **前端回滚**：
+   - 移除 Prism.js 相关 import 和 useEffect
+   - 恢复原始 `createSafeHTML` 函数
+   - 从 `tailwind.config.js` 移除 typography 插件
+
+2. **后端回滚**：
+   - 注释掉 `FixRelativeImageURLs` 调用
+   - 恢复原始 sanitize 策略（移除 class 属性白名单）
+
+3. **Git 回滚**：
+   ```bash
+   git revert <commit-hash>
+   ```
+
+### 功能开关（推荐）
+
+可通过环境变量控制新功能：
+
+```go
+// 后端配置
+type Config struct {
+    EnableImageURLFix   bool `env:"ENABLE_IMAGE_URL_FIX,default=true"`
+    EnableEnhancedSanitize bool `env:"ENABLE_ENHANCED_SANITIZE,default=true"`
+}
+```
+
+```tsx
+// 前端配置
+const FEATURES = {
+  SYNTAX_HIGHLIGHT: import.meta.env.VITE_ENABLE_SYNTAX_HIGHLIGHT === 'true',
+}
+```
 
 ## 验收标准
 
