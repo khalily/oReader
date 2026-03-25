@@ -4,86 +4,101 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-oReader is an online RSS reader built with Flask (backend) and AngularJS (frontend). It allows users to subscribe to RSS feeds, read articles, and manage their subscriptions.
+oReader is a modern RSS reader with Go backend and React frontend. It supports multiple users, OAuth (GitHub), feed subscriptions, and article management.
 
 ## Development Commands
 
+### Backend (Go)
+
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Start development server (API-only mode, no frontend build required)
+make dev
+# Or with environment: DATABASE_URL=oreader.db JWT_SECRET_KEY=xxx make dev
 
-# Run development server
-python manage.py runserver
+# Run all tests with coverage
+make test
 
-# Run with specific config (devlopment, testing, production)
-OREADER_CONFIG=testing python manage.py runserver
+# Run specific package tests
+go test ./internal/service -v
+go test ./internal/handler -v -run TestOAuthHandler
 
-# Access Flask shell with app context (includes db, User, Feed, Item models)
-python manage.py shell
+# Build production binary (with embedded frontend)
+make build
+
+# Lint and security check
+make lint
+make vulncheck
+```
+
+### Frontend (React/TypeScript)
+
+```bash
+cd web
+
+# Start development server (proxies to backend at localhost:8080)
+npm run dev
+
+# Build for production
+npm run build
+
+# Run unit tests
+npm run test
+
+# Run E2E tests (Playwright)
+npm run test:e2e
+```
+
+### Full Development Environment
+
+```bash
+# Run both backend and frontend with one command
+make dev-full
+# Or: ./dev.sh
 ```
 
 ## Architecture
 
-### Backend (Flask)
+### Backend Structure (`internal/`)
 
-The application uses the **application factory pattern** with Flask blueprints:
+- **`handler/`** - HTTP handlers for API endpoints. Each handler depends on services, not repositories directly.
+- **`service/`** - Business logic layer. Defines interfaces in `interfaces.go`.
+- **`repository/`** - Data access layer implementing service interfaces.
+- **`model/`** - GORM models with UUID v7 IDs via embedded `Base` struct.
+- **`middleware/`** - HTTP middleware: auth, CORS, rate limiting, security headers.
+- **`infra/`** - Infrastructure: JWT, CSRF, cookies, password hashing, RSS parsing.
+- **`config/`** - Configuration via environment variables (viper).
 
-- **`app/__init__.py`**: Factory function `create_app(config_name)` initializes extensions and registers blueprints
-- **`config.py`**: Three environments - `devlopment` (SQLite), `testing` (SQLite), `production` (PostgreSQL/MySQL via env vars)
+### Frontend Structure (`web/src/`)
 
-#### Blueprints
+- **`pages/`** - Route-level components (ItemsPage, LoginPage, OAuth pages).
+- **`components/`** - Reusable UI components organized by domain (auth/, feed/, items/, ui/).
+- **`hooks/`** - React Query hooks for API calls (useAuth, useFeeds, useItems).
+- **`stores/`** - Zustand stores for client state (authStore).
+- **`lib/api/`** - Axios client with interceptors for CSRF and token refresh.
 
-| Blueprint | URL Prefix | Purpose |
-|-----------|------------|---------|
-| `main` | `/` | Serves the SPA index.html |
-| `api` | `/api/v1` | RESTful API endpoints |
-| `auth` | `/auth` | Traditional web authentication |
+### Key Patterns
 
-#### API Layer (`app/api/`)
+1. **Authentication**: Dual-token JWT system (access + refresh tokens) stored in HttpOnly cookies. CSRF protection via double-submit cookie pattern.
 
-- Uses **Flask-RESTful** for resource-based routing
-- **Marshmallow** schemas for serialization/deserialization and validation
-- **HTTP Basic Auth** with token support (email+password for initial auth, then token for subsequent requests)
-- Authentication flow: `GET /api/v1/get_token` (email:password) → returns token → use token for subsequent requests
+2. **Repository Pattern**: Services depend on repository interfaces, not concrete implementations. This enables testing with mocks.
 
-#### Data Models (`app/models.py`)
+3. **API Proxy**: In development, Vite proxies `/api/*` requests to the Go backend. The frontend runs on port 5173, backend on 8080.
 
-- **User**: email, password_hash, generates auth tokens (1-hour expiry)
-- **Feed**: RSS feed data (title, link, description, last_build_date, img) - belongs to User
-- **Item**: Individual RSS items (title, link, description, content, pub_date, creator, star) - belongs to Feed
+4. **OAuth Flow**: GitHub OAuth callback is handled by frontend (`OAuthCallbackPage`) which calls backend with `format=json` to get JSON response instead of 302 redirect.
 
-#### RSS Parsing (`app/feedparser/`)
+## Required Environment Variables
 
-Custom feedparser module parses RSS feeds when users add subscriptions. The `FeedSchema.make_object()` method fetches the URL, parses it, creates Feed and Item records, and commits to database.
+- `DATABASE_URL` - SQLite file path or MySQL connection string
+- `JWT_SECRET_KEY` - Minimum 32 characters
 
-### Frontend (AngularJS)
+## OAuth Configuration (Optional)
 
-Single-page application in `app/static/`:
+- `GITHUB_CLIENT_ID` - GitHub OAuth app client ID
+- `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret
+- `GITHUB_CALLBACK_HOST` - Callback host (e.g., `localhost:5173` for dev)
+- `FRONTEND_URL` - Frontend URL for redirects (default: `http://localhost:5173`)
 
-- **`js/app.js`**: Route configuration with `loginRequired` guards
-- **`js/services.js`**: Auth service, token injection interceptor, $resource factories for API
-- **`js/controllers.js`**: View controllers
-- **`partials/`**: HTML templates
+## Documentation Language
 
-Auth tokens are stored via `angular-store` and injected via `tokenInjector` interceptor.
-
-## Key Patterns
-
-- **Schema-driven API**: Marshmallow schemas handle both validation and object creation (`make_object` method)
-- **Token auth**: JWT-style tokens via itsdangerous, passed as HTTP Basic Auth username with empty password
-- **SPA with API**: Flask serves static index.html, AngularJS handles routing and API consumption
-
-## Deployment
-
-Heroku deployment via Procfile using gunicorn:
-```
-web: gunicorn app:create_app\(\"production\"\) -e OREADER_CONFIG='production' -e SECRET_KEY='...' -e DATABASE_URI='...'
-```
-
-## Environment Variables
-
-| Variable | Purpose |
-|----------|---------|
-| `OREADER_CONFIG` | Config name: `devlopment`, `testing`, or `production` |
-| `SECRET_KEY` | App secret key (production) |
-| `DATABASE_URI` | Database URL (production) |
+- 提案、规范等文档使用中文撰写
+- 代码、变量名、函数名使用英文
