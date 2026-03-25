@@ -1,6 +1,7 @@
 package sanitize
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -309,4 +310,70 @@ func containsAny(s string, substrs ...string) bool {
 		}
 	}
 	return false
+}
+
+// ===== Tests for enhanced sanitization (class attributes) =====
+
+func TestSanitizeArticleContent_ClassAttributes(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantKeep string
+		wantDrop string
+	}{
+		{
+			name:     "preserve language class on pre",
+			input:    `<pre class="language-go">code</pre>`,
+			wantKeep: `class="language-go"`,
+		},
+		{
+			name:     "preserve token class on span",
+			input:    `<span class="token keyword">func</span>`,
+			wantKeep: `class="token keyword"`,
+		},
+		{
+			name:     "drop malicious class",
+			input:    `<div class="onclick-alert">text</div>`,
+			wantDrop: `onclick`,
+		},
+		{
+			name:     "preserve prose class",
+			input:    `<p class="prose-lg">text</p>`,
+			wantKeep: `prose`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SanitizeArticleContent(tt.input)
+
+			if tt.wantKeep != "" && !strings.Contains(got, tt.wantKeep) {
+				t.Errorf("Expected to keep %q, got %q", tt.wantKeep, got)
+			}
+			if tt.wantDrop != "" && strings.Contains(got, tt.wantDrop) {
+				t.Errorf("Expected to drop %q, got %q", tt.wantDrop, got)
+			}
+		})
+	}
+}
+
+func TestSanitizeArticleContent_ImageAttributes(t *testing.T) {
+	input := `<img src="https://example.com/img.jpg" alt="test" loading="lazy" referrerpolicy="no-referrer">`
+	got := SanitizeArticleContent(input)
+
+	if !strings.Contains(got, `loading="lazy"`) {
+		t.Error("Expected loading attribute to be preserved")
+	}
+	if !strings.Contains(got, `referrerpolicy="no-referrer"`) {
+		t.Error("Expected referrerpolicy attribute to be preserved")
+	}
+}
+
+func TestSanitizeArticleContent_DataAttributes(t *testing.T) {
+	input := `<pre data-language="go" data-line="5">code</pre>`
+	got := SanitizeArticleContent(input)
+
+	if !strings.Contains(got, `data-language="go"`) {
+		t.Error("Expected data-language attribute to be preserved")
+	}
 }
