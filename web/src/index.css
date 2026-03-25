@@ -57,3 +57,121 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ===== Article Rendering Optimization ===== */
+/* Comfortable reading experience styles */
+
+@layer components {
+  /* Base prose configuration */
+  .prose {
+    --tw-prose-body: 1.75;
+    --tw-prose-spacing: 1.5em;
+    font-size: 1.0625rem;
+    line-height: 1.75;
+  }
+
+  /* Paragraph spacing */
+  .prose p {
+    margin-bottom: 1.5em;
+  }
+
+  /* Headings */
+  .prose h1, .prose h2, .prose h3,
+  .prose h4, .prose h5, .prose h6 {
+    margin-top: 2em;
+    margin-bottom: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .prose h1 { font-size: 1.75em; }
+  .prose h2 { font-size: 1.5em; }
+  .prose h3 { font-size: 1.25em; }
+
+  /* Images */
+  .prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 2em auto;
+    display: block;
+  }
+
+  /* Code blocks */
+  .prose pre {
+    padding: 1.5em;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1.5em 0;
+  }
+
+  .prose code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.9em;
+  }
+
+  /* Inline code */
+  .prose :not(pre) > code {
+    background-color: hsl(var(--muted));
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    color: hsl(var(--foreground));
+  }
+
+  /* Blockquotes */
+  .prose blockquote {
+    border-left: 4px solid hsl(var(--border));
+    padding-left: 1em;
+    margin-left: 0;
+    color: hsl(var(--muted-foreground));
+    font-style: italic;
+  }
+
+  /* Links */
+  .prose a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .prose a:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  /* Lists */
+  .prose ul, .prose ol {
+    padding-left: 1.5em;
+    margin-bottom: 1.25em;
+  }
+
+  .prose li {
+    margin-bottom: 0.5em;
+  }
+
+  /* Tables */
+  .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5em 0;
+  }
+
+  .prose th, .prose td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.75em;
+    text-align: left;
+  }
+
+  .prose th {
+    background-color: hsl(var(--muted));
+    font-weight: 600;
+  }
+}
+
+/* Prism.js theme overrides for dark mode */
+.dark .prose pre {
+  background-color: hsl(220 13% 18%);
+}
+
+.dark .prose :not(pre) > code {
+  background-color: hsl(220 13% 18%);
+}
