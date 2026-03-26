@@ -49,4 +49,35 @@ describe('MarkdownRenderer', () => {
     )
     expect(screen.getByRole('table')).toBeInTheDocument()
   })
+
+  it('renders inline LaTeX math with $...$', () => {
+    render(<MarkdownRenderer content="The formula $E = mc^2$ is famous." />)
+    // KaTeX renders math in span elements with class katex
+    const katexElement = document.querySelector('.katex')
+    expect(katexElement).toBeInTheDocument()
+    expect(screen.getByText(/E/)).toBeInTheDocument()
+  })
+
+  it('renders block LaTeX math with $$...$$', () => {
+    render(<MarkdownRenderer content={'$$\\frac{\\partial L}{\\partial w} = \\nabla$$'} />)
+    const katexElement = document.querySelector('.katex')
+    expect(katexElement).toBeInTheDocument()
+  })
+
+  it('renders complex partial derivative formulas', () => {
+    const formula = '$$\\frac{\\partial(a \\cdot b)}{\\partial a} = b$$'
+    render(<MarkdownRenderer content={formula} />)
+    const katexElement = document.querySelector('.katex')
+    expect(katexElement).toBeInTheDocument()
+  })
+
+  it('renders LaTeX formulas inside GFM tables', () => {
+    const tableWithMath = `| Operation | Forward | Local gradients |
+|-----------|---------|----------------|
+| \`a + b\` | $$a + b$$ | $$\\frac{\\partial}{\\partial a} = 1$$ |`
+    render(<MarkdownRenderer content={tableWithMath} />)
+    // Should have both table and katex rendered
+    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(document.querySelectorAll('.katex').length).toBeGreaterThan(0)
+  })
 })
