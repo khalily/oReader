@@ -14,6 +14,7 @@ interface MarkdownRendererProps {
 /**
  * MarkdownRenderer renders Markdown content with:
  * - GitHub Flavored Markdown support (tables, strikethrough, etc.)
+ * - LaTeX math rendering with KaTeX (inline `$...$` and block `$$...$$`)
  * - Syntax highlighting for code blocks
  * - Lazy loading for images
  * - Secure external links (target="_blank", rel="noopener noreferrer")
