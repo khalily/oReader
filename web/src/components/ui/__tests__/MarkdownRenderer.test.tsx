@@ -55,7 +55,9 @@ describe('MarkdownRenderer', () => {
     // KaTeX renders math in span elements with class katex
     const katexElement = document.querySelector('.katex')
     expect(katexElement).toBeInTheDocument()
-    expect(screen.getByText(/E/)).toBeInTheDocument()
+    // Check that the text content is rendered (KaTeX splits math into multiple elements)
+    expect(screen.getByText('The formula', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('is famous.', { exact: false })).toBeInTheDocument()
   })
 
   it('renders block LaTeX math with $$...$$', () => {
