@@ -120,6 +120,19 @@
     color: hsl(var(--foreground));
   }
 
+  /* Remove backtick decorators added by Tailwind Typography plugin */
+  /* Use !important to override Tailwind Typography's :where() selectors */
+  .prose :not(pre) > code::before,
+  .prose :not(pre) > code::after {
+    content: none !important;
+  }
+
+  /* Also target the specific selector Tailwind Typography uses */
+  .prose :where(code):not(:where([class~="not-prose"] *))::before,
+  .prose :where(code):not(:where([class~="not-prose"] *))::after {
+    content: none !important;
+  }
+
   /* Blockquotes */
   .prose blockquote {
     border-left: 4px solid hsl(var(--border));

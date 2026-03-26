@@ -27,10 +27,13 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          code({ className: codeClassName, children, ...props }) {
+          code({ className: codeClassName, children, ...restProps }) {
             const match = /language-(\w+)/.exec(codeClassName || '')
-            const language = match ? match[1] : 'text'
             const isInline = !match
+
+            // Remove 'node' from props to avoid [object Object] in DOM
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { node: _node, ...props } = restProps as any
 
             if (isInline) {
               return (
@@ -40,7 +43,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
               )
             }
 
-            // Create a wrapper to fix the ref type issue
+            const language = match ? match[1] : 'text'
             const CodeBlock: React.FC<any> = ({ children }) => {
               return (
                 <SyntaxHighlighter
@@ -53,9 +56,12 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
               )
             }
 
-            return <CodeBlock {...props}>{children}</CodeBlock>
+            return <CodeBlock>{children}</CodeBlock>
           },
-          img({ src, alt, title, ...props }) {
+          img({ src, alt, title, ...restProps }) {
+            // Remove 'node' from props
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { node: _node, ...props } = restProps as any
             return (
               <img
                 src={src}
@@ -71,7 +77,10 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
               />
             )
           },
-          a({ href, children, ...props }) {
+          a({ href, children, ...restProps }) {
+            // Remove 'node' from props
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { node: _node, ...props } = restProps as any
             return (
               <a
                 href={href}
