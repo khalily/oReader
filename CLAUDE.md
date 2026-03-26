@@ -102,3 +102,28 @@ make dev-full
 
 - 提案、规范等文档使用中文撰写
 - 代码、变量名、函数名使用英文
+
+
+## Debug
+Add temporary debug logging to show [request/response/cookies] values, then test the flow again
+
+## Test
+Set up common mocks first: vi.mock('lucide-react'), vi.mock for useToast/useTheme, IntersectionObserver mock - then write the actual test
+
+## Coding
+
+bugfix and feature using TDD red-green-refactor.
+
+## LaTeX Math Rendering
+
+The application supports LaTeX math rendering through KaTeX:
+
+- **Inline math**: Surround with `$...$` (e.g., `$E = mc^2$`)
+- **Block math**: Surround with `$$...$$` (e.g., `$$\frac{\partial L}{\partial w} = \nabla$$`)
+- **Tables**: Math expressions work within table cells
+- **Syntax highlighting**: Code blocks also support syntax highlighting
+
+Dependencies:
+- `react-markdown` with `remark-math` plugin
+- `rehype-katex` for KaTeX rendering
+- KaTeX CSS assets are automatically included in production build
