@@ -5,6 +5,7 @@ import rehypeKatex from 'rehype-katex'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '@/lib/utils'
+import React from 'react'
 
 interface MarkdownRendererProps {
   content: string
@@ -39,16 +40,20 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
               )
             }
 
-            return (
-              <SyntaxHighlighter
-                style={oneDark}
-                language={language}
-                PreTag="div"
-                {...props}
-              >
-                {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
-            )
+            // Create a wrapper to fix the ref type issue
+            const CodeBlock: React.FC<any> = ({ children }) => {
+              return (
+                <SyntaxHighlighter
+                  style={oneDark as any}
+                  language={language}
+                  PreTag="div"
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              )
+            }
+
+            return <CodeBlock {...props}>{children}</CodeBlock>
           },
           img({ src, alt, title, ...props }) {
             return (

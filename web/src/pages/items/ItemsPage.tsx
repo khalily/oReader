@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useItems } from '@/hooks/useItems'
 import { useFeeds } from '@/hooks/useFeeds'
 import { useStats } from '@/hooks/useStats'
@@ -21,7 +21,6 @@ interface ItemsPageProps {
 }
 
 export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedItemId = searchParams.get('id') // 从 URL 读取选中的文章 ID
   const [isAddFeedOpen, setIsAddFeedOpen] = useState(false)

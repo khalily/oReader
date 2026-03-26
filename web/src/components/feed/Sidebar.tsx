@@ -45,7 +45,7 @@ export function SidebarContent({
   onFilterChange,
   totalUnread = 0,
   stats,
-}: Omit<SidebarProps, 'isMobileOpen' | 'onMobileClose' | 'stats'>) {
+}: Omit<SidebarProps, 'isMobileOpen' | 'onMobileClose'>) {
   const handleDelete = (feedId: string) => {
     if (confirm('Are you sure you want to delete this feed?')) {
       onDeleteFeed(feedId)
