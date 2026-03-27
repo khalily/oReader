@@ -2,61 +2,66 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import rehypeShiki from '@shikijs/rehype'
 import { cn } from '@/lib/utils'
-import React from 'react'
+import React, { useMemo } from 'react'
+import { CopyButton } from './CopyButton'
 
 interface MarkdownRendererProps {
   content: string
   className?: string
 }
 
+// Shiki 配置 - 支持双主题
+const shikiOptions = {
+  themes: {
+    light: 'github-light',
+    dark: 'github-dark',
+  },
+  defaultColor: false, // 使用 CSS 变量
+}
+
 /**
  * MarkdownRenderer renders Markdown content with:
  * - GitHub Flavored Markdown support (tables, strikethrough, etc.)
  * - LaTeX math rendering with KaTeX (inline `$...$` and block `$$...$$`)
- * - Syntax highlighting for code blocks
+ * - Syntax highlighting with Shiki (180+ languages)
+ * - Line numbers (always visible)
+ * - Copy button for code blocks
  * - Lazy loading for images
  * - Secure external links (target="_blank", rel="noopener noreferrer")
  */
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+  // 提取代码文本用于复制
+  const extractCodeFromChildren = (children: React.ReactNode): string => {
+    if (typeof children === 'string') return children
+    if (Array.isArray(children)) {
+      return children.map(extractCodeFromChildren).join('')
+    }
+    if (React.isValidElement(children) && children.props.children) {
+      return extractCodeFromChildren(children.props.children)
+    }
+    return ''
+  }
+
   return (
     <div className={cn('prose prose-slate dark:prose-invert max-w-none', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex]}
+        rehypePlugins={[
+          rehypeKatex,
+          [rehypeShiki, shikiOptions],
+        ]}
         components={{
-          code({ className: codeClassName, children, ...restProps }) {
-            const match = /language-(\w+)/.exec(codeClassName || '')
-            const isInline = !match
-
-            // Remove 'node' from props to avoid [object Object] in DOM
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { node: _node, ...props } = restProps as any
-
-            if (isInline) {
-              return (
-                <code className={codeClassName} {...props}>
-                  {children}
-                </code>
-              )
-            }
-
-            const language = match ? match[1] : 'text'
-            const CodeBlock: React.FC<any> = ({ children }) => {
-              return (
-                <SyntaxHighlighter
-                  style={oneDark as any}
-                  language={language}
-                  PreTag="div"
-                >
-                  {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
-              )
-            }
-
-            return <CodeBlock>{children}</CodeBlock>
+          // 包装 pre 元素添加复制按钮
+          pre({ children, ...props }) {
+            const code = extractCodeFromChildren(children)
+            return (
+              <div className="relative group">
+                <pre {...props}>{children}</pre>
+                {code && <CopyButton code={code} />}
+              </div>
+            )
           },
           img({ src, alt, title, ...restProps }) {
             // Remove 'node' from props
