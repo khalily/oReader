@@ -190,3 +190,68 @@
 .dark .prose :not(pre) > code {
   background-color: hsl(220 13% 18%);
 }
+
+/* ===== Shiki Syntax Highlighting ===== */
+
+/* Base Shiki container styles */
+.shiki {
+  padding: 1.5em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+
+/* Line numbers using CSS counter */
+.shiki {
+  counter-reset: line;
+}
+
+.shiki .line {
+  display: block;
+  min-height: 1em;
+}
+
+.shiki .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 2.5em;
+  margin-right: 1em;
+  text-align: right;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.4;
+  user-select: none;
+}
+
+/* Remove line number from first line if it's empty */
+.shiki .line:empty::before {
+  content: counter(line);
+}
+
+/* Code block wrapper for copy button positioning */
+.prose pre {
+  position: relative;
+  padding: 0;
+  margin: 1.5em 0;
+  background: transparent;
+}
+
+.prose pre .shiki {
+  margin: 0;
+}
+
+/* Dark mode adjustments for Shiki */
+.dark .shiki {
+  background-color: hsl(220 13% 18%);
+}
+
+/* Inline code - preserve existing styles, ensure no Shiki interference */
+.prose :not(pre) > code {
+  background-color: hsl(var(--muted));
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  color: hsl(var(--foreground));
+}
