@@ -104,7 +104,7 @@ func setupPaperRouter(svc *mockPaperService) *gin.Engine {
 		c.Next()
 	})
 
-	h := NewPaperHandler(svc)
+	h := NewPaperHandler(svc, 52428800) // 50MB max upload size
 	papers := router.Group("/api/v1/papers")
 	{
 		papers.POST("/upload", h.UploadPaper)
@@ -134,7 +134,7 @@ func TestPaperHandler_UploadPaper(t *testing.T) {
 	writer := multipart.NewWriter(&buf)
 	part, err := writer.CreateFormFile("file", "test.pdf")
 	require.NoError(t, err)
-	_, err = part.Write([]byte("fake-pdf-content"))
+	_, err = part.Write([]byte("%PDF-1.4 fake-pdf-content"))
 	require.NoError(t, err)
 	writer.Close()
 

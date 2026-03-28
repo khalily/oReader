@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	pbgrpc "oreader/internal/infra/grpc"
@@ -13,11 +14,15 @@ import (
 	"oreader/internal/model"
 )
 
+const defaultConversionTimeout = 10 * time.Minute
+
 type paperService struct {
-	paperRepo  PaperRepository
-	tagRepo    PaperTagRepository
-	grpcClient pbgrpc.PaperConverterClient
-	uploadDir  string
+	paperRepo     PaperRepository
+	tagRepo       PaperTagRepository
+	grpcClient    pbgrpc.PaperConverterClient
+	uploadDir     string
+	grpcTimeout   time.Duration
+	conversionMu  sync.Mutex // B4: prevent concurrent updates on same paper
 }
 
 // NewPaperService creates a new paper service
@@ -28,15 +33,27 @@ func NewPaperService(
 	uploadDir string,
 ) PaperService {
 	return &paperService{
-		paperRepo:  paperRepo,
-		tagRepo:    tagRepo,
-		grpcClient: grpcClient,
-		uploadDir:  uploadDir,
+		paperRepo:   paperRepo,
+		tagRepo:     tagRepo,
+		grpcClient:  grpcClient,
+		uploadDir:   uploadDir,
+		grpcTimeout: defaultConversionTimeout,
 	}
 }
 
 // UploadPaper saves the PDF to disk, creates a Paper record, and starts async conversion
 func (s *paperService) UploadPaper(ctx context.Context, userID string, filename string, pdfContent []byte) (*model.Paper, error) {
+	// B3: Check if gRPC converter is available
+	if s.grpcClient == nil {
+		return nil, fmt.Errorf("paper converter service is not available, please try again later")
+	}
+
+	// S4: Sanitize filename to prevent path traversal
+	safeFilename := filepath.Base(filename)
+	if safeFilename == "" || safeFilename == "." || safeFilename == ".." {
+		return nil, fmt.Errorf("invalid filename")
+	}
+
 	// Save PDF to disk organized by user and date
 	dateDir := time.Now().Format("2006-01-02")
 	pdfDir := filepath.Join(s.uploadDir, userID, dateDir)
@@ -44,7 +61,7 @@ func (s *paperService) UploadPaper(ctx context.Context, userID string, filename 
 		return nil, fmt.Errorf("failed to create upload directory: %w", err)
 	}
 
-	pdfPath := filepath.Join(pdfDir, filename)
+	pdfPath := filepath.Join(pdfDir, safeFilename)
 	if err := os.WriteFile(pdfPath, pdfContent, 0644); err != nil {
 		return nil, fmt.Errorf("failed to save PDF: %w", err)
 	}
@@ -52,7 +69,7 @@ func (s *paperService) UploadPaper(ctx context.Context, userID string, filename 
 	// Create Paper record in pending status
 	paper := &model.Paper{
 		UserID:           userID,
-		OriginalFilename: filename,
+		OriginalFilename: safeFilename,
 		PDFPath:          pdfPath,
 		PDFSize:          int64(len(pdfContent)),
 		Status:           model.PaperStatusPending,
@@ -70,19 +87,25 @@ func (s *paperService) UploadPaper(ctx context.Context, userID string, filename 
 	logger.Info().
 		Str("paper_id", paper.ID).
 		Str("user_id", userID).
-		Str("filename", filename).
+		Str("filename", safeFilename).
 		Int64("size", paper.PDFSize).
 		Msg("Paper uploaded, starting conversion")
 
-	// Start async conversion goroutine
-	go s.processConversion(paper.ID, pdfContent, filename)
+	// P1: Don't pass pdfContent to goroutine — read from disk instead
+	go s.processConversion(paper.ID, safeFilename)
 
 	return paper, nil
 }
 
 // processConversion runs in a goroutine to convert PDF and extract metadata
-func (s *paperService) processConversion(paperID string, pdfContent []byte, filename string) {
-	ctx := context.Background()
+func (s *paperService) processConversion(paperID string, filename string) {
+	// P3: Use a context with timeout for all RPC calls
+	ctx, cancel := context.WithTimeout(context.Background(), s.grpcTimeout)
+	defer cancel()
+
+	// B4: Lock to prevent concurrent conversion updates on same paper
+	s.conversionMu.Lock()
+	defer s.conversionMu.Unlock()
 
 	// Update status to processing
 	paper, err := s.paperRepo.GetByID(ctx, paperID)
@@ -98,6 +121,13 @@ func (s *paperService) processConversion(paperID string, pdfContent []byte, file
 	paper.Status = model.PaperStatusProcessing
 	if err := s.paperRepo.Update(ctx, paper); err != nil {
 		logger.Error().Err(err).Str("paper_id", paperID).Msg("Failed to update paper status to processing")
+		return
+	}
+
+	// P1: Read PDF from disk instead of holding bytes in memory
+	pdfContent, err := os.ReadFile(paper.PDFPath)
+	if err != nil {
+		s.failPaper(ctx, paperID, fmt.Sprintf("failed to read PDF file: %v", err))
 		return
 	}
 
@@ -285,12 +315,6 @@ func (s *paperService) RetryPaper(ctx context.Context, userID, paperID string) (
 		return nil, fmt.Errorf("can only retry failed papers, current status: %s", paper.Status)
 	}
 
-	// Read PDF from disk
-	pdfContent, err := os.ReadFile(paper.PDFPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read PDF file: %w", err)
-	}
-
 	// Reset paper status
 	paper.Status = model.PaperStatusPending
 	paper.Error = ""
@@ -298,8 +322,8 @@ func (s *paperService) RetryPaper(ctx context.Context, userID, paperID string) (
 		return nil, fmt.Errorf("failed to reset paper status: %w", err)
 	}
 
-	// Start async conversion
-	go s.processConversion(paper.ID, pdfContent, paper.OriginalFilename)
+	// Start async conversion (processConversion reads PDF from disk)
+	go s.processConversion(paper.ID, paper.OriginalFilename)
 
 	return paper, nil
 }

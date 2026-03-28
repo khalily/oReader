@@ -2,11 +2,7 @@ import { Calendar, Users, ExternalLink, Download, Tag } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Paper } from '@/types/paper'
-
-function parseJsonArray(str: string | null): string[] {
-  if (!str) return []
-  try { return JSON.parse(str) } catch { return [] }
-}
+import { parseJsonArray } from '@/lib/utils'
 
 interface PaperMetaProps {
   paper: Paper

@@ -18,7 +18,7 @@ type Paper struct {
 	Keywords         string `gorm:"type:text" json:"keywords"`
 	PublishedYear    string `gorm:"type:varchar(10)" json:"published_year"`
 	DOI              string `gorm:"type:varchar(200)" json:"doi"`
-	PDFPath          string `gorm:"type:varchar(500)" json:"pdf_path"`
+	PDFPath          string `gorm:"type:varchar(500)" json:"-"`
 	PDFSize          int64  `json:"pdf_size"`
 	MarkdownContent  string `gorm:"type:longtext" json:"markdown_content"`
 	CoverImage       string `gorm:"type:varchar(500)" json:"cover_image"`

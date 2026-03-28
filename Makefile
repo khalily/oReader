@@ -1,4 +1,4 @@
-.PHONY: test build run migrate-up migrate-down migrate-create clean
+.PHONY: test test-all build run migrate-up migrate-down migrate-create clean converter-install converter-dev converter-test
 
 # Go parameters
 GOCMD=go
@@ -64,7 +64,7 @@ build-prod: build-prepare
 dev:
 	$(GOCMD) run -tags noembed $(MAIN_PACKAGE)
 
-## dev-full: Run both backend and frontend development servers
+## dev-full: Run full dev environment (backend + frontend + converter)
 dev-full:
 	@./dev.sh
 
@@ -123,6 +123,35 @@ frontend-dev:
 ## frontend-build: Build frontend for production
 frontend-build:
 	cd web && npm run build
+
+## converter-install: Install Python converter dependencies
+converter-install:
+	@echo "Installing converter dependencies..."
+	pip install -r converter/requirements.txt
+	@echo "Converter dependencies installed"
+
+## converter-dev: Start the paper converter gRPC server
+converter-dev:
+	@echo "Starting paper converter gRPC server..."
+	cd converter && python server.py
+
+## converter-test: Run converter unit tests
+converter-test:
+	@echo "Running converter tests..."
+	cd converter && python -m pytest tests/ -v
+
+## test-all: Run all tests (Go + Frontend + Converter)
+test-all:
+	@echo "========== Running Go Tests =========="
+	$(GOTEST) -v -race ./internal/...
+	@echo ""
+	@echo "========== Running Frontend Tests =========="
+	cd web && npm test -- --run
+	@echo ""
+	@echo "========== Running Converter Tests =========="
+	cd converter && python -m pytest tests/ -v
+	@echo ""
+	@echo "========== All Tests Complete =========="
 
 ## docker-build: Build Docker image
 docker-build:

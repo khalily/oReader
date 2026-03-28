@@ -61,3 +61,7 @@ Thumbs.db
 
 # test
 internal/repository/test_*
+
+# other
+.superpowers
+uploads

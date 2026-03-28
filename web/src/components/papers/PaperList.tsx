@@ -1,7 +1,8 @@
-import { FileText, Loader2, RefreshCw } from 'lucide-react'
+import { FileText, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { Paper, PaperStatus } from '@/types/paper'
+import { parseJsonArray } from '@/lib/utils'
 
 interface PaperListProps {
   papers: Paper[]
@@ -23,15 +24,6 @@ function StatusBadge({ status }: { status: PaperStatus }) {
       return <Badge variant="destructive">Failed</Badge>
     default:
       return <Badge variant="outline">{status}</Badge>
-  }
-}
-
-function parseJsonArray(str: string | null): string[] {
-  if (!str) return []
-  try {
-    return JSON.parse(str)
-  } catch {
-    return []
   }
 }
 
@@ -88,13 +80,22 @@ export function PaperList({ papers, isLoading, onPaperClick, onRetry, onDelete }
             <div className="flex flex-col items-end gap-2 flex-shrink-0">
               <StatusBadge status={paper.status} />
               {paper.status === 'failed' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); onRetry(paper.id) }}
-                >
-                  <RefreshCw className="h-3 w-3" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onRetry(paper.id) }}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onDelete(paper.id) }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               )}
               {paper.status === 'failed' && paper.error && (
                 <p className="text-xs text-destructive max-w-48 truncate">{paper.error}</p>

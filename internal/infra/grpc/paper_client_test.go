@@ -10,9 +10,13 @@ import (
 )
 
 func TestNewPaperClient_InvalidAddress(t *testing.T) {
+	// With non-blocking dial, the client is created even for invalid addresses.
+	// Connection errors surface when actual RPC calls are made.
 	client, err := NewPaperClient("invalid:99999", 5*time.Second)
-	assert.Error(t, err)
-	assert.Nil(t, client)
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
+	// Clean up
+	client.Close()
 }
 
 func TestPaperClientInterface(t *testing.T) {

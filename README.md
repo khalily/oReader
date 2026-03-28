@@ -14,6 +14,7 @@ A modern RSS reader built with Go (backend) and React (frontend), featuring a cl
 - ⭐ **Star & Save**: Mark articles as starred to read later
 - 📖 **Read/Unread Tracking**: Automatic read tracking with manual mark as read options
 - 📥 **OPML Import/Export**: Easily migrate your feeds from other readers
+- 📄 **Paper Import**: Upload PDF academic papers, auto-convert to Markdown with MinerU + LLM refinement, extract metadata (title, authors, DOI, keywords)
 - 🔄 **Auto Refresh**: Background refresh keeps your feeds up to date
 - 🚀 **Fast & Responsive**: Built with Go and React for optimal performance
 - 🎨 **Modern UI**: Clean, responsive interface with dark mode support
@@ -29,6 +30,7 @@ A modern RSS reader built with Go (backend) and React (frontend), featuring a cl
 - **Authentication**: JWT (HS256) with dual-token system
 - **Security**: bcrypt password hashing, CSRF protection, rate limiting
 - **Logging**: zerolog structured logging
+- **Paper Converter**: Python gRPC service (MinerU for PDF parsing, OpenAI-compatible LLM for metadata extraction)
 
 ### Frontend
 - **Framework**: React 18 with TypeScript
@@ -46,6 +48,7 @@ A modern RSS reader built with Go (backend) and React (frontend), featuring a cl
 - Go 1.25 or higher
 - Node.js 18+ and npm
 - SQLite (for development) or MySQL (for production)
+- Python 3.10+ and pip (optional, for Paper converter service)
 
 ### Installation
 
@@ -66,12 +69,18 @@ cd web
 npm install
 ```
 
-4. **Run the application**:
+4. **Install converter dependencies** (optional, for Paper Import):
 ```bash
-# Quick start with environment variables
-DATABASE_URL=oreader.db JWT_SECRET_KEY=dev-secret-key-change-in-production-min-32-chars make run
+pip install -r converter/requirements.txt
+```
 
-# Or use the convenience script
+5. **Run the application**:
+```bash
+# One-click dev environment (backend + frontend + converter)
+chmod +x dev.sh
+./dev.sh
+
+# Or API-only mode
 chmod +x run.sh
 ./run.sh
 ```
@@ -93,14 +102,20 @@ The application will be available at `http://localhost:8080`
 
 ### Development Server
 
-For development with hot-reload:
+**One-click full development environment** (backend + frontend + converter):
+```bash
+chmod +x dev.sh
+./dev.sh
+```
+
+Or start services individually:
 
 1. **Start backend** (in one terminal):
 ```bash
-# Option 1: Use the convenience script
+# API-only mode
 ./run.sh
 
-# Option 2: Set environment variables and run
+# Or set environment variables and run
 DATABASE_URL=oreader.db JWT_SECRET_KEY=dev-secret-key-min-32-chars make run
 ```
 
@@ -109,6 +124,14 @@ DATABASE_URL=oreader.db JWT_SECRET_KEY=dev-secret-key-min-32-chars make run
 cd web
 npm run dev
 ```
+
+3. **Start converter service** (optional, for Paper Import — in another terminal):
+```bash
+cd converter
+python server.py
+```
+
+The converter service runs on `localhost:50051` by default. Without it, paper upload will return an error.
 
 The frontend will be available at `http://localhost:5173` and proxy API requests to the backend at `http://localhost:8080`.
 
@@ -130,6 +153,23 @@ go test ./internal/service
 
 # Run tests without race detection
 make test-short
+```
+
+### Running Converter Tests
+
+```bash
+cd converter
+python -m pytest tests/ -v
+```
+
+### Running All Tests
+
+```bash
+# Run Go + Frontend + Converter tests together
+make test-all
+
+# Or use the convenience script
+./test-all.sh
 ```
 
 ### Running E2E Tests
@@ -194,8 +234,23 @@ make migrate-create name=add_new_field
 | `RATE_LIMIT_ENABLED` | Enable rate limiting | `true` | No |
 | `GITHUB_CLIENT_ID` | GitHub OAuth client ID | - | No |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret | - | No |
+| `PAPER_GRPC_ADDR` | Paper converter gRPC service address | `localhost:50051` | No |
+| `PAPER_UPLOAD_DIR` | Directory for uploaded PDF files | `uploads/papers` | No |
+| `PAPER_MAX_UPLOAD_SIZE` | Maximum PDF upload size in bytes | `52428800` (50MB) | No |
+| `PAPER_GRPC_TIMEOUT` | gRPC client timeout | `5m` | No |
 
 See `.env.example` for all available options.
+
+**Converter Service Environment Variables** (set in the converter's environment):
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `LLM_API_KEY` | API key for metadata extraction | - | No* |
+| `LLM_BASE_URL` | LLM API base URL | `https://api.openai.com/v1` | No |
+| `LLM_MODEL` | LLM model name | `gpt-4o-mini` | No |
+| `GRPC_PORT` | gRPC server listen port | `50051` | No |
+
+\* Without `LLM_API_KEY`, the converter skips metadata extraction and LLM refinement, but PDF-to-Markdown conversion still works via MinerU.
 
 ### Production Deployment
 
@@ -259,16 +314,28 @@ See [SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) for comprehensive security rev
 oreader/
 ├── cmd/
 │   └── server/          # Application entry point
+├── converter/           # Python gRPC Paper converter service
+│   ├── server.py        # gRPC server entry point
+│   ├── converter.py     # PDF conversion & LLM metadata extraction
+│   ├── requirements.txt # Python dependencies
+│   ├── proto/           # Protobuf definitions & generated code
+│   └── tests/           # Converter unit tests
 ├── internal/
 │   ├── config/          # Configuration management
-│   ├── handler/         # HTTP request handlers
-│   ├── infra/           # Infrastructure code (JWT, CSRF, etc.)
-│   ├── middleware/      # HTTP middleware
-│   ├── model/           # Data models
-│   ├── repository/      # Database repositories
-│   ├── service/         # Business logic
-│   └── worker/          # Background workers
+│   ├── handler/         # HTTP request handlers (feeds, items, papers)
+│   ├── infra/
+│   │   ├── grpc/        # gRPC client for paper converter
+│   │   └── markdown/    # Markdown conversion infrastructure
+│   ├── middleware/       # Auth, CSRF, logging middleware
+│   ├── model/           # Domain models (User, Feed, Item, Paper)
+│   ├── repository/      # Database repositories (including paper_repository)
+│   ├── service/         # Business logic (including paper_service)
+│   └── worker/          # Background feed refresh worker
 ├── web/                 # React frontend
+│   └── src/
+│       ├── components/papers/  # Paper UI components
+│       ├── pages/papers/       # Paper pages
+│       └── hooks/              # Custom hooks (useAuth, useFeeds, useItems, usePapers)
 ├── migrations/          # Database migrations
 ├── docs/                # Documentation
 ├── Makefile             # Build commands
@@ -310,6 +377,18 @@ Contributions are welcome! Please follow these steps:
 
 **Issue**: Go version mismatch
 - **Solution**: Ensure you're using Go 1.25 or higher (`go version`)
+
+**Issue**: Paper upload returns "converter service not available"
+- **Solution**: Start the converter service: `cd converter && python server.py`
+
+**Issue**: Paper conversion fails with "MinerU conversion failed"
+- **Solution**: Ensure MinerU is installed: `pip install -r converter/requirements.txt`
+
+**Issue**: Paper metadata is empty after conversion
+- **Solution**: Set `LLM_API_KEY` in the converter's environment. Without it, metadata extraction is skipped.
+
+**Issue**: Converter gRPC connection refused
+- **Solution**: Verify the converter service is running and `PAPER_GRPC_ADDR` matches (default: `localhost:50051`)
 
 ## License
 

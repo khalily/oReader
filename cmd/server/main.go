@@ -150,7 +150,7 @@ func main() {
 	importHandler := handler.NewImportHandler(feedService, importService, feedRepo)
 	oauthHandler := handler.NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, oauthStateRepo, pendingOAuthRepo, "")
 	statsHandler := handler.NewStatsHandler(statsService)
-	paperHandler := handler.NewPaperHandler(paperService)
+	paperHandler := handler.NewPaperHandler(paperService, cfg.Paper.MaxUploadSize)
 
 	// Setup Gin
 	if cfg.IsProduction() {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-oReader is a modern RSS reader with Go backend and React frontend. It supports multiple users, OAuth (GitHub), feed subscriptions, and article management.
+oReader is a modern RSS reader with Go backend and React frontend. It supports multiple users, OAuth (GitHub), feed subscriptions, article management, and academic paper import with PDF-to-Markdown conversion.
 
 ### Environment Setup
 
@@ -15,10 +15,13 @@ cp .env.example .env   # Required before first run
 ### Development Commands
 
 ```bash
-# Full stack (backend + frontend)
+# Full dev environment (backend + frontend + converter gRPC)
 ./dev.sh
 
-# Backend only (API mode, no frontend build)
+# Backend only (API mode)
+./run.sh
+
+# Backend only (via Makefile)
 make dev
 
 # Frontend only
@@ -46,6 +49,14 @@ make build
 make lint                          # Go (golangci-lint)
 cd web && npm run lint             # Frontend
 
+# Converter service (Python gRPC)
+make converter-install          # Install Python dependencies
+make converter-dev              # Start gRPC converter server
+make converter-test             # Run converter tests
+
+# Run ALL tests (Go + Frontend + Converter)
+make test-all
+
 # Database migrations
 make migrate-create name=xxx       # Create new migration
 make migrate-up                    # Apply migrations
@@ -60,23 +71,41 @@ make migrate-down                  # Rollback
 cmd/
   server/              # Main application entry point
   migrate-to-markdown/ # HTML→Markdown migration tool
+converter/
+  server.py            # Paper converter gRPC server
+  converter.py         # PDF parsing (MinerU) + LLM metadata extraction
+  requirements.txt     # Python dependencies
+  proto/               # Protobuf definitions & generated Go/Python code
+  tests/               # Converter unit tests
 internal/
   config/              # Configuration loading
-  handler/             # HTTP handlers (controllers)
-  infra/markdown/      # Markdown conversion infrastructure
+  handler/             # HTTP handlers - feeds, items, papers
+  infra/
+    grpc/              # gRPC client for paper converter service
+    markdown/          # Markdown conversion infrastructure
   middleware/           # Auth, CSRF, logging middleware
-  model/               # Domain models
-  repository/          # Data access layer (SQLite)
-  service/             # Business logic layer
+  model/               # Domain models (User, Feed, Item, Paper, PaperTag)
+  repository/          # Data access layer - including paper_repository
+  service/             # Business logic - including paper_service
   testutil/            # Test helpers
   worker/              # Background feed refresh worker
 migrations/            # SQL migration files
 web/src/
-  components/          # React components (auth, feed, items, ui)
-  hooks/               # Custom React hooks (useAuth, useFeeds, useItems, useStats)
+  components/
+    papers/            # Paper UI components (PaperUpload, PaperList, PaperMeta)
+    auth/              # Login, register, social auth
+    feed/              # Sidebar, FeedCard, AddFeedDialog
+    items/             # ArticlePanel, ItemList
+    ui/                # Shared UI (MarkdownRenderer, CopyButton, etc.)
+  hooks/               # Custom hooks (useAuth, useFeeds, useItems, useStats, usePapers)
+  pages/
+    papers/            # PapersPage, PaperViewPage
+    items/             # ItemsPage, ItemViewPage
+    auth/              # LoginPage, RegisterPage
+    oauth/             # OAuthCallbackPage
   lib/api/             # Axios API client
-  pages/               # Page components (auth, items, oauth)
   stores/              # Zustand state stores (authStore, itemsStore)
+  types/               # TypeScript types (feed.ts, paper.ts, index.ts)
 ```
 
 ### Key Patterns
@@ -94,6 +123,57 @@ web/src/
 6. **API Client**: Centralized Axios instance in `web/src/lib/api/axios.ts` handles request/response interceptors, auth token injection, and error transformation.
 
 7. **Background Worker**: `internal/worker/` implements feed refresh as a background goroutine with configurable interval (`REFRESH_INTERVAL` env var, default 15m).
+
+## Papers Feature Architecture
+
+The Papers feature allows users to upload PDF academic papers, auto-convert to Markdown, and extract metadata via a Python gRPC converter service.
+
+### Architecture Flow
+
+```
+User uploads PDF → Go handler validates & saves to disk → Go service spawns goroutine
+  → gRPC Convert() call to Python converter → MinerU parses PDF → LLM refines Markdown
+  → gRPC ExtractMetadata() → Go service updates Paper record → Frontend polls status
+```
+
+### Components
+
+1. **Python gRPC Converter** (`converter/`):
+   - `server.py`: gRPC server with `Convert` (streaming) and `ExtractMetadata` RPCs
+   - `converter.py`: MinerU PDF parsing, LLM metadata extraction & Markdown refinement
+   - `proto/paper.proto`: Protobuf service definition
+   - Requires `LLM_API_KEY` for metadata extraction (gracefully skips if not set)
+
+2. **Go gRPC Client** (`internal/infra/grpc/paper_client.go`):
+   - `PaperConverterClient` interface for testability
+   - Non-blocking dial (lazy connection); errors surface on RPC calls
+
+3. **Go Backend**:
+   - Handler (`internal/handler/paper_handler.go`): upload, list, get, update, delete, retry, download, tags
+   - Service (`internal/service/paper_service.go`): async conversion via goroutine, PDF stored on disk (goroutine reads from disk, not memory), mutex prevents concurrent updates on same paper
+   - Model (`internal/model/paper.go`): Paper, PaperTag (+ PaperCollection reserved)
+
+4. **Frontend**:
+   - `hooks/usePapers.ts`: TanStack Query hooks, auto-polling status for pending/processing papers
+   - `components/papers/`: PaperUpload (drag-drop + apiClient), PaperList, PaperMeta
+   - `pages/papers/`: PapersPage (search/filter/pagination), PaperViewPage (MarkdownRenderer)
+
+### Key Environment Variables
+
+| Component | Variable | Description |
+|-----------|----------|-------------|
+| Go backend | `PAPER_GRPC_ADDR` | Converter service address (default: `localhost:50051`) |
+| Go backend | `PAPER_UPLOAD_DIR` | PDF storage directory (default: `uploads/papers`) |
+| Go backend | `PAPER_MAX_UPLOAD_SIZE` | Max upload size in bytes (default: 52428800 = 50MB) |
+| Python converter | `LLM_API_KEY` | OpenAI-compatible API key (optional, skips LLM if not set) |
+| Python converter | `LLM_BASE_URL` | API base URL (default: OpenAI) |
+| Python converter | `GRPC_PORT` | Server port (default: 50051) |
+
+### Testing
+
+- Go: `paper_handler_test.go`, `paper_service_test.go`, `paper_repository_test.go`, `paper_client_test.go`, `model/paper_test.go`
+- Python: `converter/tests/test_converter.py` (mocks OpenAI client)
+- Frontend: follow existing patterns in `src/hooks/__tests__/` when adding paper-specific tests
 
 
 ## Markdown Rendering Pipeline

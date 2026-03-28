@@ -36,8 +36,8 @@ async function listPapers(options?: ListPapersOptions): Promise<ListPapersRespon
   return response.data
 }
 
-async function getPaper(paperId: string): Promise<{ paper: Paper }> {
-  const response = await apiClient.get<{ paper: Paper }>(`/papers/${paperId}`)
+async function getPaper(paperId: string): Promise<Paper> {
+  const response = await apiClient.get<Paper>(`/papers/${paperId}`)
   return response.data
 }
 
@@ -46,8 +46,8 @@ async function getPaperStatus(paperId: string): Promise<PaperStatusResponse> {
   return response.data
 }
 
-async function updatePaper(paperId: string, data: UpdatePaperRequest): Promise<{ paper: Paper }> {
-  const response = await apiClient.put<{ paper: Paper }>(`/papers/${paperId}`, data)
+async function updatePaper(paperId: string, data: UpdatePaperRequest): Promise<Paper> {
+  const response = await apiClient.put<Paper>(`/papers/${paperId}`, data)
   return response.data
 }
 
@@ -59,8 +59,8 @@ async function deletePaper(paperId: string): Promise<void> {
   await apiClient.delete(`/papers/${paperId}`)
 }
 
-async function retryPaper(paperId: string): Promise<{ paper: Paper }> {
-  const response = await apiClient.post<{ paper: Paper }>(`/papers/${paperId}/retry`)
+async function retryPaper(paperId: string): Promise<Paper> {
+  const response = await apiClient.post<Paper>(`/papers/${paperId}/retry`)
   return response.data
 }
 

@@ -8,6 +8,23 @@ import openai
 
 logger = logging.getLogger(__name__)
 
+# Q6: Reuse OpenAI client instead of creating per-request
+_openai_client = None
+
+def _get_openai_client() -> openai.OpenAI | None:
+    global _openai_client
+    if _openai_client is not None:
+        return _openai_client
+    api_key = os.getenv("LLM_API_KEY")
+    if not api_key:
+        return None
+    base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+    _openai_client = openai.OpenAI(api_key=api_key, base_url=base_url)
+    return _openai_client
+
+def _get_llm_model() -> str:
+    return os.getenv("LLM_MODEL", "gpt-4o-mini")
+
 METADATA_EXTRACTION_PROMPT = """You are an academic paper metadata extractor. Given the following Markdown content converted from a PDF paper, extract structured metadata.
 
 IMPORTANT: Return ONLY a JSON object, no markdown fences or explanation.
@@ -66,20 +83,16 @@ def parse_metadata_response(response: str) -> PaperMetadataResult | None:
 
 def extract_metadata(markdown: str) -> PaperMetadataResult:
     """Call LLM to extract metadata from markdown content."""
-    api_key = os.getenv("LLM_API_KEY")
-    base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
-    model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-
-    if not api_key:
+    client = _get_openai_client()
+    if client is None:
         logger.warning("LLM_API_KEY not set, skipping metadata extraction")
         return PaperMetadataResult()
 
-    client = openai.OpenAI(api_key=api_key, base_url=base_url)
     prompt = extract_metadata_prompt(markdown)
 
     try:
         response = client.chat.completions.create(
-            model=model,
+            model=_get_llm_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
             max_tokens=2000,
@@ -94,14 +107,9 @@ def extract_metadata(markdown: str) -> PaperMetadataResult:
 
 def refine_markdown(markdown: str) -> str:
     """Call LLM to fix formatting issues in the markdown."""
-    api_key = os.getenv("LLM_API_KEY")
-    base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
-    model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-
-    if not api_key:
+    client = _get_openai_client()
+    if client is None:
         return markdown
-
-    client = openai.OpenAI(api_key=api_key, base_url=base_url)
 
     prompt = f"""Fix formatting issues in this Markdown converted from a PDF academic paper.
 Rules:
@@ -117,7 +125,7 @@ Markdown:
 
     try:
         response = client.chat.completions.create(
-            model=model,
+            model=_get_llm_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
             max_tokens=16000,

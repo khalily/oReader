@@ -14,7 +14,7 @@ export default function PaperViewPage() {
   const { data, isLoading, error } = useGetPaper(id ?? null)
   const { data: statusData } = useGetPaperStatus(id ?? null)
 
-  const paper = data?.paper ?? null
+  const paper = data ?? null
   const status = statusData ?? null
 
   const handleDownload = () => {

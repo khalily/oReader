@@ -7,6 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import apiClient from '@/lib/api/axios'
+import { useToast } from '@/components/ui/toast'
 
 interface PaperUploadProps {
   open: boolean
@@ -18,7 +20,9 @@ export function PaperUpload({ open, onOpenChange, onSuccess }: PaperUploadProps)
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -38,6 +42,7 @@ export function PaperUpload({ open, onOpenChange, onSuccess }: PaperUploadProps)
     const droppedFile = e.dataTransfer.files?.[0]
     if (droppedFile && droppedFile.type === 'application/pdf') {
       setFile(droppedFile)
+      setError(null)
     }
   }, [])
 
@@ -45,6 +50,7 @@ export function PaperUpload({ open, onOpenChange, onSuccess }: PaperUploadProps)
     const selected = e.target.files?.[0]
     if (selected) {
       setFile(selected)
+      setError(null)
     }
   }
 
@@ -52,24 +58,22 @@ export function PaperUpload({ open, onOpenChange, onSuccess }: PaperUploadProps)
     if (!file || isUploading) return
 
     setIsUploading(true)
+    setError(null)
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const response = await fetch('/api/v1/papers/upload', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
+      await apiClient.post('/papers/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
-
-      if (!response.ok) {
-        throw new Error('Upload failed')
-      }
 
       setFile(null)
       onOpenChange(false)
       onSuccess()
-    } catch (error) {
-      console.error('Upload error:', error)
+      toast.showSuccess('Paper uploaded successfully')
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Upload failed'
+      setError(msg)
+      toast.showError(msg)
     } finally {
       setIsUploading(false)
     }
@@ -78,6 +82,7 @@ export function PaperUpload({ open, onOpenChange, onSuccess }: PaperUploadProps)
   const handleClose = () => {
     if (!isUploading) {
       setFile(null)
+      setError(null)
       onOpenChange(false)
     }
   }
@@ -143,6 +148,10 @@ export function PaperUpload({ open, onOpenChange, onSuccess }: PaperUploadProps)
             </>
           )}
         </Button>
+
+        {error && (
+          <p className="text-sm text-destructive text-center">{error}</p>
+        )}
       </DialogContent>
     </Dialog>
   )

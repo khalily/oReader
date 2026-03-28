@@ -2,10 +2,13 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	apperrors "oreader/internal/infra/errors"
@@ -15,13 +18,15 @@ import (
 
 // PaperHandler handles paper-related HTTP requests
 type PaperHandler struct {
-	paperService service.PaperService
+	paperService   service.PaperService
+	maxUploadSize  int64
 }
 
 // NewPaperHandler creates a new paper handler
-func NewPaperHandler(paperService service.PaperService) *PaperHandler {
+func NewPaperHandler(paperService service.PaperService, maxUploadSize int64) *PaperHandler {
 	return &PaperHandler{
-		paperService: paperService,
+		paperService:   paperService,
+		maxUploadSize:  maxUploadSize,
 	}
 }
 
@@ -52,6 +57,25 @@ func (h *PaperHandler) UploadPaper(c *gin.Context) {
 		return
 	}
 
+	// S1: Enforce file size limit
+	if h.maxUploadSize > 0 && file.Size > h.maxUploadSize {
+		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation,
+			fmt.Sprintf("File too large (max %d MB)", h.maxUploadSize/1024/1024), nil)
+		return
+	}
+
+	// S2: Validate file extension and content type
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext != ".pdf" {
+		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, "Only PDF files are accepted", nil)
+		return
+	}
+	contentType := file.Header.Get("Content-Type")
+	if contentType != "" && contentType != "application/pdf" && contentType != "application/x-pdf" && contentType != "application/octet-stream" {
+		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, "Only PDF files are accepted", nil)
+		return
+	}
+
 	src, err := file.Open()
 	if err != nil {
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to read uploaded file", nil)
@@ -59,9 +83,20 @@ func (h *PaperHandler) UploadPaper(c *gin.Context) {
 	}
 	defer src.Close()
 
-	pdfContent, err := io.ReadAll(src)
+	// Read with size limit to prevent memory exhaustion
+	pdfContent, err := io.ReadAll(io.LimitReader(src, h.maxUploadSize+1))
 	if err != nil {
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to read file content", nil)
+		return
+	}
+	if int64(len(pdfContent)) > h.maxUploadSize {
+		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, "File too large", nil)
+		return
+	}
+
+	// S2: Validate PDF magic bytes (%PDF-)
+	if len(pdfContent) < 5 || string(pdfContent[:5]) != "%PDF-" {
+		apperrors.SendError(c, http.StatusBadRequest, apperrors.ErrValidation, "Invalid PDF file", nil)
 		return
 	}
 
@@ -100,6 +135,14 @@ func (h *PaperHandler) ListPapers(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	// Support page/per_page pagination (B1 fix)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "0"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "0"))
+	if page > 0 && perPage > 0 {
+		limit = perPage
+		offset = (page - 1) * perPage
+	}
 
 	if limit <= 0 || limit > 100 {
 		limit = 20
@@ -155,7 +198,7 @@ func (h *PaperHandler) GetPaper(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, paper)
+	c.JSON(http.StatusOK, gin.H{"paper": paper})
 }
 
 // GetPaperStatus handles GET /api/v1/papers/:id/status
@@ -227,7 +270,7 @@ func (h *PaperHandler) UpdatePaper(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, paper)
+	c.JSON(http.StatusOK, gin.H{"paper": paper})
 }
 
 // UpdateTags handles PUT /api/v1/papers/:id/tags
@@ -286,7 +329,7 @@ func (h *PaperHandler) RetryPaper(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, paper)
+	c.JSON(http.StatusOK, gin.H{"paper": paper})
 }
 
 // DeletePaper handles DELETE /api/v1/papers/:id
@@ -366,7 +409,15 @@ func (h *PaperHandler) DownloadPaper(c *gin.Context) {
 		return
 	}
 
-	// Set appropriate headers for file download
-	c.Header("Content-Disposition", "attachment; filename=\""+filepath.Base(filename)+"\"")
+	// Set appropriate headers for file download (S3: sanitize filename for header safety)
+	safeName := filepath.Base(filename)
+	safeName = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == '"' {
+			return -1
+		}
+		return r
+	}, safeName)
+	encodedName := url.QueryEscape(safeName)
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", safeName, encodedName))
 	c.File(pdfPath)
 }

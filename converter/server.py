@@ -1,6 +1,8 @@
 import logging
 import os
+import shutil
 import sys
+import tempfile
 from concurrent import futures
 
 import grpc
@@ -28,19 +30,17 @@ class PaperConverterServicer(paper_pb2_grpc.PaperConverterServicer):
         # Phase 1: Mining (MinerU)
         yield paper_pb2.ConvertProgress(status="mining", progress=10)
         try:
-            import tempfile
-
             # Save PDF to temp file
             with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
                 tmp.write(request.pdf_content)
                 tmp_path = tmp.name
 
+            output_dir = tempfile.mkdtemp()
             try:
                 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
                 from magic_pdf.pipe.UNIPipe import UNIPipe
 
                 # Use MinerU to convert
-                output_dir = tempfile.mkdtemp()
                 reader = FileBasedDataReader("")
                 writer = FileBasedDataWriter(output_dir)
 
@@ -67,7 +67,9 @@ class PaperConverterServicer(paper_pb2_grpc.PaperConverterServicer):
                     else:
                         markdown = "# Conversion Error\n\nMinerU did not produce markdown output."
             finally:
+                # B5: Clean up both temp PDF and output directory
                 os.unlink(tmp_path)
+                shutil.rmtree(output_dir, ignore_errors=True)
 
             yield paper_pb2.ConvertProgress(status="mining", progress=50)
 
