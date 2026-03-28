@@ -15,6 +15,7 @@ import (
 	"oreader/internal/config"
 	"oreader/internal/handler"
 	"oreader/internal/infra/database"
+	pbgrpc "oreader/internal/infra/grpc"
 	"oreader/internal/infra/jwt"
 	"oreader/internal/infra/logger"
 	"oreader/internal/infra/ratelimit"
@@ -65,6 +66,10 @@ func main() {
 		&model.ImportJob{},
 		&model.OAuthState{},
 		&model.PendingOAuth{},
+		&model.Paper{},
+		&model.PaperTag{},
+		&model.PaperCollection{},
+		&model.PaperCollectionItem{},
 	); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto-migrate database")
 		os.Exit(1)
@@ -82,6 +87,8 @@ func main() {
 	oauthStateRepo := repository.NewOAuthStateRepository(db)
 	pendingOAuthRepo := repository.NewPendingOAuthRepository(db)
 	statsRepo := repository.NewStatsRepository(db)
+	paperRepo := repository.NewPaperRepository(db)
+	paperTagRepo := repository.NewPaperTagRepository(db)
 
 	// Initialize services
 	accessTTL, err := cfg.GetAccessTTL()
@@ -107,6 +114,20 @@ func main() {
 	refreshWorkerService := service.NewRefreshWorkerService(feedRepo, itemRepo, userFeedRepo)
 	statsService := service.NewStatsService(statsRepo)
 
+	// Initialize paper converter gRPC client
+	var paperGRPCClient pbgrpc.PaperConverterClient
+	grpcTimeout, err := cfg.GetGRPCTimeout()
+	if err != nil {
+		log.Warn().Err(err).Msg("Invalid gRPC timeout, using default 5m")
+		grpcTimeout = 5 * time.Minute
+	}
+	paperGRPCClient, err = pbgrpc.NewPaperClient(cfg.Paper.GRPCAddr, grpcTimeout)
+	if err != nil {
+		log.Warn().Err(err).Msg("Paper converter gRPC service not available, paper upload will be limited")
+	}
+
+	paperService := service.NewPaperService(paperRepo, paperTagRepo, paperGRPCClient, cfg.Paper.UploadDir)
+
 	// Initialize rate limiter
 	rateLimiter := ratelimit.NewMemoryLimiter()
 
@@ -129,6 +150,7 @@ func main() {
 	importHandler := handler.NewImportHandler(feedService, importService, feedRepo)
 	oauthHandler := handler.NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, oauthStateRepo, pendingOAuthRepo, "")
 	statsHandler := handler.NewStatsHandler(statsService)
+	paperHandler := handler.NewPaperHandler(paperService)
 
 	// Setup Gin
 	if cfg.IsProduction() {
@@ -216,6 +238,21 @@ func main() {
 			opml := protected.Group("/opml")
 			{
 				opml.POST("/import", importHandler.ImportFeeds)
+			}
+
+			// Paper routes
+			papers := protected.Group("/papers")
+			{
+				papers.POST("/upload", paperHandler.UploadPaper)
+				papers.GET("", paperHandler.ListPapers)
+				papers.GET("/tags", paperHandler.ListTags)
+				papers.GET("/:id", paperHandler.GetPaper)
+				papers.GET("/:id/status", paperHandler.GetPaperStatus)
+				papers.PUT("/:id", paperHandler.UpdatePaper)
+				papers.PUT("/:id/tags", paperHandler.UpdateTags)
+				papers.POST("/:id/retry", paperHandler.RetryPaper)
+				papers.DELETE("/:id", paperHandler.DeletePaper)
+				papers.GET("/:id/download", paperHandler.DownloadPaper)
 			}
 		}
 
@@ -333,6 +370,13 @@ func main() {
 	// Stop the background worker
 	log.Info().Msg("Shutting down background refresh worker...")
 	backgroundWorker.Stop()
+
+	// Close gRPC connection
+	if paperGRPCClient != nil {
+		if err := paperGRPCClient.Close(); err != nil {
+			log.Error().Err(err).Msg("gRPC connection close error")
+		}
+	}
 
 	// Shutdown the HTTP server
 	log.Info().Msg("Shutting down HTTP server...")
