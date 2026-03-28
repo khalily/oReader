@@ -303,13 +303,18 @@ func (s *feedService) RefreshFeed(ctx context.Context, userID, feedID string) (*
 		return nil, err
 	}
 
-	// Create new items (deduplicated by GUID)
+	// Create new items or update existing ones with improved content
 	newItemCount := 0
 	for _, parsedItem := range parsedFeed.Items {
 		// Check if item already exists
-		_, err := s.itemRepo.GetByGUID(ctx, feedID, parsedItem.GUID)
+		existingItem, err := s.itemRepo.GetByGUID(ctx, feedID, parsedItem.GUID)
 		if err == nil {
-			// Item exists, skip
+			// Item exists — update content if it differs (e.g. improved language preservation)
+			if existingItem.Content != parsedItem.Content {
+				existingItem.Content = parsedItem.Content
+				existingItem.Description = parsedItem.Description
+				_ = s.itemRepo.Update(ctx, existingItem)
+			}
 			continue
 		}
 

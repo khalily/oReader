@@ -236,6 +236,7 @@ type ItemRepository interface {
 	CreateBatch(ctx context.Context, items []*model.Item) error
 	GetByID(ctx context.Context, id string) (*model.Item, error)
 	GetByGUID(ctx context.Context, feedID, guid string) (*model.Item, error)
+	Update(ctx context.Context, item *model.Item) error
 	ListByFeedID(ctx context.Context, feedID string, userID string, opts ListOptions) ([]*ItemWithState, int64, error)
 	ListStarred(ctx context.Context, userID string, opts ListOptions) ([]*ItemWithState, int64, error)
 	ListUnread(ctx context.Context, userID string, opts ListOptions) ([]*ItemWithState, int64, error)

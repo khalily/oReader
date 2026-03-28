@@ -168,6 +168,11 @@ func (m *MockItemRepository) CountByFeedID(ctx context.Context, feedID string) (
 	return args.Get(0).(int64), args.Error(1)
 }
 
+func (m *MockItemRepository) Update(ctx context.Context, item *model.Item) error {
+	args := m.Called(ctx, item)
+	return args.Error(0)
+}
+
 // Unit tests using mocks for error scenarios
 
 func TestFeedService_GetUserFeeds_RepoError(t *testing.T) {

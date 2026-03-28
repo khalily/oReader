@@ -1,5 +1,8 @@
 # IDE
 .idea/
+*.swp
+*.swo
+*~
 
 # Worktrees
 .worktrees/

@@ -20,6 +20,8 @@ vi.mock('lucide-react', () => ({
   ArrowLeft: () => <div data-testid="arrow-left-icon" />,
   ChevronDown: () => <div data-testid="chevron-down-icon" />,
   ChevronUp: () => <div data-testid="chevron-up-icon" />,
+  Check: () => <div data-testid="check-icon" />,
+  Copy: () => <div data-testid="copy-icon" />,
 }))
 
 const API_BASE_URL = '/api/v1'

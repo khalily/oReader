@@ -194,13 +194,18 @@ func (s *refreshWorkerService) refreshSingleFeedWithContext(ctx context.Context,
 			Msg("Failed to update feed metadata")
 	}
 
-	// Create new items (deduplicated by GUID)
+	// Create new items or update existing ones with improved content (deduplicated by GUID)
 	newItemCount := 0
 	for _, parsedItem := range parsedFeed.Items {
 		// Check if item already exists
-		_, err := s.itemRepo.GetByGUID(context.Background(), feed.ID, parsedItem.GUID)
+		existingItem, err := s.itemRepo.GetByGUID(context.Background(), feed.ID, parsedItem.GUID)
 		if err == nil {
-			// Item exists, skip
+			// Item exists — update content if it differs (e.g. improved language preservation)
+			if existingItem.Content != parsedItem.Content {
+				existingItem.Content = parsedItem.Content
+				existingItem.Description = parsedItem.Description
+				_ = s.itemRepo.Update(context.Background(), existingItem)
+			}
 			continue
 		}
 

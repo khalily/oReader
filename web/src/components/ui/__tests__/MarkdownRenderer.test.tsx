@@ -1,45 +1,99 @@
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
 import { MarkdownRenderer } from '../MarkdownRenderer'
 
+// Mock @shikijs/rehype — 默认导出是 async transformer，与真实行为一致
+vi.mock('@shikijs/rehype', () => ({
+  default: () => async (tree: any) => tree,
+}))
+
+// Mock clipboard API
+const mockClipboardWrite = vi.fn()
+Object.assign(navigator, {
+  clipboard: {
+    writeText: mockClipboardWrite.mockResolvedValue(undefined),
+  },
+})
+
 describe('MarkdownRenderer', () => {
-  it('renders plain text', () => {
-    render(<MarkdownRenderer content="Hello World" />)
-    expect(screen.getByText('Hello World')).toBeInTheDocument()
+  beforeEach(() => {
+    mockClipboardWrite.mockClear()
   })
 
-  it('renders headings', () => {
+  it('renders plain text', async () => {
+    const { container } = render(<MarkdownRenderer content="Hello World" />)
+    // MarkdownHooks renders async; wait until text appears
+    await waitFor(() => {
+      expect(container.textContent).toContain('Hello World')
+    })
+  })
+
+  it('renders headings', async () => {
     render(<MarkdownRenderer content="# Title" />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Title' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Title' })
+    ).toBeInTheDocument()
   })
 
-  it('renders links with target blank', () => {
+  it('renders links with target blank', async () => {
     render(<MarkdownRenderer content="[Link](https://example.com)" />)
-    const link = screen.getByRole('link', { name: 'Link' })
+    const link = await screen.findByRole('link', { name: 'Link' })
     expect(link).toHaveAttribute('href', 'https://example.com')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
-  it('renders code blocks with syntax highlighting', () => {
+  it('renders code blocks with pre element', async () => {
     render(<MarkdownRenderer content={'```go\nfmt.Println("Hello")\n```'} />)
-    // Syntax highlighter breaks text into spans, so check for parts
-    expect(screen.getByText('fmt')).toBeInTheDocument()
-    expect(screen.getByText('Println')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(document.querySelector('pre')).toBeInTheDocument()
+      expect(document.querySelector('pre code')).toBeInTheDocument()
+    })
   })
 
-  it('renders images with lazy loading', () => {
+  it('renders code blocks with language class', async () => {
+    render(<MarkdownRenderer content={'```go\nfmt.Println("Hello")\n```'} />)
+    await waitFor(() => {
+      const codeElement = document.querySelector('code')
+      expect(codeElement).toBeInTheDocument()
+      expect(codeElement?.className).toMatch(/language-go/)
+    })
+  })
+
+  it('renders multiple code blocks', async () => {
+    const { container } = render(
+      <MarkdownRenderer
+        content={`\`\`\`rust
+fn main() {}
+\`\`\`
+
+\`\`\`python
+print("hello")
+\`\`\`
+
+\`\`\`typescript
+const x: number = 1
+\`\`\``}
+      />
+    )
+    await waitFor(() => {
+      expect(container.querySelectorAll('pre code').length).toBe(3)
+    })
+  })
+
+  it('renders images with lazy loading', async () => {
     render(<MarkdownRenderer content="![Alt text](https://example.com/img.png)" />)
-    const img = screen.getByRole('img', { name: 'Alt text' })
+    const img = await screen.findByRole('img', { name: 'Alt text' })
     expect(img).toHaveAttribute('loading', 'lazy')
   })
 
   it('applies custom className', () => {
     const { container } = render(<MarkdownRenderer content="test" className="custom-class" />)
+    // className on outer div is synchronous, no need to wait
     expect(container.firstChild).toHaveClass('custom-class')
   })
 
-  it('renders GFM tables', () => {
+  it('renders GFM tables', async () => {
     render(
       <MarkdownRenderer
         content={`| A | B |
@@ -47,39 +101,67 @@ describe('MarkdownRenderer', () => {
 | 1 | 2 |`}
       />
     )
-    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(await screen.findByRole('table')).toBeInTheDocument()
   })
 
-  it('renders inline LaTeX math with $...$', () => {
+  it('renders inline LaTeX math with $...$', async () => {
     render(<MarkdownRenderer content="The formula $E = mc^2$ is famous." />)
-    // KaTeX renders math in span elements with class katex
-    const katexElement = document.querySelector('.katex')
-    expect(katexElement).toBeInTheDocument()
-    // Check that the text content is rendered (KaTeX splits math into multiple elements)
+    await waitFor(() => {
+      expect(document.querySelector('.katex')).toBeInTheDocument()
+    })
     expect(screen.getByText('The formula', { exact: false })).toBeInTheDocument()
     expect(screen.getByText('is famous.', { exact: false })).toBeInTheDocument()
   })
 
-  it('renders block LaTeX math with $$...$$', () => {
+  it('renders block LaTeX math with $$...$$', async () => {
     render(<MarkdownRenderer content={'$$\\frac{\\partial L}{\\partial w} = \\nabla$$'} />)
-    const katexElement = document.querySelector('.katex')
-    expect(katexElement).toBeInTheDocument()
+    await waitFor(() => {
+      expect(document.querySelector('.katex')).toBeInTheDocument()
+    })
   })
 
-  it('renders complex partial derivative formulas', () => {
+  it('renders complex partial derivative formulas', async () => {
     const formula = '$$\\frac{\\partial(a \\cdot b)}{\\partial a} = b$$'
     render(<MarkdownRenderer content={formula} />)
-    const katexElement = document.querySelector('.katex')
-    expect(katexElement).toBeInTheDocument()
+    await waitFor(() => {
+      expect(document.querySelector('.katex')).toBeInTheDocument()
+    })
   })
 
-  it('renders LaTeX formulas inside GFM tables', () => {
+  it('renders LaTeX formulas inside GFM tables', async () => {
     const tableWithMath = `| Operation | Forward | Local gradients |
 |-----------|---------|----------------|
 | \`a + b\` | $$a + b$$ | $$\\frac{\\partial}{\\partial a} = 1$$ |`
     render(<MarkdownRenderer content={tableWithMath} />)
-    // Should have both table and katex rendered
-    expect(screen.getByRole('table')).toBeInTheDocument()
-    expect(document.querySelectorAll('.katex').length).toBeGreaterThan(0)
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(document.querySelectorAll('.katex').length).toBeGreaterThan(0)
+    })
+  })
+
+  it('shows copy button on code blocks', async () => {
+    const { container } = render(
+      <MarkdownRenderer content={'```go\nfmt.Println("Hello")\n```'} />
+    )
+    await waitFor(() => {
+      expect(container.querySelector('button')).toBeInTheDocument()
+    })
+  })
+
+  it('copies code to clipboard when copy button is clicked', async () => {
+    const { container } = render(
+      <MarkdownRenderer content={'```go\nfmt.Println("Hello")\n```'} />
+    )
+    const copyButton = await waitFor(() => {
+      const btn = container.querySelector('button')
+      expect(btn).toBeInTheDocument()
+      return btn!
+    })
+
+    fireEvent.click(copyButton)
+
+    await waitFor(() => {
+      expect(mockClipboardWrite).toHaveBeenCalled()
+    })
   })
 })

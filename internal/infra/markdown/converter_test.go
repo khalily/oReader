@@ -323,3 +323,64 @@ func TestConverter_Convert_CodeWithBackticks(t *testing.T) {
 		})
 	}
 }
+
+func TestConverter_Convert_CodeBlockLanguage(t *testing.T) {
+	converter := NewConverter()
+
+	tests := []struct {
+		name        string
+		input       string
+		wantContain string
+		wantNot     string
+	}{
+		{
+			name:        "language on code element (standard)",
+			input:       `<pre><code class="language-go">fmt.Println("Hello")</code></pre>`,
+			wantContain: "```go",
+			wantNot:     "```language-go",
+		},
+		{
+			name:        "Jekyll/Rouge: language on wrapper div",
+			input:       `<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code>print("Hello")</code></pre></div></div>`,
+			wantContain: "```python",
+			wantNot:     "```\n",
+		},
+		{
+			name:        "Rouge: language on pre element",
+			input:       `<pre class="language-rust"><code>fn main() {}</code></pre>`,
+			wantContain: "```rust",
+		},
+		{
+			name:        "no language at all",
+			input:       `<pre><code>fmt.Println("Hello")</code></pre>`,
+			wantContain: "```\nfmt.Println",
+		},
+		{
+			name:        "language on code takes priority over parent",
+			input:       `<div class="language-python highlighter-rouge"><pre><code class="language-go">fmt.Println("Hello")</code></pre></div>`,
+			wantContain: "```go",
+			wantNot:     "```python",
+		},
+		{
+			name:        "Jekyll/Rouge with javascript language",
+			input:       `<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code>console.log("Hi")</code></pre></div></div>`,
+			wantContain: "```javascript",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := converter.Convert(tt.input)
+			if err != nil {
+				t.Fatalf("Convert() error = %v", err)
+			}
+
+			if !strings.Contains(result, tt.wantContain) {
+				t.Errorf("Expected to contain %q, got: %q", tt.wantContain, result)
+			}
+			if tt.wantNot != "" && strings.Contains(result, tt.wantNot) {
+				t.Errorf("Should not contain %q, got: %q", tt.wantNot, result)
+			}
+		})
+	}
+}

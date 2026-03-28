@@ -182,16 +182,24 @@
   }
 }
 
-/* Prism.js theme overrides for dark mode */
-.dark .prose pre {
-  background-color: hsl(220 13% 18%);
-}
-
-.dark .prose :not(pre) > code {
-  background-color: hsl(220 13% 18%);
-}
-
 /* ===== Shiki Syntax Highlighting ===== */
+
+/* Dual-theme CSS variable mapping (required by defaultColor: false)
+ * Shiki generates --shiki-light / --shiki-dark on each <span>,
+ * but does NOT set color/background-color itself.
+ * These rules map the variables to actual colors, with .dark toggle for theme switch.
+ */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
 
 /* Base Shiki container styles */
 .shiki {
@@ -201,7 +209,7 @@
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 0.9em;
-  line-height: 1.6;
+  line-height: 1.0;
 }
 
 /* Line numbers using CSS counter */
@@ -243,10 +251,7 @@
   margin: 0;
 }
 
-/* Dark mode adjustments for Shiki */
-.dark .shiki {
-  background-color: hsl(220 13% 18%);
-}
+/* Dark mode is handled by CSS variable mapping above */
 
 /* Inline code - preserve existing styles, ensure no Shiki interference */
 .prose :not(pre) > code {

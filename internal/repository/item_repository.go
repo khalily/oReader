@@ -92,6 +92,13 @@ func (r *itemRepository) GetByID(ctx context.Context, id string) (*model.Item, e
 	return &item, nil
 }
 
+// Update updates an existing item
+func (r *itemRepository) Update(ctx context.Context, item *model.Item) error {
+	return r.db.WithContext(ctx).Save(item).Error
+}
+
+// GetByGUID retrieves an item by feed ID and GUID
+
 // GetByGUID retrieves an item by feed ID and GUID
 func (r *itemRepository) GetByGUID(ctx context.Context, feedID, guid string) (*model.Item, error) {
 	var item model.Item

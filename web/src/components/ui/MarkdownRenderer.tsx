@@ -1,10 +1,10 @@
-import ReactMarkdown from 'react-markdown'
+import { MarkdownHooks } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import rehypeShiki from '@shikijs/rehype'
 import { cn } from '@/lib/utils'
-import React, { useMemo } from 'react'
+import React from 'react'
 import { CopyButton } from './CopyButton'
 
 interface MarkdownRendererProps {
@@ -12,49 +12,88 @@ interface MarkdownRendererProps {
   className?: string
 }
 
-// Shiki 配置 - 支持双主题
+// ─── Shiki 配置 ────────────────────────────────────────────────────
 const shikiOptions = {
   themes: {
     light: 'github-light',
     dark: 'github-dark',
   },
-  defaultColor: false, // 使用 CSS 变量
+  defaultColor: false, // 使用 CSS 变量实现双主题切换
 }
+
+// ─── rehype-add-default-lang ────────────────────────────────────────
+// 后端 HTML→Markdown 转换后，代码块可能不带语言标识（如 ```python），
+// 导致 remark-rehype 生成的 <code> 没有 className="language-xxx"。
+// Shiki 只处理带 language-xxx class 的 code 元素，无标识的直接跳过。
+// 此插件在 Shiki 之前运行，为无语言标识的代码块添加 language-text。
+// ────────────────────────────────────────────────────────────────────
+function rehypeAddDefaultLang() {
+  return (tree: any) => {
+    function visit(node: any) {
+      if (
+        node?.tagName === 'pre' &&
+        node.children?.[0]?.tagName === 'code'
+      ) {
+        const code = node.children[0]
+        const classes: string[] = code.properties?.className ?? []
+        const hasLang = classes.some(
+          (c: string) => typeof c === 'string' && c.startsWith('language-')
+        )
+        if (!hasLang) {
+          code.properties ??= {}
+          code.properties.className = [...classes, 'language-text']
+        }
+      }
+      for (const child of node?.children ?? []) visit(child)
+    }
+    visit(tree)
+  }
+}
+
+// ─── Module-level 常量 ──────────────────────────────────────────────
+// MarkdownHooks 在 useEffect 中比较 rehypePlugins 引用，
+// 每次 render 创建新数组会导致不必要的重新处理。
+// ────────────────────────────────────────────────────────────────────
+const remarkPlugins = [remarkGfm, remarkMath]
+const rehypePlugins = [
+  rehypeKatex,
+  rehypeAddDefaultLang,
+  [rehypeShiki, shikiOptions],
+] as const
 
 /**
  * MarkdownRenderer renders Markdown content with:
  * - GitHub Flavored Markdown support (tables, strikethrough, etc.)
  * - LaTeX math rendering with KaTeX (inline `$...$` and block `$$...$$`)
- * - Syntax highlighting with Shiki (180+ languages)
- * - Line numbers (always visible)
+ * - Syntax highlighting with Shiki (dual theme: light + dark)
  * - Copy button for code blocks
  * - Lazy loading for images
  * - Secure external links (target="_blank", rel="noopener noreferrer")
  */
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
-  // 提取代码文本用于复制
   const extractCodeFromChildren = (children: React.ReactNode): string => {
     if (typeof children === 'string') return children
     if (Array.isArray(children)) {
       return children.map(extractCodeFromChildren).join('')
     }
     if (React.isValidElement(children) && children.props.children) {
-      return extractCodeFromChildren(children.props.children)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const childProps = children.props as { children: React.ReactNode }
+      if (childProps && typeof childProps.children !== 'undefined') {
+        return extractCodeFromChildren(childProps.children)
+      }
     }
     return ''
   }
 
   return (
     <div className={cn('prose prose-slate dark:prose-invert max-w-none', className)}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[
-          rehypeKatex,
-          [rehypeShiki, shikiOptions],
-        ]}
+      <MarkdownHooks
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        fallback={<div>{content}</div>}
         components={{
-          // 包装 pre 元素添加复制按钮
-          pre({ children, ...props }) {
+          pre({ children, node: _node, ...props }) {
             const code = extractCodeFromChildren(children)
             return (
               <div className="relative group">
@@ -64,7 +103,6 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
             )
           },
           img({ src, alt, title, ...restProps }) {
-            // Remove 'node' from props
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { node: _node, ...props } = restProps as any
             return (
@@ -83,7 +121,6 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
             )
           },
           a({ href, children, ...restProps }) {
-            // Remove 'node' from props
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { node: _node, ...props } = restProps as any
             return (
@@ -101,7 +138,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
         }}
       >
         {content}
-      </ReactMarkdown>
+      </MarkdownHooks>
     </div>
   )
 }

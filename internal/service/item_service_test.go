@@ -160,6 +160,16 @@ func (m *mockItemRepository) CountByFeedID(ctx context.Context, feedID string) (
 	return count, nil
 }
 
+func (m *mockItemRepository) Update(ctx context.Context, item *model.Item) error {
+	for i, existing := range m.items {
+		if existing.ID == item.ID {
+			m.items[i] = item
+			return nil
+		}
+	}
+	return errors.New("item not found")
+}
+
 // mockUserItemStateRepository is a mock implementation of UserItemStateRepository
 type mockUserItemStateRepository struct {
 	states      []*model.UserItemState

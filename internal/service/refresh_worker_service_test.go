@@ -116,6 +116,16 @@ func (m *refreshMockItemRepository) ListUnread(ctx context.Context, userID strin
 	return nil, 0, nil
 }
 
+func (m *refreshMockItemRepository) Update(ctx context.Context, item *model.Item) error {
+	for i, existing := range m.items {
+		if existing.ID == item.ID {
+			m.items[i] = item
+			return nil
+		}
+	}
+	return errors.New("item not found")
+}
+
 func (m *refreshMockItemRepository) CountByFeedID(ctx context.Context, feedID string) (int64, error) {
 	count := int64(0)
 	for _, item := range m.items {

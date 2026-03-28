@@ -1,41 +1,51 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MarkdownRenderer } from '../MarkdownRenderer'
+
+// Mock @shikijs/rehype — 与 MarkdownRenderer.test.tsx 保持一致
+vi.mock('@shikijs/rehype', () => ({
+  default: () => async (tree: any) => tree,
+}))
 
 describe('MarkdownRenderer CSS Styles', () => {
   describe('Inline Code', () => {
-    it('should render inline code without visible backticks', () => {
+    it('should render inline code without visible backticks', async () => {
       const content = 'Use the `log(a)` function to compute logarithm'
       render(<MarkdownRenderer content={content} />)
 
-      const codeElement = screen.getByText('log(a)')
-      expect(codeElement.tagName).toBe('CODE')
-
-      // Verify the code element exists and has correct content
-      expect(codeElement.textContent).toBe('log(a)')
+      await waitFor(() => {
+        const codeElement = document.querySelector('code')
+        expect(codeElement).toBeInTheDocument()
+        expect(codeElement?.textContent).toBe('log(a)')
+      }, { timeout: 10000 })
     })
 
-    it('should render code with brackets correctly', () => {
+    it('should render code with brackets correctly', async () => {
       const content = 'The token list `[BOS, e, m, m, a, BOS]` is processed'
       render(<MarkdownRenderer content={content} />)
 
-      const codeElement = screen.getByText('[BOS, e, m, m, a, BOS]')
-      expect(codeElement.tagName).toBe('CODE')
-      expect(codeElement.textContent).toBe('[BOS, e, m, m, a, BOS]')
+      await waitFor(() => {
+        const codeElements = document.querySelectorAll('code')
+        expect(codeElements.length).toBeGreaterThanOrEqual(1)
+        const target = Array.from(codeElements).find(el => el.textContent === '[BOS, e, m, m, a, BOS]')
+        expect(target).toBeInTheDocument()
+      }, { timeout: 10000 })
     })
 
-    it('should not have node attribute in rendered code element', () => {
+    it('should not have node attribute in rendered code element', async () => {
       const content = 'Use `code` here'
       render(<MarkdownRenderer content={content} />)
 
-      const codeElement = screen.getByText('code')
-      // The node attribute should not be present in the DOM
-      expect(codeElement.hasAttribute('node')).toBe(false)
+      await waitFor(() => {
+        const codeElement = document.querySelector('code')
+        expect(codeElement).toBeInTheDocument()
+        expect(codeElement?.hasAttribute('node')).toBe(false)
+      }, { timeout: 10000 })
     })
   })
 
   describe('Code in Tables', () => {
-    it('should render code in table cells correctly', () => {
+    it('should render code in table cells correctly', async () => {
       const content = `
 | Operation | Forward |
 | --- | --- |
@@ -44,27 +54,26 @@ describe('MarkdownRenderer CSS Styles', () => {
 
       render(<MarkdownRenderer content={content} />)
 
-      // Check that code is rendered in table
-      const codeElement = screen.getByText('log(a)')
-      expect(codeElement.tagName).toBe('CODE')
+      expect(await screen.findByRole('table')).toBeInTheDocument()
 
-      // Check table structure exists
-      const table = document.querySelector('table')
-      expect(table).toBeInTheDocument()
+      await waitFor(() => {
+        const codeInTable = document.querySelector('table code')
+        expect(codeInTable).toBeInTheDocument()
+      })
     })
   })
 
   describe('LaTeX Math', () => {
-    it('should render inline math with $ delimiters', () => {
+    it('should render inline math with $ delimiters', async () => {
       const content = 'The formula $E = mc^2$ is famous'
       render(<MarkdownRenderer content={content} />)
 
-      // KaTeX renders math in span elements with class katex
-      const katexElement = document.querySelector('.katex')
-      expect(katexElement).toBeInTheDocument()
+      await waitFor(() => {
+        expect(document.querySelector('.katex')).toBeInTheDocument()
+      })
     })
 
-    it('should render block math with $$ delimiters', () => {
+    it('should render block math with $$ delimiters', async () => {
       const content = `
 Block formula:
 $$
@@ -74,22 +83,23 @@ $$
 
       render(<MarkdownRenderer content={content} />)
 
-      const katexElement = document.querySelector('.katex-display')
-      expect(katexElement).toBeInTheDocument()
+      await waitFor(() => {
+        expect(document.querySelector('.katex-display')).toBeInTheDocument()
+      })
     })
 
-    it('should render LaTeX commands like \\ln and \\max', () => {
+    it('should render LaTeX commands like \\ln and \\max', async () => {
       const content = 'Use $\\ln(a)$ and $\\max(0, a)$ functions'
       render(<MarkdownRenderer content={content} />)
 
-      // Both math expressions should be rendered
-      const katexElements = document.querySelectorAll('.katex')
-      expect(katexElements.length).toBeGreaterThanOrEqual(2)
+      await waitFor(() => {
+        expect(document.querySelectorAll('.katex').length).toBeGreaterThanOrEqual(2)
+      })
     })
   })
 
   describe('Combined Code and Math', () => {
-    it('should correctly render table with code and math together', () => {
+    it('should correctly render table with code and math together', async () => {
       const content = `
 | Operation | Forward | Local gradients |
 | --- | --- | --- |
@@ -99,15 +109,12 @@ $$
 
       render(<MarkdownRenderer content={content} />)
 
-      // Verify code elements using more specific selectors
-      const codeElements = document.querySelectorAll('table code')
-      expect(codeElements.length).toBe(2)
+      expect(await screen.findByRole('table')).toBeInTheDocument()
 
-      // Verify table exists
-      expect(document.querySelector('table')).toBeInTheDocument()
-
-      // Verify math is rendered
-      expect(document.querySelectorAll('.katex').length).toBeGreaterThan(0)
+      await waitFor(() => {
+        expect(document.querySelectorAll('table code').length).toBe(2)
+        expect(document.querySelectorAll('.katex').length).toBeGreaterThan(0)
+      })
     })
   })
 })
