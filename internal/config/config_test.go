@@ -150,6 +150,34 @@ func TestValidateConfig(t *testing.T) {
 	}
 }
 
+func TestPaperConfigDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "test.db")
+	t.Setenv("JWT_SECRET_KEY", "super-secret-key-at-least-32-characters!!")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, "localhost:50051", cfg.Paper.GRPCAddr)
+	assert.Equal(t, "uploads/papers", cfg.Paper.UploadDir)
+	assert.Equal(t, int64(50*1024*1024), cfg.Paper.MaxUploadSize)
+	assert.Equal(t, "5m", cfg.Paper.GRPCTimeout)
+}
+
+func TestPaperConfigFromEnv(t *testing.T) {
+	t.Setenv("DATABASE_URL", "test.db")
+	t.Setenv("JWT_SECRET_KEY", "super-secret-key-at-least-32-characters!!")
+	t.Setenv("PAPER_GRPC_ADDR", "paper-service:50051")
+	t.Setenv("PAPER_UPLOAD_DIR", "/data/papers")
+	t.Setenv("PAPER_MAX_UPLOAD_SIZE", "104857600")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, "paper-service:50051", cfg.Paper.GRPCAddr)
+	assert.Equal(t, "/data/papers", cfg.Paper.UploadDir)
+	assert.Equal(t, int64(104857600), cfg.Paper.MaxUploadSize)
+}
+
 func clearEnvVars() {
 	envVars := []string{
 		"DATABASE_URL",

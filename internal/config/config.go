@@ -17,6 +17,7 @@ type Config struct {
 	RateLimit RateLimitConfig
 	Logging   LoggingConfig
 	OAuth     OAuthConfig
+	Paper     PaperConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -61,6 +62,14 @@ type OAuthConfig struct {
 	GitHubCallbackHost string // OAuth callback host (e.g., "10.37.126.68:8080") - used when behind proxy
 }
 
+// PaperConfig holds paper import configuration
+type PaperConfig struct {
+	GRPCAddr      string
+	UploadDir     string
+	MaxUploadSize int64
+	GRPCTimeout   string
+}
+
 // Load reads configuration from environment variables
 func Load() (*Config, error) {
 	v := viper.New()
@@ -79,6 +88,12 @@ func Load() (*Config, error) {
 	v.SetDefault("RATE_LIMIT_ENABLED", true)
 	v.SetDefault("LOG_LEVEL", "info")
 
+	// Paper defaults
+	v.SetDefault("PAPER_GRPC_ADDR", "localhost:50051")
+	v.SetDefault("PAPER_UPLOAD_DIR", "uploads/papers")
+	v.SetDefault("PAPER_MAX_UPLOAD_SIZE", 52428800) // 50MB
+	v.SetDefault("PAPER_GRPC_TIMEOUT", "5m")
+
 	// Bind environment variables
 	_ = v.BindEnv("DATABASE_URL")
 	_ = v.BindEnv("JWT_SECRET_KEY")
@@ -94,6 +109,10 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("GITHUB_CLIENT_ID")
 	_ = v.BindEnv("GITHUB_CLIENT_SECRET")
 	_ = v.BindEnv("GITHUB_CALLBACK_HOST")
+	_ = v.BindEnv("PAPER_GRPC_ADDR")
+	_ = v.BindEnv("PAPER_UPLOAD_DIR")
+	_ = v.BindEnv("PAPER_MAX_UPLOAD_SIZE")
+	_ = v.BindEnv("PAPER_GRPC_TIMEOUT")
 
 	cfg := &Config{
 		Server: ServerConfig{
@@ -123,6 +142,12 @@ func Load() (*Config, error) {
 			GitHubClientID:     v.GetString("GITHUB_CLIENT_ID"),
 			GitHubClientSecret: v.GetString("GITHUB_CLIENT_SECRET"),
 			GitHubCallbackHost: v.GetString("GITHUB_CALLBACK_HOST"),
+		},
+		Paper: PaperConfig{
+			GRPCAddr:      v.GetString("PAPER_GRPC_ADDR"),
+			UploadDir:     v.GetString("PAPER_UPLOAD_DIR"),
+			MaxUploadSize: v.GetInt64("PAPER_MAX_UPLOAD_SIZE"),
+			GRPCTimeout:   v.GetString("PAPER_GRPC_TIMEOUT"),
 		},
 	}
 
@@ -173,4 +198,9 @@ func (c *Config) IsDevelopment() bool {
 // IsProduction returns true if running in production mode
 func (c *Config) IsProduction() bool {
 	return c.Server.Env == "production"
+}
+
+// GetGRPCTimeout returns the gRPC timeout as a duration
+func (c *Config) GetGRPCTimeout() (time.Duration, error) {
+	return time.ParseDuration(c.Paper.GRPCTimeout)
 }
