@@ -1,0 +1,5 @@
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+magic-pdf[full]>=0.10.0
+openai>=1.0.0
+python-dotenv>=1.0.0
