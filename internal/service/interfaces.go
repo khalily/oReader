@@ -25,6 +25,8 @@ var (
 	ErrFeedAlreadySubscribed = errors.New("already subscribed to this feed")
 	// ErrItemNotFound is returned when an item is not found
 	ErrItemNotFound = errors.New("item not found")
+	// ErrPaperNotFound is returned when a paper is not found
+	ErrPaperNotFound = errors.New("paper not found")
 )
 
 // ItemWithState represents an item with user-specific state
@@ -345,4 +347,28 @@ type PaperListOptions struct {
 	Status string
 	Sort   string // "created_at", "title", "published_year"
 	Order  string // "asc", "desc"
+}
+
+// PaperService defines the interface for paper business logic
+type PaperService interface {
+	UploadPaper(ctx context.Context, userID string, filename string, pdfContent []byte) (*model.Paper, error)
+	GetPaper(ctx context.Context, userID, paperID string) (*model.Paper, error)
+	ListPapers(ctx context.Context, userID string, opts PaperListOptions) ([]*model.Paper, int64, error)
+	UpdatePaper(ctx context.Context, userID, paperID string, updates map[string]interface{}) (*model.Paper, error)
+	DeletePaper(ctx context.Context, userID, paperID string) error
+	GetPaperStatus(ctx context.Context, userID, paperID string) (*PaperStatusResponse, error)
+	RetryPaper(ctx context.Context, userID, paperID string) (*model.Paper, error)
+	ListTags(ctx context.Context, userID string) ([]string, error)
+	UpdateTags(ctx context.Context, userID, paperID string, tags []string) error
+	DownloadPaper(ctx context.Context, userID, paperID string) (string, string, error)
+}
+
+// PaperStatusResponse represents the conversion status of a paper
+type PaperStatusResponse struct {
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	Progress  int32  `json:"progress"`
+	Error     string `json:"error,omitempty"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
