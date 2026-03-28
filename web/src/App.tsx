@@ -10,6 +10,8 @@ import { OAuthPendingPage } from '@/pages/oauth/OAuthPendingPage'
 import { OAuthCallbackPage } from '@/pages/oauth/OAuthCallbackPage'
 import ItemsPage from '@/pages/items/ItemsPage'
 import ItemViewPage from '@/pages/items/ItemViewPage'
+import PapersPage from '@/pages/papers/PapersPage'
+import PaperViewPage from '@/pages/papers/PaperViewPage'
 import { useAuthStore } from '@/stores/authStore'
 import { useEffect } from 'react'
 import type { FilterType } from '@/components/feed/Sidebar'
@@ -95,6 +97,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ItemViewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/papers"
+        element={
+          <ProtectedRoute>
+            <PapersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/papers/:id"
+        element={
+          <ProtectedRoute>
+            <PaperViewPage />
           </ProtectedRoute>
         }
       />

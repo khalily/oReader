@@ -1,4 +1,5 @@
-import { Home, Star, Rss, Menu, Calendar } from 'lucide-react'
+import { Home, Star, Rss, Menu, Calendar, BookOpen } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FeedList } from './FeedList'
@@ -46,6 +47,8 @@ export function SidebarContent({
   totalUnread = 0,
   stats,
 }: Omit<SidebarProps, 'isMobileOpen' | 'onMobileClose'>) {
+  const navigate = useNavigate()
+
   const handleDelete = (feedId: string) => {
     if (confirm('Are you sure you want to delete this feed?')) {
       onDeleteFeed(feedId)
@@ -97,6 +100,17 @@ export function SidebarContent({
             )
           })}
         </nav>
+
+        <div className="border-t my-2" />
+
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          onClick={() => navigate('/papers')}
+        >
+          <BookOpen className="w-4 h-4 mr-2" />
+          Papers
+        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
