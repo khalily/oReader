@@ -306,3 +306,43 @@ type StatsService interface {
 	// GetUserStats returns article statistics for a user
 	GetUserStats(ctx context.Context, userID string) (*UserStats, error)
 }
+
+// PaperRepository defines the interface for paper data access
+type PaperRepository interface {
+	Create(ctx context.Context, paper *model.Paper) error
+	GetByID(ctx context.Context, id string) (*model.Paper, error)
+	ListByUserID(ctx context.Context, userID string, opts PaperListOptions) ([]*model.Paper, int64, error)
+	Update(ctx context.Context, paper *model.Paper) error
+	Delete(ctx context.Context, id string) error
+	ListTags(ctx context.Context, userID string) ([]string, error)
+}
+
+// PaperTagRepository defines the interface for paper tag data access
+type PaperTagRepository interface {
+	SetTags(ctx context.Context, paperID string, tags []string) error
+	GetByPaperID(ctx context.Context, paperID string) ([]*model.PaperTag, error)
+}
+
+// PaperCollectionRepository defines the interface for paper collection data access
+type PaperCollectionRepository interface {
+	Create(ctx context.Context, collection *model.PaperCollection) error
+	GetByID(ctx context.Context, id string) (*model.PaperCollection, error)
+	ListByUserID(ctx context.Context, userID string) ([]*model.PaperCollection, error)
+	Update(ctx context.Context, collection *model.PaperCollection) error
+	Delete(ctx context.Context, id string) error
+	AddPaper(ctx context.Context, collectionID, paperID string) error
+	RemovePaper(ctx context.Context, collectionID, paperID string) error
+	ListPapers(ctx context.Context, collectionID string) ([]*model.Paper, error)
+}
+
+// PaperListOptions defines pagination and filtering for papers
+type PaperListOptions struct {
+	Limit  int
+	Offset int
+	Query  string // search title, authors, keywords
+	Year   string
+	Tag    string
+	Status string
+	Sort   string // "created_at", "title", "published_year"
+	Order  string // "asc", "desc"
+}
