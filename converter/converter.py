@@ -85,7 +85,8 @@ def extract_metadata(markdown: str) -> PaperMetadataResult:
             max_tokens=2000,
         )
         content = response.choices[0].message.content or ""
-        return parse_metadata_response(content)
+        result = parse_metadata_response(content)
+        return result if result is not None else PaperMetadataResult()
     except Exception as e:
         logger.error("LLM metadata extraction failed: %s", e)
         return PaperMetadataResult()
