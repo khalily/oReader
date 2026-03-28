@@ -13,9 +13,9 @@ type Paper struct {
 	Base
 	UserID           string `gorm:"type:varchar(36);not null;index" json:"user_id"`
 	Title            string `gorm:"type:varchar(500)" json:"title"`
-	Authors          string `gorm:"type:json" json:"authors"`
+	Authors          string `gorm:"type:text" json:"authors"`
 	Abstract         string `gorm:"type:text" json:"abstract"`
-	Keywords         string `gorm:"type:json" json:"keywords"`
+	Keywords         string `gorm:"type:text" json:"keywords"`
 	PublishedYear    string `gorm:"type:varchar(10)" json:"published_year"`
 	DOI              string `gorm:"type:varchar(200)" json:"doi"`
 	PDFPath          string `gorm:"type:varchar(500)" json:"pdf_path"`
@@ -48,8 +48,8 @@ type PaperCollection struct {
 // PaperCollectionItem represents a paper in a collection
 type PaperCollectionItem struct {
 	Base
-	CollectionID string           `gorm:"type:varchar(36);not null;index" json:"collection_id"`
-	PaperID      string           `gorm:"type:varchar(36);not null;index" json:"paper_id"`
+	CollectionID string           `gorm:"type:varchar(36);not null;uniqueIndex:idx_collection_paper" json:"collection_id"`
+	PaperID      string           `gorm:"type:varchar(36);not null;uniqueIndex:idx_collection_paper" json:"paper_id"`
 	Collection   *PaperCollection `gorm:"foreignKey:CollectionID" json:"collection,omitempty"`
 	Paper        *Paper           `gorm:"foreignKey:PaperID" json:"paper,omitempty"`
 }
