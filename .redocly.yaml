@@ -1,0 +1,13 @@
+extends:
+  - recommended
+
+rules:
+  # localhost/dev server URLs are intentional
+  no-server-example.com: off
+
+  # Some operations (health, logout, redirect) legitimately lack 4xx/2xx
+  operation-4xx-response: off
+  operation-2xx-response: off
+
+  # License URL is optional for well-known licenses
+  info-license-strict: off

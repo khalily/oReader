@@ -9,7 +9,8 @@ info:
     ## 认证方式
 
     使用 JWT 双令牌系统（Access Token + Refresh Token），通过 HttpOnly Cookie 传递。
-    所有状态变更请求（POST/PUT/DELETE）需要 CSRF Token。
+    登录/注册/刷新成功后，响应体返回 `csrf_token`，前端需存储并在后续状态变更请求中通过
+    `X-CSRF-Token` Header 传递。
 
     ## 速率限制
 
@@ -23,6 +24,7 @@ info:
   version: 2.0.0
   license:
     name: MIT
+    url: https://opensource.org/licenses/MIT
 
 servers:
   - url: http://localhost:8080
@@ -71,7 +73,7 @@ paths:
     post:
       operationId: register
       summary: 用户注册
-      description: 创建新用户账号，返回 access/refresh 令牌
+      description: 创建新用户账号，设置 HttpOnly Cookie 并返回 CSRF Token
       tags: [Auth]
       security: []
       requestBody:
@@ -81,7 +83,7 @@ paths:
             schema:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
-        "200":
+        "201":
           description: 注册成功
           content:
             application/json:
@@ -98,7 +100,7 @@ paths:
               example:
                 error:
                   code: CONFLICT
-                  message: "Email already registered"
+                  message: "User already exists"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -106,7 +108,7 @@ paths:
     post:
       operationId: login
       summary: 用户登录
-      description: 使用邮箱和密码登录，返回 access/refresh 令牌
+      description: 使用邮箱和密码登录，设置 HttpOnly Cookie 并返回 CSRF Token
       tags: [Auth]
       security: []
       requestBody:
@@ -131,7 +133,7 @@ paths:
               example:
                 error:
                   code: UNAUTHORIZED
-                  message: "Invalid email or password"
+                  message: "Invalid credentials"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -139,7 +141,7 @@ paths:
     post:
       operationId: refreshToken
       summary: 刷新访问令牌
-      description: 使用 refresh token（HttpOnly Cookie）获取新的 access token
+      description: 使用 refresh token（HttpOnly Cookie）获取新的 access token 和 CSRF Token
       tags: [Auth]
       security: []
       responses:
@@ -148,7 +150,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/RefreshResponse"
+                $ref: "#/components/schemas/AuthResponse"
         "401":
           description: Refresh token 无效或已过期
           content:
@@ -166,10 +168,9 @@ paths:
     post:
       operationId: logout
       summary: 用户登出
-      description: 使 refresh token 失效并清除 cookies
+      description: 使 refresh token 失效并清除 cookies（无需认证，即使 token 过期也可调用）
       tags: [Auth]
-      security:
-        - cookieAuth: []
+      security: []
       responses:
         "200":
           description: 登出成功
@@ -177,8 +178,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
 
   /api/v1/auth/me:
     get:
@@ -194,7 +193,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/MeResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -218,7 +217,11 @@ paths:
     get:
       operationId: githubOAuthCallback
       summary: GitHub OAuth 回调
-      description: 处理 GitHub OAuth 回调，验证授权码并完成认证
+      description: |
+        处理 GitHub OAuth 回调，验证授权码并完成认证。
+
+        默认返回 302 重定向到前端页面。
+        当 `format=json` 时返回 JSON 响应，适用于前端 AJAX 调用。
       tags: [Auth]
       security: []
       parameters:
@@ -234,7 +237,21 @@ paths:
           description: CSRF 防护令牌
           schema:
             type: string
+        - name: format
+          in: query
+          description: 响应格式（设为 json 返回 JSON 而非 302 重定向）
+          schema:
+            type: string
+            enum: [json]
       responses:
+        "200":
+          description: format=json 时返回认证结果
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/GitHubCallbackSuccessResponse"
+                  - $ref: "#/components/schemas/GitHubCallbackPendingResponse"
         "302":
           description: 重定向到前端页面（附带令牌或错误信息）
           headers:
@@ -242,12 +259,21 @@ paths:
               schema:
                 type: string
                 format: uri
+        "400":
+          description: OAuth 错误
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
 
   /api/v1/auth/oauth/pending:
     get:
       operationId: getPendingOAuth
       summary: 获取待完成的 OAuth 信息
-      description: 通过 token 查询尚未完成注册的 OAuth 状态
+      description: 通过 token 查询尚未完成注册的 GitHub OAuth 状态
       tags: [Auth]
       security: []
       parameters:
@@ -264,6 +290,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PendingOAuthResponse"
+        "400":
+          description: token 缺失
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -271,7 +306,7 @@ paths:
     post:
       operationId: completeOAuth
       summary: 完成 OAuth 注册
-      description: 为 OAuth 用户提供邮箱以完成账号创建
+      description: 为 OAuth 用户提供邮箱以完成账号创建，设置 HttpOnly Cookie
       tags: [Auth]
       security: []
       requestBody:
@@ -282,15 +317,35 @@ paths:
               $ref: "#/components/schemas/CompleteOAuthRequest"
       responses:
         "200":
-          description: OAuth 注册完成，返回令牌
+          description: OAuth 注册完成
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/CompleteOAuthResponse"
         "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
+          description: 请求参数错误或 token 过期
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "409":
+          description: 邮箱已被使用
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: EMAIL_ALREADY_USED
+                      message:
+                        type: string
 
   # ── Feeds ───────────────────────────────────
   /api/v1/feeds:
@@ -301,15 +356,16 @@ paths:
       tags: [Feeds]
       security:
         - cookieAuth: []
+        - csrfToken: []
       parameters:
         - name: limit
           in: query
-          description: 返回数量（默认 100）
+          description: 返回数量（默认 20）
           schema:
             type: integer
             minimum: 1
             maximum: 100
-            default: 100
+            default: 20
         - name: offset
           in: query
           description: 偏移量
@@ -373,13 +429,14 @@ paths:
       tags: [Feeds]
       security:
         - cookieAuth: []
+        - csrfToken: []
       responses:
         "200":
           description: 成功返回 Feed 详情
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Feed"
+                $ref: "#/components/schemas/GetFeedResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -393,14 +450,8 @@ paths:
         - cookieAuth: []
         - csrfToken: []
       responses:
-        "200":
-          description: 取消订阅成功
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-              example:
-                message: "Feed deleted successfully"
+        "204":
+          description: 取消订阅成功（无响应体）
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -462,6 +513,7 @@ paths:
       tags: [Items]
       security:
         - cookieAuth: []
+        - csrfToken: []
       parameters:
         - name: limit
           in: query
@@ -517,13 +569,14 @@ paths:
       tags: [Items]
       security:
         - cookieAuth: []
+        - csrfToken: []
       responses:
         "200":
           description: 成功返回文章详情
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ItemWithState"
+                $ref: "#/components/schemas/ItemResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -553,7 +606,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StarReadResponse"
+                $ref: "#/components/schemas/ItemResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -583,7 +636,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StarReadResponse"
+                $ref: "#/components/schemas/ItemResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -598,6 +651,7 @@ paths:
       tags: [Stats]
       security:
         - cookieAuth: []
+        - csrfToken: []
       responses:
         "200":
           description: 成功返回统计
@@ -621,10 +675,16 @@ paths:
       requestBody:
         required: true
         content:
-          application/xml:
+          multipart/form-data:
             schema:
-              type: string
-              description: OPML XML 文件内容
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: OPML XML 文件（最大 1MB）
       responses:
         "202":
           description: 导入任务已创建
@@ -644,16 +704,25 @@ paths:
     get:
       operationId: getImportStatus
       summary: 获取导入任务状态
-      description: 查询 OPML 导入异步任务的执行状态
+      description: 查询 OPML 导入异步任务的执行状态（需认证且为任务所有者）
       tags: [OPML]
-      security: []
+      security:
+        - cookieAuth: []
       responses:
         "200":
           description: 返回任务状态
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ImportJob"
+                $ref: "#/components/schemas/ImportJobStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 无权访问该任务
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -661,9 +730,10 @@ paths:
     get:
       operationId: exportOpml
       summary: 导出 OPML 文件
-      description: 将用户订阅的 Feed 导出为 OPML 格式（支持无认证访问）
+      description: 将用户订阅的 Feed 导出为 OPML 格式（需认证）
       tags: [OPML]
-      security: []
+      security:
+        - cookieAuth: []
       responses:
         "200":
           description: OPML XML 文件
@@ -675,7 +745,9 @@ paths:
             Content-Disposition:
               schema:
                 type: string
-                example: "attachment; filename=\"feeds.opml\""
+                example: "attachment; filename=\"oreader-subscriptions.xml\""
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   # ── Papers ──────────────────────────────────
   /api/v1/papers/upload:
@@ -707,7 +779,7 @@ paths:
                   format: binary
                   description: PDF 文件（最大 50MB）
       responses:
-        "201":
+        "202":
           description: 上传成功，开始异步转换
           content:
             application/json:
@@ -746,6 +818,7 @@ paths:
       tags: [Papers]
       security:
         - cookieAuth: []
+        - csrfToken: []
       parameters:
         - name: q
           in: query
@@ -814,6 +887,7 @@ paths:
       tags: [Papers]
       security:
         - cookieAuth: []
+        - csrfToken: []
       responses:
         "200":
           description: 成功返回标签列表
@@ -840,13 +914,14 @@ paths:
       tags: [Papers]
       security:
         - cookieAuth: []
+        - csrfToken: []
       responses:
         "200":
           description: 成功返回论文详情
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Paper"
+                $ref: "#/components/schemas/PaperResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -872,7 +947,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Paper"
+                $ref: "#/components/schemas/PaperResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -889,14 +964,8 @@ paths:
         - cookieAuth: []
         - csrfToken: []
       responses:
-        "200":
-          description: 删除成功
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-              example:
-                message: "Paper deleted successfully"
+        "204":
+          description: 删除成功（无响应体）
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -909,10 +978,11 @@ paths:
     get:
       operationId: getPaperStatus
       summary: 获取论文转换状态
-      description: 轻量级接口，仅返回论文的转换状态和错误信息，适合前端轮询
+      description: 轻量级接口，仅返回论文的转换状态和进度，适合前端轮询
       tags: [Papers]
       security:
         - cookieAuth: []
+        - csrfToken: []
       responses:
         "200":
           description: 返回转换状态
@@ -975,7 +1045,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Paper"
+                $ref: "#/components/schemas/PaperResponse"
         "400":
           description: 当前状态不允许重试（仅 failed 状态可重试）
           content:
@@ -1008,6 +1078,7 @@ paths:
       tags: [Papers]
       security:
         - cookieAuth: []
+        - csrfToken: []
       responses:
         "200":
           description: PDF 文件
@@ -1042,7 +1113,7 @@ components:
       type: apiKey
       in: header
       name: X-CSRF-Token
-      description: CSRF 防护令牌，状态变更请求（POST/PUT/DELETE）必需
+      description: CSRF 防护令牌，由登录/注册/刷新接口在响应体中返回
 
   # ── Parameters ──────────────────────────────
   parameters:
@@ -1143,6 +1214,22 @@ components:
     # ── User ──────────────────────────────────
     User:
       type: object
+      description: 用户基本信息（登录/注册/刷新接口返回）
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+        nickname:
+          type: string
+          maxLength: 100
+
+    UserFull:
+      type: object
+      description: 用户完整信息（/auth/me 接口返回）
       properties:
         id:
           type: string
@@ -1155,29 +1242,14 @@ components:
           type: string
           maxLength: 100
         avatar_url:
-          type: string
+          type:
+            - string
+            - "null"
           format: uri
-          nullable: true
         auth_provider:
           type: string
           enum: [email, github]
           default: email
-          readOnly: true
-        github_id:
-          type: string
-          nullable: true
-          readOnly: true
-        github_login:
-          type: string
-          nullable: true
-          readOnly: true
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
           readOnly: true
 
     # ── Auth ──────────────────────────────────
@@ -1193,7 +1265,7 @@ components:
         password:
           type: string
           format: password
-          minLength: 6
+          minLength: 8
         nickname:
           type: string
           maxLength: 100
@@ -1213,24 +1285,20 @@ components:
 
     AuthResponse:
       type: object
+      description: 认证成功响应（登录/注册/刷新共用）。JWT 通过 HttpOnly Cookie 传递，不在响应体中。
       properties:
-        access_token:
-          type: string
-          description: JWT access token
-        refresh_token:
-          type: string
-          description: Refresh token（同时写入 HttpOnly Cookie）
         user:
           $ref: "#/components/schemas/User"
+        csrf_token:
+          type: string
+          description: CSRF 防护令牌，前端需存储并在后续请求中通过 X-CSRF-Token Header 传递
 
-    RefreshResponse:
+    MeResponse:
       type: object
+      description: 当前用户信息响应
       properties:
-        access_token:
-          type: string
-          description: 新的 JWT access token
         user:
-          $ref: "#/components/schemas/User"
+          $ref: "#/components/schemas/UserFull"
 
     CompleteOAuthRequest:
       type: object
@@ -1245,19 +1313,77 @@ components:
           type: string
           format: email
 
-    PendingOAuthResponse:
+    CompleteOAuthResponse:
       type: object
+      description: OAuth 注册完成响应
       properties:
-        token:
+        id:
           type: string
-        provider:
-          type: string
-          example: github
-        github_login:
-          type: string
+          format: uuid
         email:
           type: string
-          nullable: true
+        nickname:
+          type: string
+        avatar_url:
+          type:
+            - string
+            - "null"
+          format: uri
+        auth_provider:
+          type: string
+          enum: [email, github]
+
+    PendingOAuthResponse:
+      type: object
+      description: 待完成的 OAuth 信息
+      properties:
+        github_login:
+          type: string
+          description: GitHub 用户名
+        nickname:
+          type: string
+          description: 昵称
+        avatar_url:
+          type: string
+          format: uri
+          description: GitHub 头像 URL
+
+    GitHubCallbackSuccessResponse:
+      type: object
+      description: GitHub OAuth 成功响应（format=json）
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            nickname:
+              type: string
+            avatar_url:
+              type: string
+            auth_provider:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+        csrf_token:
+          type: string
+
+    GitHubCallbackPendingResponse:
+      type: object
+      description: GitHub OAuth 需要补充邮箱时返回（format=json）
+      properties:
+        redirect:
+          type: string
+          example: pending
+        pending_token:
+          type: string
+          description: 用于查询待完成 OAuth 信息的 token
 
     # ── Feed ──────────────────────────────────
     Feed:
@@ -1275,13 +1401,15 @@ components:
         description:
           type: string
         image_url:
-          type: string
+          type:
+            - string
+            - "null"
           format: uri
-          nullable: true
         last_fetched_at:
-          type: string
+          type:
+            - string
+            - "null"
           format: date-time
-          nullable: true
           readOnly: true
         last_fetch_status:
           type: string
@@ -1300,7 +1428,7 @@ components:
 
     FeedListItem:
       type: object
-      description: Feed 列表中的精简 Feed 信息
+      description: Feed 列表中的精简 Feed 信息（含用户关联数据）
       properties:
         id:
           type: string
@@ -1313,16 +1441,24 @@ components:
         description:
           type: string
         image_url:
-          type: string
+          type:
+            - string
+            - "null"
           format: uri
-          nullable: true
         last_fetched_at:
-          type: string
+          type:
+            - string
+            - "null"
           format: date-time
-          nullable: true
         item_count:
           type: integer
           description: 该 Feed 下的文章数量
+        unread_count:
+          type: integer
+          description: 该 Feed 下的未读文章数量
+        position:
+          type: integer
+          description: 用户排序位置
 
     FeedListResponse:
       type: object
@@ -1347,43 +1483,31 @@ components:
     CreateFeedResponse:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        feed_url:
-          type: string
-          format: uri
-        title:
-          type: string
-        description:
-          type: string
-        image_url:
-          type: string
-          format: uri
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        new_items:
+        feed:
+          $ref: "#/components/schemas/Feed"
+        new_item_count:
           type: integer
           description: 本次订阅拉取到的新文章数量
+
+    GetFeedResponse:
+      type: object
+      properties:
+        feed:
+          $ref: "#/components/schemas/Feed"
+        item_count:
+          type: integer
+          description: 该 Feed 下的文章数量
 
     RefreshFeedResponse:
       type: object
       properties:
-        message:
-          type: string
-          example: "Feed refresh triggered"
-        new_items:
+        new_item_count:
           type: integer
           description: 本次刷新拉取到的新文章数量
 
     MarkAllReadResponse:
       type: object
       properties:
-        message:
-          type: string
-          example: "All items marked as read"
         count:
           type: integer
           description: 标记为已读的文章数量
@@ -1414,12 +1538,14 @@ components:
           type: string
           description: 文章完整内容（HTML）
         pub_date:
-          type: string
+          type:
+            - string
+            - "null"
           format: date-time
-          nullable: true
         creator:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         created_at:
           type: string
           format: date-time
@@ -1433,6 +1559,9 @@ components:
       type: object
       description: 用户对文章的状态标记
       properties:
+        item_id:
+          type: string
+          format: uuid
         is_starred:
           type: boolean
           default: false
@@ -1440,9 +1569,10 @@ components:
           type: boolean
           default: false
         read_at:
-          type: string
+          type:
+            - string
+            - "null"
           format: date-time
-          nullable: true
 
     FeedResponse:
       type: object
@@ -1459,9 +1589,10 @@ components:
         description:
           type: string
         image_url:
-          type: string
+          type:
+            - string
+            - "null"
           format: uri
-          nullable: true
 
     ItemWithState:
       type: object
@@ -1471,11 +1602,20 @@ components:
         - type: object
           properties:
             feed:
-              $ref: "#/components/schemas/FeedResponse"
-              nullable: true
+              anyOf:
+                - $ref: "#/components/schemas/FeedResponse"
+                - type: "null"
             user_state:
-              $ref: "#/components/schemas/UserItemState"
-              nullable: true
+              anyOf:
+                - $ref: "#/components/schemas/UserItemState"
+                - type: "null"
+
+    ItemResponse:
+      type: object
+      description: 单篇文章响应包装
+      properties:
+        item:
+          $ref: "#/components/schemas/ItemWithState"
 
     ItemListResponse:
       type: object
@@ -1491,8 +1631,9 @@ components:
           type: boolean
           description: 是否有更多数据
         next_cursor:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
           description: 下一页游标
 
     SetStarRequest:
@@ -1510,13 +1651,6 @@ components:
       properties:
         read:
           type: boolean
-
-    StarReadResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
 
     # ── Stats ─────────────────────────────────
     UserStats:
@@ -1538,6 +1672,24 @@ components:
     # ── OPML ──────────────────────────────────
     ImportJobResponse:
       type: object
+      description: 导入任务创建响应
+      properties:
+        message:
+          type: string
+          example: "Import job started"
+        job_id:
+          type: string
+          format: uuid
+        total_feeds:
+          type: integer
+          description: OPML 中的 Feed 总数
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+
+    ImportJobStatus:
+      type: object
+      description: 导入任务状态查询响应
       properties:
         job_id:
           type: string
@@ -1545,42 +1697,32 @@ components:
         status:
           type: string
           enum: [pending, processing, completed, failed]
-        total_feeds:
+        total:
           type: integer
-          description: OPML 中的 Feed 总数
-        message:
-          type: string
-          example: "Import job started"
-
-    ImportJob:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        user_id:
-          type: string
-          format: uuid
-        status:
-          type: string
-          enum: [pending, processing, completed, failed]
-        total_feeds:
-          type: integer
+          description: Feed 总数
         processed:
           type: integer
+          description: 已处理数量
         failed:
           type: integer
-        error:
-          type: string
-          nullable: true
+          description: 失败数量
+        progress:
+          type: integer
+          description: 进度百分比（0-100）
         started_at:
-          type: string
+          type:
+            - string
+            - "null"
           format: date-time
-          nullable: true
         ended_at:
-          type: string
+          type:
+            - string
+            - "null"
           format: date-time
-          nullable: true
+        error:
+          type:
+            - string
+            - "null"
 
     # ── Paper ─────────────────────────────────
     PaperStatus:
@@ -1612,13 +1754,13 @@ components:
           description: 论文标题（自动提取或手动修改）
         authors:
           type: string
-          description: 作者列表（逗号分隔）
+          description: 作者列表（JSON 数组字符串）
         abstract:
           type: string
           description: 论文摘要
         keywords:
           type: string
-          description: 关键词（逗号分隔）
+          description: 关键词（JSON 数组字符串）
         published_year:
           type: string
           description: 发表年份
@@ -1645,8 +1787,9 @@ components:
         status:
           $ref: "#/components/schemas/PaperStatus"
         error:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
           description: 失败时的错误信息
           readOnly: true
         created_at:
@@ -1666,12 +1809,26 @@ components:
           format: uuid
         status:
           $ref: "#/components/schemas/PaperStatus"
+        progress:
+          type: integer
+          description: 转换进度（0=等待, 50=处理中, 100=完成, 0=失败）
         error:
+          type:
+            - string
+            - "null"
+        created_at:
           type: string
-          nullable: true
+          format: date-time
         updated_at:
           type: string
           format: date-time
+
+    PaperResponse:
+      type: object
+      description: 单篇论文响应包装（get/update/retry 使用）
+      properties:
+        paper:
+          $ref: "#/components/schemas/Paper"
 
     PaperListResponse:
       type: object
@@ -1682,29 +1839,27 @@ components:
             $ref: "#/components/schemas/Paper"
         total:
           type: integer
-        page:
-          type: integer
-        per_page:
-          type: integer
-        total_pages:
-          type: integer
 
     UpdatePaperRequest:
       type: object
       minProperties: 1
       properties:
         title:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         abstract:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         published_year:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         doi:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
 
     UpdateTagsRequest:
       type: object

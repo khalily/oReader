@@ -1,5 +1,6 @@
 .PHONY: test test-all build run migrate-up migrate-down migrate-create clean \
        converter-install converter-dev converter-test \
+       lint-openapi \
        docker-dev docker-prod docker-test docker-down docker-down-prod \
        docker-logs docker-build docker-clean
 
@@ -108,6 +109,10 @@ deps:
 lint:
 	@which golangci-lint > /dev/null || (echo "Please install golangci-lint" && exit 1)
 	golangci-lint run ./...
+
+## lint-openapi: Lint OpenAPI spec with redocly
+lint-openapi:
+	npx @redocly/cli lint docs/openapi.yaml --config .redocly.yaml
 
 ## vulncheck: Run security vulnerability check
 vulncheck:
