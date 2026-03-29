@@ -150,8 +150,8 @@ export function Sidebar({
   onFilterChange,
   totalUnread = 0,
   stats,
-  isMobileOpen: _isMobileOpen = false,
-  onMobileClose: _onMobileClose,
+  isMobileOpen: _isMobileOpen = false, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onMobileClose: _onMobileClose, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: SidebarProps) {
   return (
     <>

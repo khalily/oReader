@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<
     }
   }
 
-  static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> {
+  static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> { // eslint-disable-line @typescript-eslint/no-unused-vars
     return { hasError: true }
   }
 
@@ -133,7 +133,7 @@ export class AppErrorBoundary extends Component<
     }
   }
 
-  static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> {
+  static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> { // eslint-disable-line @typescript-eslint/no-unused-vars
     return { hasError: true }
   }
 

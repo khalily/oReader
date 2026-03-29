@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { act } from '@testing-library/react'
 import { useItemsStore } from '../itemsStore'
 import type { Article } from '@/types/feed'

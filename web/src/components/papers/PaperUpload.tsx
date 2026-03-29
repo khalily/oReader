@@ -70,8 +70,9 @@ export function PaperUpload({ open, onOpenChange, onSuccess }: PaperUploadProps)
       onOpenChange(false)
       onSuccess()
       toast.showSuccess('Paper uploaded successfully')
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Upload failed'
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.response?.data?.message || (err as Error)?.message || 'Upload failed'
       setError(msg)
       toast.showError(msg)
     } finally {

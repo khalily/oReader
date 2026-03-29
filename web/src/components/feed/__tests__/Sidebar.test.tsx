@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { Sidebar } from '../Sidebar'
 import type { UserFeed, StatsResponse } from '@/types/feed'
 
@@ -15,6 +16,7 @@ vi.mock('lucide-react', () => ({
   RefreshCw: () => <div data-testid="refresh-icon" />,
   Trash2: () => <div data-testid="trash-icon" />,
   Calendar: () => <div data-testid="calendar-icon" />,
+  BookOpen: () => <div data-testid="bookopen-icon" />,
 }))
 
 // Mock stats data
@@ -47,7 +49,9 @@ const createWrapper = () => {
     },
   })
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </MemoryRouter>
   )
 }
 

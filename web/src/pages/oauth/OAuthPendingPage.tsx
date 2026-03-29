@@ -74,7 +74,7 @@ export function OAuthPendingPage() {
         email: data.email,
       });
       navigate('/items');
-    } catch (err: any) {
+    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
       const errorCode = err.response?.data?.error?.code;
       if (errorCode === 'EMAIL_ALREADY_USED') {
         setError('该邮箱已被注册，请使用其他邮箱');

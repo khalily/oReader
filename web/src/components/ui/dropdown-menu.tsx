@@ -46,7 +46,7 @@ export function DropdownMenuTrigger({ children, asChild = false }: DropdownMenuT
 
   if (asChild && React.isValidElement(children)) {
     const childProps = children.props as Record<string, unknown>
-    return React.cloneElement(children as React.ReactElement<any>, {
+    return React.cloneElement(children as React.ReactElement<any>, { // eslint-disable-line @typescript-eslint/no-explicit-any
       onClick: (e: React.MouseEvent) => {
         handleClick()
         ;(childProps.onClick as (e: React.MouseEvent) => void)?.(e)

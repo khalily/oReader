@@ -9,10 +9,10 @@ import grpc
 
 # Add proto to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'proto'))
-import paper_pb2
-import paper_pb2_grpc
+import paper_pb2  # noqa: E402
+import paper_pb2_grpc  # noqa: E402
 
-from converter import extract_metadata, refine_markdown
+from converter import extract_metadata, refine_markdown  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

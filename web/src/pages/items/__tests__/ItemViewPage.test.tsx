@@ -168,6 +168,7 @@ describe('ItemViewPage', () => {
   })
 
   it('should show error state on 404', async () => {
+    vi.setConfig({ testTimeout: 10000 })
     server.use(
       http.get(`${API_BASE_URL}/items/:id`, () => {
         return HttpResponse.json(

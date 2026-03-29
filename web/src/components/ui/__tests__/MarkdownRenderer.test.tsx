@@ -4,7 +4,7 @@ import { MarkdownRenderer } from '../MarkdownRenderer'
 
 // Mock @shikijs/rehype — 默认导出是 async transformer，与真实行为一致
 vi.mock('@shikijs/rehype', () => ({
-  default: () => async (tree: any) => tree,
+  default: () => async (tree: any) => tree, // eslint-disable-line @typescript-eslint/no-explicit-any
 }))
 
 // Mock clipboard API

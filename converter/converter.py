@@ -22,8 +22,10 @@ def _get_openai_client() -> openai.OpenAI | None:
     _openai_client = openai.OpenAI(api_key=api_key, base_url=base_url)
     return _openai_client
 
+
 def _get_llm_model() -> str:
     return os.getenv("LLM_MODEL", "gpt-4o-mini")
+
 
 METADATA_EXTRACTION_PROMPT = """You are an academic paper metadata extractor. Given the following Markdown content converted from a PDF paper, extract structured metadata.
 

@@ -143,7 +143,7 @@ describe('ProtectedRoute', () => {
     // Simulate a loading state by having authentication check be async
     mockAuthStoreState.isAuthenticated = false
 
-    const { container } = render(
+    render(
       <Routes>
         <Route path="/login" element={<div>Login Page</div>} />
         <Route

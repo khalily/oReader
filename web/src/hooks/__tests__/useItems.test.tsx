@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
@@ -13,11 +13,11 @@ const handlers = [
   // List items
   http.get(`${API_BASE_URL}/items`, ({ request }) => {
     const url = new URL(request.url)
-    const limit = url.searchParams.get('limit') || '20'
-    const cursor = url.searchParams.get('cursor')
-    const feedId = url.searchParams.get('feed_id')
-    const starred = url.searchParams.get('starred')
-    const read = url.searchParams.get('read')
+    url.searchParams.get('limit')
+    url.searchParams.get('cursor')
+    url.searchParams.get('feed_id')
+    url.searchParams.get('starred')
+    url.searchParams.get('read')
 
     return HttpResponse.json({
       items: [

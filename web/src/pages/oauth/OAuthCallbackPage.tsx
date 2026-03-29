@@ -68,7 +68,7 @@ export function OAuthCallbackPage() {
 
         // Navigate to items page
         navigate('/items', { replace: true });
-      } catch (err: any) {
+      } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
         console.error('OAuth callback error:', err);
 
         // Handle specific error cases

@@ -4,7 +4,7 @@ import { MarkdownRenderer } from '../MarkdownRenderer'
 
 // Mock @shikijs/rehype — 与 MarkdownRenderer.test.tsx 保持一致
 vi.mock('@shikijs/rehype', () => ({
-  default: () => async (tree: any) => tree,
+  default: () => async (tree: any) => tree, // eslint-disable-line @typescript-eslint/no-explicit-any
 }))
 
 describe('MarkdownRenderer CSS Styles', () => {

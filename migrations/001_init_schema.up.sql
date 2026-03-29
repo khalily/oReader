@@ -1,9 +1,6 @@
 -- 001_init_schema.up.sql
 -- Initial schema for oReader
 
--- Enable foreign keys for SQLite
-PRAGMA foreign_keys = ON;
-
 -- Users table
 CREATE TABLE users (
     id VARCHAR(36) PRIMARY KEY,

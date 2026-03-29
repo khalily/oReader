@@ -28,7 +28,9 @@ const shikiOptions = {
 // 此插件在 Shiki 之前运行，为无语言标识的代码块添加 language-text。
 // ────────────────────────────────────────────────────────────────────
 function rehypeAddDefaultLang() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (tree: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function visit(node: any) {
       if (
         node?.tagName === 'pre' &&
@@ -77,7 +79,6 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
       return children.map(extractCodeFromChildren).join('')
     }
     if (React.isValidElement(children) && children.props.children) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const childProps = children.props as { children: React.ReactNode }
       if (childProps && typeof childProps.children !== 'undefined') {
         return extractCodeFromChildren(childProps.children)
@@ -93,7 +94,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
         rehypePlugins={rehypePlugins}
         fallback={<div>{content}</div>}
         components={{
-          pre({ children, node: _node, ...props }) {
+          pre({ children, node: _node, ...props }) { // eslint-disable-line @typescript-eslint/no-unused-vars
             const code = extractCodeFromChildren(children)
             return (
               <div className="relative group">
@@ -103,7 +104,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
             )
           },
           img({ src, alt, title, ...restProps }) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
             const { node: _node, ...props } = restProps as any
             return (
               <img
@@ -121,7 +122,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
             )
           },
           a({ href, children, ...restProps }) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
             const { node: _node, ...props } = restProps as any
             return (
               <a

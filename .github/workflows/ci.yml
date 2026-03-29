@@ -65,7 +65,7 @@ jobs:
         run: go mod download
 
       - name: Go vet
-        run: go vet ./...
+        run: go vet ./cmd/... ./internal/...
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6

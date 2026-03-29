@@ -161,6 +161,7 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           refetchFeeds()
           toast.showSuccess('Feed deleted successfully')
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
           // Always refresh feeds on error - the feed may already be deleted
           // This ensures the UI is in sync with the backend

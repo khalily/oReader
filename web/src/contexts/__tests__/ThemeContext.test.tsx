@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { ThemeProvider, useTheme } from '../ThemeContext'
 import type { ReactNode } from 'react'
 
@@ -13,12 +13,6 @@ const localStorageMock = {
 
 // Shared listeners array for matchMedia mock (module level)
 let mediaQueryListeners: Array<(e: MediaQueryListEvent) => void> = []
-
-// Helper to trigger media query change
-function triggerMediaQueryChange(newMatches: boolean) {
-  const event = { matches: newMatches, media: '(prefers-color-scheme: dark)' } as MediaQueryListEvent
-  mediaQueryListeners.forEach((handler) => handler(event))
-}
 
 describe('ThemeContext', () => {
   let matchMediaMock: ReturnType<typeof vi.fn>

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ItemList } from '../ItemList'
-import type { Article, ListItemsOptions } from '@/types/feed'
+import type { Article } from '@/types/feed'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 
@@ -315,7 +315,6 @@ describe('ItemList component', () => {
 
     await waitFor(() => {
       // The second article is read
-      const articleCards = screen.getAllByText(/Example Feed/)
       // Read articles should have muted text
       expect(screen.getByText('Second Article')).toBeInTheDocument()
     })

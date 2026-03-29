@@ -48,7 +48,7 @@ const handlers = [
     }
     return HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Feed not found' } }, { status: 404 })
   }),
-  http.post(`${API_BASE_URL}/feeds/:id/refresh`, ({ params }) => {
+  http.post(`${API_BASE_URL}/feeds/:id/refresh`, ({ params }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
     return HttpResponse.json({ updated: true, new_item_count: 3 })
   }),
 ]

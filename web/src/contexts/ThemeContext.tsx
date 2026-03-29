@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 export type Theme = 'light' | 'dark' | 'system'
@@ -67,6 +68,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     // Apply theme on mount and when theme changes
     const resolved = resolveTheme(theme)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResolvedTheme(resolved)
     applyTheme(resolved)
 

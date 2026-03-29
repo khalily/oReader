@@ -204,7 +204,6 @@ describe('ArticlePanel component', () => {
         })
       )
 
-      const wrapper = createWrapper()
       const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false } },
       })

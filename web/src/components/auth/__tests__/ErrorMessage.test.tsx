@@ -40,7 +40,7 @@ describe('ErrorMessage', () => {
           },
         },
       },
-    } as any
+    } as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
     render(<ErrorMessage message={apiError} />)
     expect(screen.getByText('Invalid email format')).toBeInTheDocument()
@@ -60,7 +60,7 @@ describe('ErrorMessage', () => {
           },
         },
       },
-    } as any
+    } as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
     render(<ErrorMessage message={apiError} />)
     expect(screen.getByText('Validation failed')).toBeInTheDocument()
@@ -72,7 +72,7 @@ describe('ErrorMessage', () => {
   })
 
   it('should handle unknown error format gracefully', () => {
-    const { container } = render(<ErrorMessage message={{ unknown: 'format' } as any} />)
+    const { container } = render(<ErrorMessage message={{ unknown: 'format' } as any} />) // eslint-disable-line @typescript-eslint/no-explicit-any
     // Should not render for unknown error format
     expect(container.firstChild).toBeNull()
   })
@@ -114,7 +114,7 @@ describe('ErrorMessage', () => {
             },
           },
         },
-      } as any
+      } as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
       const { unmount } = render(<ErrorMessage message={apiError} />)
       expect(screen.getByText(`${code} message`)).toBeInTheDocument()

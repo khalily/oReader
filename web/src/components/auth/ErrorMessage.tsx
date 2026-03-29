@@ -8,7 +8,7 @@ type ErrorMessageProps = {
   className?: string
 }
 
-export function getErrorMessage(message: ErrorMessageProps['message']): string | null {
+function getErrorMessage(message: ErrorMessageProps['message']): string | null {
   if (!message) return null
 
   if (typeof message === 'string') {
