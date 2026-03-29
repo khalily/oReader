@@ -163,5 +163,10 @@ func setupFeedSecurityTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("Failed to migrate database: %v", err)
 	}
 
+	// Clean table to avoid data pollution from parallel tests sharing the same DB
+	if err := db.Exec("DELETE FROM feeds").Error; err != nil {
+		t.Fatalf("Failed to clean feeds table: %v", err)
+	}
+
 	return db
 }

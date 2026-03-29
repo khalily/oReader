@@ -23,6 +23,14 @@ func setupSecurityTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("Failed to migrate database: %v", err)
 	}
 
+	// Clean tables to avoid data pollution from parallel tests sharing the same DB
+	tables := []string{"user_item_states", "items", "user_feeds", "feeds", "users"}
+	for _, table := range tables {
+		if err := db.Exec("DELETE FROM " + table).Error; err != nil {
+			t.Fatalf("Failed to clean %s table: %v", table, err)
+		}
+	}
+
 	return db
 }
 

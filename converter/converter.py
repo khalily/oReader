@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 # Q6: Reuse OpenAI client instead of creating per-request
 _openai_client = None
 
+
 def _get_openai_client() -> openai.OpenAI | None:
     global _openai_client
     if _openai_client is not None:
@@ -27,22 +28,27 @@ def _get_llm_model() -> str:
     return os.getenv("LLM_MODEL", "gpt-4o-mini")
 
 
-METADATA_EXTRACTION_PROMPT = """You are an academic paper metadata extractor. Given the following Markdown content converted from a PDF paper, extract structured metadata.
-
-IMPORTANT: Return ONLY a JSON object, no markdown fences or explanation.
-
-Required fields:
-- title: Paper title (string)
-- authors: List of author names (array of strings)
-- abstract: Paper abstract (string, may be empty)
-- keywords: List of keywords/topics (array of strings, 3-8 items)
-- published_year: Publication year (string, e.g. "2024")
-- doi: DOI if found (string, may be empty)
-
-Markdown content:
-{markdown}
-
-JSON response:"""
+METADATA_EXTRACTION_PROMPT = (
+    "You are an academic paper metadata extractor. "
+    "Given the following Markdown content converted from a PDF paper, "
+    "extract structured metadata.\n"
+    "\n"
+    "IMPORTANT: Return ONLY a JSON object, no markdown fences or "
+    "explanation.\n"
+    "\n"
+    "Required fields:\n"
+    "- title: Paper title (string)\n"
+    "- authors: List of author names (array of strings)\n"
+    "- abstract: Paper abstract (string, may be empty)\n"
+    "- keywords: List of keywords/topics (array of strings, 3-8 items)\n"
+    '- published_year: Publication year (string, e.g. "2024")\n'
+    "- doi: DOI if found (string, may be empty)\n"
+    "\n"
+    "Markdown content:\n"
+    "{markdown}\n"
+    "\n"
+    "JSON response:"
+)
 
 
 @dataclass

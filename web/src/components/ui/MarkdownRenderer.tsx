@@ -57,11 +57,12 @@ function rehypeAddDefaultLang() {
 // 每次 render 创建新数组会导致不必要的重新处理。
 // ────────────────────────────────────────────────────────────────────
 const remarkPlugins = [remarkGfm, remarkMath]
-const rehypePlugins = [
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const rehypePlugins: any[] = [
   rehypeKatex,
   rehypeAddDefaultLang,
   [rehypeShiki, shikiOptions],
-] as const
+]
 
 /**
  * MarkdownRenderer renders Markdown content with:
@@ -78,8 +79,8 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
     if (Array.isArray(children)) {
       return children.map(extractCodeFromChildren).join('')
     }
-    if (React.isValidElement(children) && children.props.children) {
-      const childProps = children.props as { children: React.ReactNode }
+    if (React.isValidElement(children)) {
+      const childProps = children.props as { children?: React.ReactNode }
       if (childProps && typeof childProps.children !== 'undefined') {
         return extractCodeFromChildren(childProps.children)
       }
