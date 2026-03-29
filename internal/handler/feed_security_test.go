@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
 	"oreader/internal/model"
 	"oreader/internal/repository"
+	"oreader/internal/testutil"
 )
 
 // TestFeedRepository_SQLInjection_FeedURL tests SQL injection in feed URL at repository level
@@ -154,12 +155,9 @@ func TestFeedRepository_SQLInjection_Delete(t *testing.T) {
 	}
 }
 
-// setupSecurityTestDB creates an in-memory database for security testing
+// setupFeedSecurityTestDB creates a test database for security testing
 func setupFeedSecurityTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := testutil.SetupTestDB(t)
 
 	if err := db.AutoMigrate(&model.Feed{}); err != nil {
 		t.Fatalf("Failed to migrate database: %v", err)

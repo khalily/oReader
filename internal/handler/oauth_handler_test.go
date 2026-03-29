@@ -14,13 +14,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"oreader/internal/config"
 	"oreader/internal/infra/jwt"
 	"oreader/internal/model"
 	"oreader/internal/repository"
+	"oreader/internal/testutil"
 )
 
 func init() {
@@ -28,19 +28,18 @@ func init() {
 }
 
 func setupOAuthTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
+	db := testutil.SetupTestDB(t)
 
 	// Drop tables to ensure clean schema with latest model changes
 	_ = db.Migrator().DropTable(&model.User{}, &model.RefreshToken{}, &model.OAuthState{}, &model.PendingOAuth{})
 
-	err = db.AutoMigrate(&model.User{}, &model.RefreshToken{}, &model.OAuthState{}, &model.PendingOAuth{})
+	err := db.AutoMigrate(&model.User{}, &model.RefreshToken{}, &model.OAuthState{}, &model.PendingOAuth{})
 	require.NoError(t, err)
 	return db
 }
 
 func setupOAuthTestConfig(t *testing.T) *config.Config {
-	t.Setenv("DATABASE_URL", ":memory:")
+	t.Setenv("DATABASE_URL", testutil.GetTestDatabaseURL())
 	t.Setenv("JWT_SECRET_KEY", "test-secret-key-must-be-at-least-32-characters")
 	t.Setenv("JWT_ACCESS_TTL", "15m")
 	t.Setenv("JWT_REFRESH_TTL", "168h")

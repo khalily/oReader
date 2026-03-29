@@ -7,20 +7,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"oreader/internal/model"
+	"oreader/internal/testutil"
 )
 
 func setupPendingOAuthTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
+	db := testutil.SetupTestDB(t)
 
 	// Drop table to ensure clean schema with latest model changes
 	_ = db.Migrator().DropTable(&model.PendingOAuth{})
 
-	err = db.AutoMigrate(&model.PendingOAuth{})
+	err := db.AutoMigrate(&model.PendingOAuth{})
 	require.NoError(t, err)
 
 	return db

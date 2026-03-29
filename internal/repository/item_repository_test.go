@@ -8,17 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"oreader/internal/model"
 	"oreader/internal/service"
+	"oreader/internal/testutil"
 )
 
 func setupItemDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := testutil.SetupTestDB(t)
 
 	// Migrate tables
 	if err := db.AutoMigrate(&model.Feed{}, &model.User{}, &model.Item{}, &model.UserItemState{}, &model.UserFeed{}); err != nil {
@@ -27,15 +24,9 @@ func setupItemDB(t *testing.T) *gorm.DB {
 
 	return db
 }
-
-// setupItemDBShared creates a shared in-memory database for concurrent access testing
+// setupItemDBShared creates a test database for concurrent access testing
 func setupItemDBShared(t *testing.T) *gorm.DB {
-	// Use unique database name with timestamp to avoid conflicts between test runs
-	dbName := fmt.Sprintf("file:test_%s_%d?cache=shared", t.Name(), time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := testutil.SetupTestDB(t)
 
 	// Migrate tables
 	if err := db.AutoMigrate(&model.Feed{}, &model.User{}, &model.Item{}, &model.UserItemState{}); err != nil {
@@ -1247,7 +1238,7 @@ func TestItemRepository_RaceCondition_ConcurrentWrites(t *testing.T) {
 				return
 			}
 			if err := repo.Create(ctx, item); err != nil {
-				// SQLite may return "database table is locked" which is expected
+				// MySQL may return "database table is locked" which is expected
 				if !strings.Contains(err.Error(), "locked") && !strings.Contains(err.Error(), "busy") {
 					errChan <- err
 				}
@@ -1266,7 +1257,7 @@ func TestItemRepository_RaceCondition_ConcurrentWrites(t *testing.T) {
 		t.Errorf("Concurrent write error: %v", err)
 	}
 
-	// Verify at least some items were created (SQLite concurrency is limited)
+	// Verify at least some items were created (MySQL concurrency is limited)
 	if successCount < 1 {
 		t.Errorf("Expected at least 1 successful write, got %d", successCount)
 	}
@@ -1296,7 +1287,7 @@ func TestItemRepository_RaceCondition_ConcurrentBatchWrites(t *testing.T) {
 	}
 
 	// Run concurrent batch creates for each feed
-	// Note: SQLite has limited concurrent write support, so some batches may fail
+	// Note: MySQL has limited concurrent write support, so some batches may fail
 	const itemsPerBatch = 20
 	var wg sync.WaitGroup
 	errChan := make(chan error, numFeeds)
@@ -1321,7 +1312,7 @@ func TestItemRepository_RaceCondition_ConcurrentBatchWrites(t *testing.T) {
 				}
 			}
 			if err := repo.CreateBatch(ctx, items); err != nil {
-				// SQLite may return "database table is locked" which is expected
+				// MySQL may return "database table is locked" which is expected
 				if !strings.Contains(err.Error(), "locked") && !strings.Contains(err.Error(), "busy") {
 					errChan <- err
 				}
@@ -1340,7 +1331,7 @@ func TestItemRepository_RaceCondition_ConcurrentBatchWrites(t *testing.T) {
 		t.Errorf("Concurrent batch write error: %v", err)
 	}
 
-	// Verify at least some batches succeeded (SQLite concurrency is limited)
+	// Verify at least some batches succeeded (MySQL concurrency is limited)
 	// We expect at least 1 batch to succeed
 	if successCount < 1 {
 		t.Errorf("Expected at least 1 successful batch, got %d", successCount)
@@ -1348,7 +1339,7 @@ func TestItemRepository_RaceCondition_ConcurrentBatchWrites(t *testing.T) {
 }
 
 // TestItemRepository_RaceCondition_MixedOperations tests mixed read/write operations
-// Note: SQLite has limited concurrent write support, so we reduce concurrency
+// Note: MySQL has limited concurrent write support, so we reduce concurrency
 func TestItemRepository_RaceCondition_MixedOperations(t *testing.T) {
 	db := setupItemDBShared(t)
 	repo := NewItemRepository(db)
@@ -1389,12 +1380,12 @@ func TestItemRepository_RaceCondition_MixedOperations(t *testing.T) {
 		t.Fatalf("Failed to create items: %v", err)
 	}
 
-	// Reduced concurrency for SQLite compatibility
+	// Reduced concurrency for MySQL compatibility
 	const numGoroutines = 30
 	var wg sync.WaitGroup
 	errChan := make(chan error, numGoroutines)
 
-	// Helper to check if error is a SQLite lock error (expected in concurrent tests)
+	// Helper to check if error is a MySQL lock error (expected in concurrent tests)
 	isLockError := func(err error) bool {
 		if err == nil {
 			return false
@@ -1426,7 +1417,7 @@ func TestItemRepository_RaceCondition_MixedOperations(t *testing.T) {
 					errChan <- err
 				}
 			case 3:
-				// Create new item - SQLite may lock on concurrent writes, so we accept some failures
+				// Create new item - MySQL may lock on concurrent writes, so we accept some failures
 				item := &model.Item{
 					FeedID: feed.ID,
 					GUID:   fmt.Sprintf("mixed-concurrent-%d", idx),
@@ -1438,7 +1429,7 @@ func TestItemRepository_RaceCondition_MixedOperations(t *testing.T) {
 					return
 				}
 				if err := repo.Create(ctx, item); err != nil {
-					// SQLite may return "database table is locked" which is expected
+					// MySQL may return "database table is locked" which is expected
 					if !isLockError(err) {
 						errChan <- err
 					}

@@ -1,12 +1,17 @@
 # Dockerfile for Development with Hot Reload
-# This file is used by docker-compose.yml for local development
+# Used by docker-compose.yml for local development
+#
+# Targets:
+#   development  - Go backend with air hot-reload (no CGO needed, MySQL only)
+#   frontend-dev - React frontend with Vite dev server
 
 # =============================================================================
-# Development stage with hot-reload support
+# Development stage: Go backend with hot-reload support
 # =============================================================================
 FROM golang:1.25-alpine AS development
 
 # Install development tools
+# No gcc/musl-dev needed - MySQL driver is pure Go, SQLite removed
 RUN apk add --no-cache \
     git \
     make \
@@ -15,40 +20,46 @@ RUN apk add --no-cache \
     bash \
     ca-certificates
 
+# Pure Go build (no CGO)
+ENV CGO_ENABLED=0
+
+# Set Go proxy for reliable downloads
+ENV GOPROXY=https://goproxy.cn,direct
+
 WORKDIR /src
 
 # Install air for hot reload (if not available via apk)
 RUN go install github.com/air-verse/air@latest || true
 
-# Copy go mod files
+# Copy go mod files for dependency caching
 COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code (mounted as volume in docker-compose)
+# Copy source code (mounted as volume in docker-compose for live reload)
 COPY . .
 
-# Build the application once to verify
-RUN go build -o /tmp/oreader ./cmd/server
+# Verify build works with noembed tag (dev mode, no frontend embedding)
+RUN go build -tags noembed -o /tmp/oreader ./cmd/server
 
 # Default command (overridden by docker-compose)
 CMD ["air"]
 
 # =============================================================================
-# Frontend development stage (for running frontend separately)
+# Frontend development stage: React with Vite dev server
 # =============================================================================
 FROM node:22-alpine AS frontend-dev
 
 WORKDIR /web
 
-# Copy package files
+# Copy package files first for better caching
 COPY web/package.json web/package-lock.json ./
 
 # Install all dependencies (including dev)
 RUN npm install
 
-# Copy source
+# Copy frontend source (mounted as volume in docker-compose for live reload)
 COPY web/ ./
 
 # Expose Vite dev server port

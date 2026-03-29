@@ -10,19 +10,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"oreader/internal/model"
 	"oreader/internal/repository"
+	"oreader/internal/testutil"
 )
 
 // itemIntegrationTestSetup creates a test environment with in-memory database
 func itemIntegrationTestSetup(t *testing.T) (ItemService, *repository.ItemRepository, *repository.UserFeedRepository, string, string) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-
-	err = db.AutoMigrate(&model.User{}, &model.Feed{}, &model.Item{}, &model.UserFeed{}, &model.UserItemState{})
+	db := testutil.SetupTestDB(t)
+	err := db.AutoMigrate(&model.User{}, &model.Feed{}, &model.Item{}, &model.UserFeed{}, &model.UserItemState{})
 	require.NoError(t, err)
 
 	// Create test user

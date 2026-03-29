@@ -25,7 +25,7 @@ A modern RSS reader built with Go (backend) and React (frontend), featuring a cl
 ### Backend
 - **Language**: Go 1.25+
 - **Framework**: Gin Web Framework
-- **Database**: SQLite (development), MySQL (production)
+- **Database**: MySQL (all environments, via Docker Compose)
 - **ORM**: GORM
 - **Authentication**: JWT (HS256) with dual-token system
 - **Security**: bcrypt password hashing, CSRF protection, rate limiting
@@ -45,12 +45,13 @@ A modern RSS reader built with Go (backend) and React (frontend), featuring a cl
 
 ### Prerequisites
 
-- Go 1.25 or higher
-- Node.js 18+ and npm
-- SQLite (for development) or MySQL (for production)
-- Python 3.10+ and pip (optional, for Paper converter service)
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) (recommended)
+- Go 1.25 or higher (for local development without Docker)
+- Node.js 22+ and npm (for local frontend development)
+- MySQL 8.0+ (for local development without Docker)
+- Python 3.11+ and pip (for Paper converter service without Docker)
 
-### Installation
+### Using Docker Compose (Recommended)
 
 1. **Clone the repository**:
 ```bash
@@ -58,85 +59,91 @@ git clone https://github.com/yourusername/oreader.git
 cd oreader
 ```
 
-2. **Install backend dependencies**:
+2. **Configure environment**:
 ```bash
+cp .env.example .env
+# Edit .env and set JWT_SECRET_KEY (minimum 32 characters)
+```
+
+3. **Start development environment**:
+```bash
+docker compose up
+```
+
+This starts all services:
+- **Backend** (Go API): `http://localhost:8080`
+- **Frontend** (Vite dev server): `http://localhost:5173`
+- **Converter** (Python gRPC): `localhost:50051`
+- **Database** (MySQL 9.0): `localhost:3306`
+
+### Without Docker
+
+1. **Clone and install dependencies**:
+```bash
+git clone https://github.com/yourusername/oreader.git
+cd oreader
 go mod download
+cd web && npm install
 ```
 
-3. **Install frontend dependencies**:
+2. **Set up MySQL database** and configure `.env`:
 ```bash
-cd web
-npm install
+DATABASE_URL=mysql://oreader:oreader@tcp(localhost:3306)/oreader?charset=utf8mb4&parseTime=True&loc=Local
+JWT_SECRET_KEY=your-secret-key-minimum-32-characters
 ```
 
-4. **Install converter dependencies** (optional, for Paper Import):
+3. **Run the application**:
 ```bash
-pip install -r converter/requirements.txt
+# Backend
+make dev
+
+# Frontend (separate terminal)
+make frontend-dev
 ```
-
-5. **Run the application**:
-```bash
-# One-click dev environment (backend + frontend + converter)
-chmod +x dev.sh
-./dev.sh
-
-# Or API-only mode
-chmod +x run.sh
-./run.sh
-```
-
-The application will be available at `http://localhost:8080`
 
 **Required Environment Variables**:
-- `DATABASE_URL`: Database connection string (e.g., `oreader.db` for SQLite)
+- `DATABASE_URL`: MySQL connection string
 - `JWT_SECRET_KEY`: Secret key for JWT signing (minimum 32 characters)
 
 **Note**: The application automatically runs database migrations on startup.
-
-**Optional Environment Variables**:
-- `ENV`: Environment mode (`development` or `production`, default: `development`)
-- `PORT`: Server port (default: `8080`)
-- `LOG_LEVEL`: Logging level (`debug`, `info`, `warn`, `error`, default: `info`)
 
 ## Development
 
 ### Development Server
 
-**One-click full development environment** (backend + frontend + converter):
+**Docker Compose (Recommended)** — one command starts the full environment (backend + frontend + converter + MySQL):
 ```bash
-chmod +x dev.sh
-./dev.sh
+docker compose up
 ```
 
-Or start services individually:
+Services:
+- **Backend** (Go + air hot-reload): `http://localhost:8080`
+- **Frontend** (Vite dev server): `http://localhost:5173`
+- **Converter** (Python gRPC): `localhost:50051`
+- **MySQL**: `localhost:3306`
 
-1. **Start backend** (in one terminal):
+See [Docker Deployment](#docker-deployment) for more profiles (prod, test, tools).
+
+**Without Docker** — start services individually:
+
+1. **Start backend** (requires local MySQL):
 ```bash
-# API-only mode
-./run.sh
-
-# Or set environment variables and run
-DATABASE_URL=oreader.db JWT_SECRET_KEY=dev-secret-key-min-32-chars make run
+DATABASE_URL='mysql://oreader:oreader@tcp(localhost:3306)/oreader?charset=utf8mb4&parseTime=True&loc=Local' \
+JWT_SECRET_KEY=dev-secret-key-min-32-chars make dev
 ```
 
-2. **Start frontend** (in another terminal):
+2. **Start frontend** (separate terminal):
 ```bash
-cd web
-npm run dev
+cd web && npm run dev
 ```
 
-3. **Start converter service** (optional, for Paper Import — in another terminal):
+3. **Start converter service** (optional, for Paper Import — separate terminal):
 ```bash
-cd converter
-python server.py
+cd converter && python server.py
 ```
-
-The converter service runs on `localhost:50051` by default. Without it, paper upload will return an error.
-
-The frontend will be available at `http://localhost:5173` and proxy API requests to the backend at `http://localhost:8080`.
 
 **Required Environment Variables**:
-- `DATABASE_URL`: Database file path (e.g., `oreader.db`)
+- `DATABASE_URL`: MySQL connection string (`mysql://user:pass@tcp(host:port)/dbname?parseTime=true`)
 - `JWT_SECRET_KEY`: Secret key for JWT signing (minimum 32 characters)
 
 ### Running Tests
@@ -223,7 +230,7 @@ make migrate-create name=add_new_field
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `DATABASE_URL` | Database connection string | `oreader.db` | Yes |
+| `DATABASE_URL` | MySQL connection string | `mysql://oreader:oreader@tcp(localhost:3306)/oreader?parseTime=true` | Yes |
 | `JWT_SECRET_KEY` | JWT signing secret (min 32 chars) | - | Yes |
 | `ENV` | Environment mode (development/production) | `development` | No |
 | `PORT` | Server port | `8080` | No |
@@ -254,10 +261,18 @@ See `.env.example` for all available options.
 
 ### Production Deployment
 
+```bash
+# Start production environment with Docker Compose
+docker compose --profile prod up -d
+
+# Or build and deploy manually
+make build
+```
+
 For production deployment, ensure:
 
-1. Set `OREADER_CONFIG=production`
-2. Use MySQL database with `DATABASE_URL` in format: `user:password@tcp(host:port)/dbname`
+1. Set `ENV=production`
+2. Use MySQL database with `DATABASE_URL` in format: `mysql://user:password@tcp(host:port)/dbname?parseTime=true`
 3. Set a strong `JWT_SECRET_KEY` (min 32 characters)
 4. Enable HTTPS/TLS
 5. Configure proper CORS origins
@@ -265,28 +280,55 @@ For production deployment, ensure:
 
 ## Docker Deployment
 
-### Using Docker Compose (Development)
+All environments are managed through a single `docker-compose.yml` using profiles.
+
+### Development (Default)
 
 ```bash
-docker-compose up
+docker compose up              # Start dev environment
+docker compose up --build      # Rebuild and start
+docker compose down            # Stop
 ```
 
-### Using Docker Compose (Production)
+### Production
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker compose --profile prod up -d      # Start production
+docker compose --profile prod down       # Stop
 ```
 
-### Building Docker Image
+### Testing
 
 ```bash
-make docker-build
+docker compose --profile test up --abort-on-container-exit   # Run tests
 ```
 
-### Running Docker Container
+### Tools (phpMyAdmin)
 
 ```bash
-make docker-run
+docker compose --profile tools up phpmyadmin                # Standalone
+docker compose --profile prod --profile tools up            # With production
+```
+
+### Access Points
+
+| Environment | URL | Notes |
+|-------------|-----|-------|
+| Development | `http://<HOST_IP>:5173` | Vite dev server + hot reload |
+| Production | `http://<HOST_IP>:8080` | Embedded frontend, static binary |
+| phpMyAdmin | `http://<HOST_IP>:8081` | Database management |
+
+### Makefile Shortcuts
+
+```bash
+make docker-dev        # Development environment
+make docker-prod       # Production environment
+make docker-test       # Run tests in Docker
+make docker-down       # Stop development
+make docker-down-prod  # Stop production
+make docker-logs       # Follow logs
+make docker-build      # Build all images
+make docker-clean      # Remove containers, volumes, images
 ```
 
 ## API Documentation

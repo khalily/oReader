@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"oreader/internal/infra/grpc"
 	"oreader/internal/model"
+	"oreader/internal/testutil"
 )
 
 // mockPaperConverterClient is a mock for the gRPC client
@@ -142,18 +142,14 @@ func (r *gormPaperTagRepo) GetByPaperID(ctx context.Context, paperID string) ([]
 
 func setupPaperServiceDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	// Use file-based SQLite with shared cache for cross-goroutine access
-	dbPath := filepath.Join(t.TempDir(), "test.db")
-	db, err := gorm.Open(sqlite.Open(dbPath+"?_journal_mode=WAL"), &gorm.Config{})
-	require.NoError(t, err)
+	db := testutil.SetupTestDB(t)
 
-	err = db.AutoMigrate(
+	err := db.AutoMigrate(
 		&model.User{},
 		&model.Paper{},
 		&model.PaperTag{},
 	)
 	require.NoError(t, err)
-
 	return db
 }
 

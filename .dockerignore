@@ -26,10 +26,16 @@ web/dist
 
 # Go files
 vendor
-# Don't exclude go.sum - it's needed for Docker build
-# *.sum
 *.test
 *.out
+
+# Python cache and bytecode
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+converter/models
 
 # IDE and editor files
 .vscode
@@ -40,7 +46,6 @@ vendor
 .DS_Store
 
 # Test files
-*.test
 coverage
 .testcoverage.yml
 
@@ -66,5 +71,5 @@ tmp
 temp
 *.tmp
 
-# Claude files
-.claude
+# Uploads (runtime data)
+uploads

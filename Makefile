@@ -1,4 +1,7 @@
-.PHONY: test test-all build run migrate-up migrate-down migrate-create clean converter-install converter-dev converter-test
+.PHONY: test test-all build run migrate-up migrate-down migrate-create clean \
+       converter-install converter-dev converter-test \
+       docker-dev docker-prod docker-test docker-down docker-down-prod \
+       docker-logs docker-build docker-clean
 
 # Go parameters
 GOCMD=go
@@ -10,7 +13,6 @@ GOMOD=$(GOCMD) mod
 
 # Binary names
 BINARY_NAME=oreader
-BINARY_UNIX=$(BINARY_NAME)_unix
 
 # Main package
 MAIN_PACKAGE=./cmd/server
@@ -24,12 +26,12 @@ COVERAGE_FILE=$(COVERAGE_DIR)/coverage.out
 
 # Database migration
 MIGRATIONS_DIR=./migrations
-DATABASE_URL?=oreader.db
+DATABASE_URL?=mysql://oreader:oreader@tcp(localhost:3306)/oreader?charset=utf8mb4&parseTime=True&loc=Local
 
 # Default target
 all: test build
 
-## test: Run all tests with coverage
+## test: Run all tests with coverage (requires MySQL)
 test:
 	@mkdir -p $(COVERAGE_DIR)
 	$(GOTEST) -v -race -coverprofile=$(COVERAGE_FILE) ./internal/... || true
@@ -54,32 +56,32 @@ build-prepare:
 ## build: Build the binary with embedded frontend (alias for build-prod)
 build: build-prod
 
-## build-prod: Build production binary with embedded frontend
+## build-prod: Build production binary with embedded frontend (pure Go, no CGO)
 build-prod: build-prepare
 	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
+	CGO_ENABLED=0 $(GOBUILD) -ldflags="-w -s" -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
 	@echo "Production binary: $(BUILD_DIR)/$(BINARY_NAME)"
 
 ## dev: Run backend in API-only mode (no frontend build required)
 dev:
-	$(GOCMD) run -tags noembed $(MAIN_PACKAGE)
+	CGO_ENABLED=0 $(GOCMD) run -tags noembed $(MAIN_PACKAGE)
 
-## dev-full: Run full dev environment (backend + frontend + converter)
+## dev-full: Run full dev environment via Docker Compose
 dev-full:
-	@./dev.sh
+	docker compose up --build
 
 ## run: Run the application (alias for dev)
 run: dev
 
-## migrate-up: Run database migrations up
+## migrate-up: Run database migrations up (MySQL)
 migrate-up:
 	@echo "Running migrations..."
-	migrate -path $(MIGRATIONS_DIR) -database sqlite3://$(DATABASE_URL) up
+	migrate -path $(MIGRATIONS_DIR) -database "$(DATABASE_URL)" up
 
-## migrate-down: Rollback database migrations
+## migrate-down: Rollback database migrations (MySQL)
 migrate-down:
 	@echo "Rolling back migrations..."
-	migrate -path $(MIGRATIONS_DIR) -database sqlite3://$(DATABASE_URL) down
+	migrate -path $(MIGRATIONS_DIR) -database "$(DATABASE_URL)" down 1
 
 ## migrate-create: Create a new migration file (usage: make migrate-create name=create_users)
 migrate-create:
@@ -88,7 +90,7 @@ migrate-create:
 
 ## migrate-version: Show migration version
 migrate-version:
-	migrate -path $(MIGRATIONS_DIR) -database sqlite3://$(DATABASE_URL) version
+	migrate -path $(MIGRATIONS_DIR) -database "$(DATABASE_URL)" version
 
 ## clean: Clean build artifacts
 clean:
@@ -153,13 +155,41 @@ test-all:
 	@echo ""
 	@echo "========== All Tests Complete =========="
 
-## docker-build: Build Docker image
-docker-build:
-	docker build -t oreader:latest .
+# =============================================================================
+# Docker Compose targets
+# =============================================================================
 
-## docker-run: Run Docker container
-docker-run:
-	docker run -p 8080:8080 oreader:latest
+## docker-dev: Start development environment with Docker Compose
+docker-dev:
+	docker compose up --build
+
+## docker-prod: Start production environment with Docker Compose
+docker-prod:
+	docker compose --profile prod up -d --build
+
+## docker-test: Run tests in Docker Compose environment
+docker-test:
+	docker compose --profile test up --build --abort-on-container-exit
+
+## docker-down: Stop Docker Compose development environment
+docker-down:
+	docker compose down
+
+## docker-down-prod: Stop Docker Compose production environment
+docker-down-prod:
+	docker compose --profile prod down
+
+## docker-logs: View Docker Compose logs (follow mode)
+docker-logs:
+	docker compose logs -f
+
+## docker-build: Build all Docker images
+docker-build:
+	docker compose build
+
+## docker-clean: Remove all Docker Compose resources (including volumes)
+docker-clean:
+	docker compose down -v --rmi local
 
 ## help: Show this help message
 help:

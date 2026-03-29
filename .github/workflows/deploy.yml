@@ -1,0 +1,112 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  # =============================================================================
+  # Build & Push Docker images
+  # =============================================================================
+  build-and-push:
+    name: "Build & Push Images"
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_digest: ${{ steps.build.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}
+          username: ${{ secrets.DOCKER_USERNAME || github.actor }}
+          password: ${{ secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
+      - name: Build and push converter image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./converter
+          file: ./converter/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}-converter
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # =============================================================================
+  # Deploy (template — uncomment and configure for your deployment target)
+  # =============================================================================
+  deploy:
+    name: "Deploy to ${{ inputs.environment || 'staging' }}"
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+    environment: ${{ inputs.environment || 'staging' }}
+
+    steps:
+      - name: Deploy info
+        run: |
+          echo "=== Deployment ==="
+          echo "Image: ${{ needs.build-and-push.outputs.image_tag }}"
+          echo "Digest: ${{ needs.build-and-push.outputs.image_digest }}"
+          echo "Environment: ${{ inputs.environment || 'staging' }}"
+          echo "Ref: ${{ github.ref_name }}"
+
+      # Uncomment and configure for your deployment target:
+      #
+      # - name: Deploy via SSH
+      #   uses: appleboy/ssh-action@v1
+      #   with:
+      #     host: ${{ secrets.DEPLOY_HOST }}
+      #     username: ${{ secrets.DEPLOY_USER }}
+      #     key: ${{ secrets.DEPLOY_SSH_KEY }}
+      #     script: |
+      #       cd /opt/oreader
+      #       docker compose --profile prod pull
+      #       docker compose --profile prod up -d --remove-orphans
+      #       docker compose --profile prod ps

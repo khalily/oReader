@@ -46,10 +46,10 @@ func GetTestOAuthClientSecret() string {
 
 // GetTestDatabaseURL returns a database URL for testing.
 // It first checks the TEST_DATABASE_URL environment variable,
-// then falls back to an in-memory SQLite database.
+// then falls back to a local MySQL test database.
 func GetTestDatabaseURL() string {
 	if url := os.Getenv("TEST_DATABASE_URL"); url != "" {
 		return url
 	}
-	return ":memory:"
+	return "oreader:oreader@tcp(localhost:3306)/oreader_test?charset=utf8mb4&parseTime=True&loc=Local"
 }

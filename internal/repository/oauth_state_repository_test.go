@@ -7,20 +7,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"oreader/internal/model"
+	"oreader/internal/testutil"
 )
 
 func setupOAuthStateTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
+	db := testutil.SetupTestDB(t)
 
 	// Drop table to ensure clean schema with latest model changes
 	_ = db.Migrator().DropTable(&model.OAuthState{})
 
-	err = db.AutoMigrate(&model.OAuthState{})
+	err := db.AutoMigrate(&model.OAuthState{})
 	require.NoError(t, err)
 
 	return db

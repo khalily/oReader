@@ -23,10 +23,13 @@ RUN npm run build
 FROM golang:1.25-alpine AS backend-builder
 
 # Install build dependencies
-# gcc is required for CGO (SQLite support)
-RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev
+# No CGO needed - MySQL driver is pure Go
+RUN apk add --no-cache git ca-certificates tzdata
 
-# Set Go proxy for reliable downloads in China/restricted networks
+# Pure Go build (no CGO)
+ENV CGO_ENABLED=0
+
+# Set Go proxy for reliable downloads
 ENV GOPROXY=https://goproxy.cn,direct
 
 WORKDIR /src
@@ -43,9 +46,7 @@ COPY . .
 # Copy frontend build from previous stage
 COPY --from=frontend-builder /web/dist ./cmd/server/dist
 
-# Build the binary with embedded frontend
-# Note: CGO is enabled for SQLite support (mattn/go-sqlite3 requires CGO)
-# For MySQL-only deployments, you can use CGO_ENABLED=0 for a static binary
+# Build the binary with embedded frontend (static, no CGO)
 RUN go build \
     -ldflags="-w -s -X main.Version=1.0.0" \
     -o /oreader \
@@ -60,8 +61,8 @@ FROM alpine:latest
 # - ca-certificates for HTTPS requests
 # - wget for health check
 # - tzdata for timezone support
-# - libc6-compat for CGO support (SQLite requires CGO)
-RUN apk add --no-cache ca-certificates wget tzdata libc6-compat
+# No libc6-compat needed - pure Go binary, no CGO
+RUN apk add --no-cache ca-certificates wget tzdata
 
 # Copy the binary
 COPY --from=backend-builder /oreader /oreader

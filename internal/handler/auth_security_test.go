@@ -9,18 +9,15 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"oreader/internal/model"
 	"oreader/internal/repository"
+	"oreader/internal/testutil"
 )
 
-// setupSecurityTestDB creates an in-memory database for security testing
+// setupSecurityTestDB creates a test database for security testing
 func setupSecurityTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := testutil.SetupTestDB(t)
 
 	if err := db.AutoMigrate(&model.User{}, &model.Feed{}, &model.UserFeed{}, &model.Item{}, &model.UserItemState{}); err != nil {
 		t.Fatalf("Failed to migrate database: %v", err)

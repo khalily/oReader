@@ -32,18 +32,18 @@ export default defineConfig({
     host: '0.0.0.0', // Allow external access
     proxy: {
       '/auth': {
-        target: 'http://localhost:8080',
-        changeOrigin: false,
+        target: process.env.VITE_API_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
         secure: false,
       },
       '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: false,
+        target: process.env.VITE_API_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
         secure: false,
       },
       '/health': {
-        target: 'http://localhost:8080',
-        changeOrigin: false,
+        target: process.env.VITE_API_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
         secure: false,
       },
     },

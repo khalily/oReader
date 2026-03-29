@@ -6,20 +6,16 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"oreader/internal/model"
 	"oreader/internal/service"
+	"oreader/internal/testutil"
 )
 
-// setupFeedDB creates an in-memory database for testing
+// setupFeedDB creates a test database for testing
 func setupFeedDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := testutil.SetupTestDB(t)
 
 	// Migrate tables
 	if err := db.AutoMigrate(&model.Feed{}, &model.UserFeed{}, &model.User{}, &model.Item{}); err != nil {
@@ -29,14 +25,9 @@ func setupFeedDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// setupFeedDBShared creates a shared in-memory database for concurrent access testing
+// setupFeedDBShared creates a test database for concurrent access testing
 func setupFeedDBShared(t *testing.T) *gorm.DB {
-	// Use unique database name with timestamp to avoid conflicts between test runs
-	dbName := fmt.Sprintf("file:test_%s_%d?cache=shared", t.Name(), time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := testutil.SetupTestDB(t)
 
 	// Migrate tables
 	if err := db.AutoMigrate(&model.Feed{}, &model.UserFeed{}, &model.User{}, &model.Item{}); err != nil {
@@ -47,10 +38,7 @@ func setupFeedDBShared(t *testing.T) *gorm.DB {
 }
 
 func setupUserDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := testutil.SetupTestDB(t)
 
 	if err := db.AutoMigrate(&model.User{}); err != nil {
 		t.Fatalf("Failed to migrate database: %v", err)
@@ -889,7 +877,7 @@ func TestFeedRepository_RaceCondition_ConcurrentReads(t *testing.T) {
 }
 
 // TestFeedRepository_RaceCondition_ConcurrentWrites tests concurrent write operations
-// Note: SQLite has limited concurrent write support
+// Note: MySQL has limited concurrent write support
 func TestFeedRepository_RaceCondition_ConcurrentWrites(t *testing.T) {
 	db := setupFeedDBShared(t)
 	repo := NewFeedRepository(db)
@@ -917,7 +905,7 @@ func TestFeedRepository_RaceCondition_ConcurrentWrites(t *testing.T) {
 				return
 			}
 			if err := repo.Create(ctx, feed); err != nil {
-				// SQLite may return "database table is locked" which is expected
+				// MySQL may return "database table is locked" which is expected
 				if !strings.Contains(err.Error(), "locked") && !strings.Contains(err.Error(), "busy") {
 					errChan <- err
 				}
@@ -1020,7 +1008,7 @@ func TestFeedRepository_RaceCondition_MixedOperations(t *testing.T) {
 	var wg sync.WaitGroup
 	errChan := make(chan error, numGoroutines)
 
-	// Helper to check if error is a SQLite lock error
+	// Helper to check if error is a MySQL lock error
 	isLockError := func(err error) bool {
 		if err == nil {
 			return false

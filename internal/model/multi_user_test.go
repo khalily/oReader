@@ -6,17 +6,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"oreader/internal/testutil"
 )
 
-// setupTestDB creates an in-memory SQLite database for testing
+// setupTestDB creates a MySQL database for testing
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err, "Failed to connect to test database")
+	db := testutil.SetupTestDB(t)
 
 	// Auto-migrate all models
-	err = db.AutoMigrate(&User{}, &Feed{}, &UserFeed{}, &Item{}, &UserItemState{})
+	err := db.AutoMigrate(&User{}, &Feed{}, &UserFeed{}, &Item{}, &UserItemState{})
 	require.NoError(t, err, "Failed to migrate test database")
 
 	return db

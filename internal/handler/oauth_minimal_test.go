@@ -4,18 +4,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 
 	"oreader/internal/model"
+	"oreader/internal/testutil"
 )
 
 func TestOAuthUserCreation(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
+	db := testutil.SetupTestDB(t)
 
 	_ = db.Migrator().DropTable(&model.User{})
-	err = db.AutoMigrate(&model.User{})
+	err := db.AutoMigrate(&model.User{})
 	require.NoError(t, err)
 
 	user := &model.User{

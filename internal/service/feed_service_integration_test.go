@@ -10,12 +10,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"oreader/internal/infra/rss"
 	"oreader/internal/model"
 	"oreader/internal/repository"
+	"oreader/internal/testutil"
 )
 
 // testParser is a mock RSS parser for testing
@@ -33,9 +33,8 @@ func (p *testParser) Parse(ctx context.Context, url string) (*rss.ParsedFeed, er
 
 // testFeedServiceSetup creates a test environment with in-memory database
 func testFeedServiceSetup(t *testing.T) (*feedService, *repository.FeedRepository, *repository.ItemRepository, *repository.UserFeedRepository, *testParser) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	err = db.AutoMigrate(&model.Feed{}, &model.Item{}, &model.UserFeed{})
+	db := testutil.SetupTestDB(t)
+	err := db.AutoMigrate(&model.Feed{}, &model.Item{}, &model.UserFeed{})
 	require.NoError(t, err)
 
 	feedRepo := repository.NewFeedRepository(db)

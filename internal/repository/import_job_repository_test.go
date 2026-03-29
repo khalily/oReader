@@ -5,17 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"oreader/internal/model"
+	"oreader/internal/testutil"
 )
 
-// setupImportJobDB creates an in-memory database for testing
+// setupImportJobDB creates a test database for testing
 func setupImportJobDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := testutil.SetupTestDB(t)
 
 	// Migrate tables
 	if err := db.AutoMigrate(

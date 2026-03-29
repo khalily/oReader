@@ -13,7 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"oreader/internal/config"
@@ -21,6 +20,7 @@ import (
 	"oreader/internal/infra/password"
 	"oreader/internal/model"
 	"oreader/internal/repository"
+	"oreader/internal/testutil"
 )
 
 func init() {
@@ -28,15 +28,14 @@ func init() {
 }
 
 func setupAuthTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	err = db.AutoMigrate(&model.User{}, &model.RefreshToken{})
+	db := testutil.SetupTestDB(t)
+	err := db.AutoMigrate(&model.User{}, &model.RefreshToken{})
 	require.NoError(t, err)
 	return db
 }
 
 func setupAuthTestConfig(t *testing.T) *config.Config {
-	t.Setenv("DATABASE_URL", ":memory:")
+	t.Setenv("DATABASE_URL", testutil.GetTestDatabaseURL())
 	t.Setenv("JWT_SECRET_KEY", "test-secret-key-must-be-at-least-32-characters")
 	t.Setenv("JWT_ACCESS_TTL", "15m")
 	t.Setenv("JWT_REFRESH_TTL", "168h")

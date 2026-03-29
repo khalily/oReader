@@ -1,0 +1,58 @@
+name: Integration Test
+
+on:
+  pull_request:
+    branches: ['**']
+    paths:
+      - 'internal/**'
+      - 'cmd/**'
+      - 'converter/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile*'
+      - 'go.mod'
+      - 'go.sum'
+      - 'migrations/**'
+  workflow_dispatch:
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-test:
+    name: "Integration: Docker Compose"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run integration tests via Docker Compose
+        run: |
+          export OREADER_DB_PASSWORD=oreader
+          export MYSQL_ROOT_PASSWORD=rootpassword
+          export JWT_SECRET_KEY=test-jwt-secret-for-testing-minimum-32-characters
+          export DOCKER_BUILDKIT=1
+
+          docker compose --profile test up \
+            --build \
+            --abort-on-container-exit \
+            --exit-code-from backend-test \
+            --timeout 120
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          docker compose --profile test logs --no-color > integration-test.log 2>&1 || true
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs
+          path: integration-test.log
+          retention-days: 7
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --profile test down -v --remove-orphans

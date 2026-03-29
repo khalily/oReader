@@ -7,17 +7,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"oreader/internal/model"
+	"oreader/internal/testutil"
 )
 
 func setupStatsTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
+	db := testutil.SetupTestDB(t)
 
-	err = db.AutoMigrate(
+	err := db.AutoMigrate(
 		&model.User{},
 		&model.Feed{},
 		&model.UserFeed{},

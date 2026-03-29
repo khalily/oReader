@@ -9,55 +9,39 @@ import (
 )
 
 func TestNewConnection(t *testing.T) {
-	tests := []struct {
-		name        string
-		dsn         string
-		expectError bool
-	}{
-		{
-			name:        "sqlite in-memory database",
-			dsn:         ":memory:",
-			expectError: false,
-		},
-		{
-			name:        "sqlite file database",
-			dsn:         "test.db",
-			expectError: false,
-		},
-		{
-			name:        "empty dsn",
-			dsn:         "",
-			expectError: true,
-		},
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL not set, skipping MySQL connection test")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			db, err := NewConnection(tt.dsn)
+	db, err := NewConnection(dsn)
+	require.NoError(t, err)
+	require.NotNil(t, db)
 
-			if tt.expectError {
-				require.Error(t, err)
-				return
-			}
-
-			require.NoError(t, err)
-			require.NotNil(t, db)
-
-			// Clean up
-			sqlDB, err := db.DB()
-			if err == nil {
-				sqlDB.Close()
-			}
-
-			if tt.dsn == "test.db" {
-				os.Remove("test.db")
-			}
-		})
+	// Clean up
+	sqlDB, err := db.DB()
+	if err == nil {
+		sqlDB.Close()
 	}
 }
 
+func TestNewConnectionEmptyDSN(t *testing.T) {
+	_, err := NewConnection("")
+	require.Error(t, err)
+}
+
+func TestNewConnectionInvalidDSN(t *testing.T) {
+	_, err := NewConnection("mysql://invalid:invalid@tcp(nonexistent:3306)/nonexistent")
+	require.Error(t, err)
+}
+
 func TestConnectionPool(t *testing.T) {
-	db, err := NewConnection(":memory:")
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL not set, skipping MySQL connection pool test")
+	}
+
+	db, err := NewConnection(dsn)
 	require.NoError(t, err)
 	defer func() {
 		sqlDB, _ := db.DB()
