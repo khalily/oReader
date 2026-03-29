@@ -8,6 +8,9 @@ WORKDIR /web
 # Copy package files first for better caching
 COPY web/package.json web/package-lock.json ./
 
+# Use domestic npm mirror for faster downloads
+RUN npm config set registry https://registry.npmmirror.com
+
 # Install dependencies
 RUN npm ci --only=production=false
 
@@ -21,6 +24,9 @@ RUN npm run build
 # Stage 2: Build Go Backend with Embedded Frontend
 # =============================================================================
 FROM golang:1.25-alpine AS backend-builder
+
+# Use domestic Alpine mirror for faster downloads
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
 
 # Install build dependencies
 # No CGO needed - MySQL driver is pure Go
@@ -56,6 +62,9 @@ RUN go build \
 # Stage 3: Final Minimal Image
 # =============================================================================
 FROM alpine:latest
+
+# Use domestic Alpine mirror for faster downloads
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
 
 # Install runtime dependencies
 # - ca-certificates for HTTPS requests

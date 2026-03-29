@@ -70,8 +70,8 @@ def parse_metadata_response(response: str) -> PaperMetadataResult | None:
     # Strip markdown code fences if present
     cleaned = response.strip()
     if cleaned.startswith("```"):
-        cleaned = re.sub(r'^```\w*\n?', '', cleaned)
-        cleaned = re.sub(r'\n?```$', '', cleaned)
+        cleaned = re.sub(r"^```\w*\n?", "", cleaned)
+        cleaned = re.sub(r"\n?```$", "", cleaned)
 
     try:
         data = json.loads(cleaned)
@@ -119,17 +119,18 @@ def refine_markdown(markdown: str) -> str:
     if client is None:
         return markdown
 
-    prompt = f"""Fix formatting issues in this Markdown converted from a PDF academic paper.
-Rules:
-- Fix broken LaTeX formulas (ensure $...$ and $$...$$ are properly paired)
-- Fix table formatting
-- Remove page numbers, headers, footers
-- Fix paragraph breaks
-- Keep all content, don't remove anything important
-- Return the corrected markdown only
-
-Markdown:
-{markdown[:20000]}"""
+    prompt = (
+        "Fix formatting issues in this Markdown converted from a PDF academic paper.\n"
+        "Rules:\n"
+        "- Fix broken LaTeX formulas (ensure $...$ and $$...$$ are properly paired)\n"
+        "- Fix table formatting\n"
+        "- Remove page numbers, headers, footers\n"
+        "- Fix paragraph breaks\n"
+        "- Keep all content, don't remove anything important\n"
+        "- Return the corrected markdown only\n"
+        "\n"
+        f"Markdown:\n{markdown[:20000]}"
+    )
 
     try:
         response = client.chat.completions.create(

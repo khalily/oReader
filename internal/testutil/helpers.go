@@ -33,6 +33,27 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	})
 	require.NoError(t, err, "Failed to connect to test database (set TEST_DATABASE_URL env var)")
 
+	// Clean all business tables to prevent data pollution between parallel tests.
+	// Order matters due to foreign key constraints: child tables first.
+	cleanTables := []string{
+		"paper_collection_items",
+		"paper_tags",
+		"user_item_states",
+		"user_feeds",
+		"import_jobs",
+		"refresh_tokens",
+		"pending_oauths",
+		"oauth_states",
+		"items",
+		"papers",
+		"paper_collections",
+		"feeds",
+		"users",
+	}
+	for _, table := range cleanTables {
+		db.Exec("DELETE FROM " + table)
+	}
+
 	t.Cleanup(func() {
 		sqlDB, _ := db.DB()
 		if sqlDB != nil {

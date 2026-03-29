@@ -10,6 +10,9 @@
 # =============================================================================
 FROM golang:1.25-alpine AS development
 
+# Use domestic Alpine mirror for faster downloads
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
+
 # Install development tools
 # No gcc/musl-dev needed - MySQL driver is pure Go, SQLite removed
 RUN apk add --no-cache \
@@ -55,6 +58,9 @@ WORKDIR /web
 
 # Copy package files first for better caching
 COPY web/package.json web/package-lock.json ./
+
+# Use domestic npm mirror for faster downloads
+RUN npm config set registry https://registry.npmmirror.com
 
 # Install all dependencies (including dev)
 RUN npm install

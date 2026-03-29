@@ -2,18 +2,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Use domestic Debian mirror for faster downloads
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+
 # Install system dependencies for MinerU/PDF processing
 # - libgl1, libglib2.0: OpenCV dependencies (used by MinerU)
 # - libgomp1: OpenMP (used by NumPy/PyTorch)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 
 # Create minimal magic-pdf config (required by magic_pdf library)
 # CPU-only mode, formula/table recognition disabled for Docker environments

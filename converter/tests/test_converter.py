@@ -4,16 +4,15 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))  # noqa: E402
 
 # Mock openai before importing converter (not installed in test env)
-sys.modules['openai'] = MagicMock()
+sys.modules["openai"] = MagicMock()
 
 from converter import extract_metadata_prompt, parse_metadata_response  # noqa: E402
 
 
 class TestConverter(unittest.TestCase):
-
     def test_extract_metadata_prompt_contains_required_fields(self):
         prompt = extract_metadata_prompt("# Test Paper\n\nSome content")
         self.assertIn("title", prompt.lower())
@@ -22,14 +21,16 @@ class TestConverter(unittest.TestCase):
         self.assertIn("keywords", prompt.lower())
 
     def test_parse_metadata_response_valid_json(self):
-        response = json.dumps({
-            "title": "Test Paper",
-            "authors": ["Alice", "Bob"],
-            "abstract": "This is abstract",
-            "keywords": ["ML", "AI"],
-            "published_year": "2024",
-            "doi": "10.1234/test"
-        })
+        response = json.dumps(
+            {
+                "title": "Test Paper",
+                "authors": ["Alice", "Bob"],
+                "abstract": "This is abstract",
+                "keywords": ["ML", "AI"],
+                "published_year": "2024",
+                "doi": "10.1234/test",
+            }
+        )
         result = parse_metadata_response(response)
         self.assertEqual(result.title, "Test Paper")
         self.assertEqual(result.authors, ["Alice", "Bob"])
@@ -47,5 +48,5 @@ class TestConverter(unittest.TestCase):
         self.assertIsNone(result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

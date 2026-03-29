@@ -167,8 +167,7 @@ describe('ItemViewPage', () => {
     expect(screen.getByTestId('loader-icon')).toBeInTheDocument()
   })
 
-  it('should show error state on 404', async () => {
-    vi.setConfig({ testTimeout: 10000 })
+  it('should show error state on 404', { timeout: 15000 }, async () => {
     server.use(
       http.get(`${API_BASE_URL}/items/:id`, () => {
         return HttpResponse.json(

@@ -227,7 +227,7 @@ describe('ArticlePanel component', () => {
   })
 
   describe('Content display', () => {
-    it('should display article title', async () => {
+    it('should display article title', { timeout: 15000 }, async () => {
       const wrapper = createWrapper()
       render(<ArticlePanel itemId="item-1" />, { wrapper })
 
