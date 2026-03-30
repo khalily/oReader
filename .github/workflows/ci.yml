@@ -109,7 +109,6 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: ${{ needs.load-versions.outputs.GOLANGCI_LINT_VERSION }}
-          install-mode: goinstall
           working-directory: backend
           args: --timeout=5m
 
@@ -283,7 +282,7 @@ jobs:
 
       - name: Sync dependencies
         working-directory: services/converter
-        run: uv sync
+        run: uv sync --prerelease=allow
 
       - name: Run converter tests
         working-directory: services/converter
