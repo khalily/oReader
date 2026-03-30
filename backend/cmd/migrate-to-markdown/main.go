@@ -45,7 +45,7 @@ func main() {
 		log.Print("Continue? (y/N): ")
 
 		var confirm string
-		fmt.Scanln(&confirm)
+		_, _ = fmt.Scanln(&confirm)
 		if strings.ToLower(confirm) != "y" {
 			log.Println("Migration cancelled.")
 			os.Exit(0)

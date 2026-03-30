@@ -37,7 +37,7 @@ func loadSpec(t *testing.T) *openapi3.T {
 	specOnce.Do(func() {
 		loader := openapi3.NewLoader()
 		loader.IsExternalRefsAllowed = true
-		specDoc, specErr = loader.LoadFromFile("../../docs/openapi.yaml")
+		specDoc, specErr = loader.LoadFromFile("../../../docs/openapi.yaml")
 	})
 	require.NoError(t, specErr, "Failed to load OpenAPI spec")
 	require.NotNil(t, specDoc, "OpenAPI spec is nil")

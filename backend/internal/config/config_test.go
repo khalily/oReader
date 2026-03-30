@@ -87,7 +87,7 @@ func TestLoadConfig(t *testing.T) {
 
 			// Set test environment variables
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
+				_ = os.Setenv(k, v)
 			}
 
 			cfg, err := Load()
@@ -194,6 +194,6 @@ func clearEnvVars() {
 		"GITHUB_CLIENT_SECRET",
 	}
 	for _, v := range envVars {
-		os.Unsetenv(v)
+		_ = os.Unsetenv(v)
 	}
 }

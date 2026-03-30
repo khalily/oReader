@@ -96,7 +96,7 @@ func (h *ImportHandler) ImportFeeds(c *gin.Context) {
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to read file", nil)
 		return
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	// Read file content
 	var buf bytes.Buffer

@@ -200,8 +200,8 @@ func TestAuthorization_CrossUserAccess(t *testing.T) {
 	if err := user2.GenerateID(); err != nil {
 		t.Fatal(err)
 	}
-	userRepo.Create(context.Background(), user1)
-	userRepo.Create(context.Background(), user2)
+	_ = userRepo.Create(context.Background(), user1)
+	_ = userRepo.Create(context.Background(), user2)
 
 	// Create feed
 	feed := &model.Feed{FeedURL: "https://example.com/feed.xml", Title: "User1 Feed"}

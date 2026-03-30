@@ -37,16 +37,6 @@ func setupFeedDBShared(t *testing.T) *gorm.DB {
 	return db
 }
 
-func setupUserDB(t *testing.T) *gorm.DB {
-	db := testutil.SetupTestDB(t)
-
-	if err := db.AutoMigrate(&model.User{}); err != nil {
-		t.Fatalf("Failed to migrate database: %v", err)
-	}
-
-	return db
-}
-
 func TestFeedRepository_Create(t *testing.T) {
 	db := setupFeedDB(t)
 	repo := NewFeedRepository(db)

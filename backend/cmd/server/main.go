@@ -49,7 +49,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to get database connection")
 		os.Exit(1)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	log.Info().Str("database", cfg.Database.URL).Msg("Connected to database")
 

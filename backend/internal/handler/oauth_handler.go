@@ -420,7 +420,7 @@ func (h *OAuthHandler) exchangeGitHubCode(ctx context.Context, code string, redi
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -454,7 +454,7 @@ func (h *OAuthHandler) getGitHubUser(ctx context.Context, accessToken string) (*
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -485,7 +485,7 @@ func (h *OAuthHandler) fetchGitHubEmails(ctx context.Context, accessToken string
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -502,6 +502,8 @@ func (h *OAuthHandler) fetchGitHubEmails(ctx context.Context, accessToken string
 }
 
 // findOrCreateUser finds an existing user or creates a new one from GitHub profile
+//
+//nolint:unused // reserved for future OAuth provider expansion
 func (h *OAuthHandler) findOrCreateUser(ctx context.Context, githubUser *GitHubUser) (*model.User, error) {
 	githubID := fmt.Sprintf("%d", githubUser.ID)
 
@@ -563,6 +565,8 @@ func (h *OAuthHandler) findOrCreateUser(ctx context.Context, githubUser *GitHubU
 }
 
 // updateUserFromGitHub updates user fields from GitHub profile
+//
+//nolint:unused // reserved for future OAuth provider expansion
 func (h *OAuthHandler) updateUserFromGitHub(user *model.User, githubUser *GitHubUser) {
 	if githubUser.Name != "" {
 		user.Nickname = githubUser.Name

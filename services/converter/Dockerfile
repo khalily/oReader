@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 libgomp1 && rm -rf /var/lib/apt/lists/*
 
 COPY services/converter/pyproject.toml .
-RUN uv pip install --system --no-cache -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com .
+RUN uv pip install --system --no-cache --prerelease=allow -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com .
 
 RUN echo '{"layout-config":{"model":"doclayout_yolo"},"formula-config":{"mfd_model":"yolo_v8_mfd","mfr_model":"unimernet_small","enable":false},"table-config":{"model":"tablemaster","enable":false,"max_time":60},"device-mode":"cpu"}' > /root/magic-pdf.json
 

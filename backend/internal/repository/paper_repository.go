@@ -79,8 +79,6 @@ func (r *paperRepository) ListByUserID(ctx context.Context, userID string, opts 
 		sort = "title"
 	case "published_year":
 		sort = "published_year"
-	default:
-		sort = "created_at"
 	}
 
 	order := "DESC"

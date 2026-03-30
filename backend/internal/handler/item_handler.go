@@ -48,10 +48,11 @@ func (h *ItemHandler) ListItems(c *gin.Context) {
 
 	var starred *bool
 	if starredStr := c.Query("starred"); starredStr != "" {
-		if starredStr == "true" {
+		switch starredStr {
+		case "true":
 			val := true
 			starred = &val
-		} else if starredStr == "false" {
+		case "false":
 			val := false
 			starred = &val
 		}
@@ -59,10 +60,11 @@ func (h *ItemHandler) ListItems(c *gin.Context) {
 
 	var read *bool
 	if readStr := c.Query("read"); readStr != "" {
-		if readStr == "true" {
+		switch readStr {
+		case "true":
 			val := true
 			read = &val
-		} else if readStr == "false" {
+		case "false":
 			val := false
 			read = &val
 		}
@@ -70,10 +72,11 @@ func (h *ItemHandler) ListItems(c *gin.Context) {
 
 	var publishedToday *bool
 	if publishedTodayStr := c.Query("published_today"); publishedTodayStr != "" {
-		if publishedTodayStr == "true" {
+		switch publishedTodayStr {
+		case "true":
 			val := true
 			publishedToday = &val
-		} else if publishedTodayStr == "false" {
+		case "false":
 			val := false
 			publishedToday = &val
 		}

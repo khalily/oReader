@@ -154,7 +154,7 @@ func loadOpenAPISpec(t *testing.T) *openapiSpec {
 	t.Helper()
 
 	// Walk up from testutil/ to find docs/openapi.yaml
-	specPath := "../../docs/openapi.yaml"
+	specPath := "../../../docs/openapi.yaml"
 	data, err := os.ReadFile(specPath)
 	require.NoError(t, err, "Failed to read OpenAPI spec at %s", specPath)
 

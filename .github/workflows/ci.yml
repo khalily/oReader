@@ -62,7 +62,7 @@ jobs:
   openapi-test:
     name: "OpenAPI: Route & Contract Tests"
     runs-on: ubuntu-latest
-    needs: [load-versions, version-drift]
+    needs: [load-versions, version-drift, openapi-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -106,17 +106,16 @@ jobs:
         run: go vet ./internal/...
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: ${{ needs.load-versions.outputs.GOLANGCI_LINT_VERSION }}
-          install-mode: goinstall
           working-directory: backend
           args: --timeout=5m
 
   backend-test:
     name: "Backend: Test"
     runs-on: ubuntu-latest
-    needs: [load-versions, version-drift]
+    needs: [load-versions, version-drift, backend-lint]
     services:
       mysql:
         image: mysql:${{ needs.load-versions.outputs.MYSQL_VERSION }}
@@ -192,7 +191,7 @@ jobs:
   frontend-test:
     name: "Frontend: Test"
     runs-on: ubuntu-latest
-    needs: [load-versions, version-drift]
+    needs: [load-versions, version-drift, frontend-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -216,34 +215,6 @@ jobs:
         with:
           name: frontend-coverage
           path: frontend/coverage/
-
-  frontend-build:
-    name: "Frontend: Build"
-    runs-on: ubuntu-latest
-    needs: [load-versions, version-drift]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ needs.load-versions.outputs.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: TypeScript check + Vite build
-        working-directory: frontend
-        run: npm run build
-
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-          retention-days: 1
 
   converter-lint:
     name: "Converter: Lint"
@@ -270,7 +241,7 @@ jobs:
   converter-test:
     name: "Converter: Test"
     runs-on: ubuntu-latest
-    needs: [load-versions, version-drift]
+    needs: [load-versions, version-drift, converter-lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -283,7 +254,7 @@ jobs:
 
       - name: Sync dependencies
         working-directory: services/converter
-        run: uv sync
+        run: uv sync --prerelease=allow
 
       - name: Run converter tests
         working-directory: services/converter
@@ -292,7 +263,7 @@ jobs:
   docker-build:
     name: "Docker: Build"
     runs-on: ubuntu-latest
-    needs: [load-versions, version-drift, frontend-build]
+    needs: [load-versions, version-drift, openapi-test, backend-test, frontend-test, converter-test]
     steps:
       - uses: actions/checkout@v4
 

@@ -43,7 +43,7 @@ type paperClient struct {
 
 // NewPaperClient creates a new gRPC client for the paper converter service
 func NewPaperClient(addr string, timeout time.Duration) (PaperConverterClient, error) {
-	conn, err := grpc.Dial(addr,
+	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {

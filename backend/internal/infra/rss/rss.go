@@ -71,7 +71,7 @@ func (f *HTTPFetcher) Fetch(url string) (string, error) {
 			Msg("HTTP request failed")
 		return "", fmt.Errorf("%w: %v", ErrFeedFetchFailed, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		logger.Error().
