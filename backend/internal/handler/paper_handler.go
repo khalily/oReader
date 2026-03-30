@@ -81,7 +81,7 @@ func (h *PaperHandler) UploadPaper(c *gin.Context) {
 		apperrors.SendError(c, http.StatusInternalServerError, apperrors.ErrInternal, "Failed to read uploaded file", nil)
 		return
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	// Read with size limit to prevent memory exhaustion
 	pdfContent, err := io.ReadAll(io.LimitReader(src, h.maxUploadSize+1))

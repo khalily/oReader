@@ -206,7 +206,7 @@ func (s *importService) processImportAsync(ctx context.Context, jobID, userID st
 			if job != nil {
 				job.Processed = processed
 				job.Failed = failed
-				s.importJobRepo.Update(jobCtx, job)
+				_ = s.importJobRepo.Update(jobCtx, job)
 			}
 		}
 	}
@@ -219,7 +219,7 @@ func (s *importService) processImportAsync(ctx context.Context, jobID, userID st
 		job.Failed = failed
 		endTime := time.Now()
 		job.EndedAt = &endTime
-		s.importJobRepo.Update(jobCtx, job)
+		_ = s.importJobRepo.Update(jobCtx, job)
 
 		logger.Info().
 			Str("job_id", jobID).

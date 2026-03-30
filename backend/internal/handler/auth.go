@@ -382,9 +382,9 @@ func (h *Handler) Refresh(c *gin.Context) {
 		return
 	}
 
-	// Revoke old token
+	// Revoke old token (best effort, log on failure)
 	if err := h.tokenRepo.Revoke(c.Request.Context(), tokenHash); err != nil {
-		// Log but continue
+		_ = err // intentionally ignored: revocation failure should not block refresh
 	}
 
 	// Generate new tokens

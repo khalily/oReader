@@ -1,0 +1,21 @@
+version: "2"
+
+issues:
+  # Exclude test files from errcheck
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+
+linters-settings:
+  errcheck:
+    # Ignore common Close/Print patterns in all files
+    ignore: ""

@@ -80,7 +80,7 @@ func (s *paperService) UploadPaper(ctx context.Context, userID string, filename 
 
 	if err := s.paperRepo.Create(ctx, paper); err != nil {
 		// Clean up saved file on DB error
-		os.Remove(pdfPath)
+		_ = os.Remove(pdfPath)
 		return nil, fmt.Errorf("failed to create paper record: %w", err)
 	}
 
