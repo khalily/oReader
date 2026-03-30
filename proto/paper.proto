@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package paper;
+
+option go_package = "github.com/khalily/oreader/proto/go";
+
+service PaperConverter {
+  rpc Convert(PdfConvertRequest) returns (stream ConvertProgress);
+  rpc ExtractMetadata(MetadataRequest) returns (PaperMetadata);
+}
+
+message PdfConvertRequest {
+  bytes pdf_content = 1;
+  string filename = 2;
+}
+
+message ConvertProgress {
+  string status = 1;
+  int32 progress = 2;
+  string markdown = 3;
+  string error = 4;
+}
+
+message MetadataRequest {
+  string markdown = 1;
+}
+
+message PaperMetadata {
+  string title = 1;
+  repeated string authors = 2;
+  string abstract = 3;
+  repeated string keywords = 4;
+  string published_year = 5;
+  string doi = 6;
+}

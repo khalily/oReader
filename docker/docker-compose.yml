@@ -1,0 +1,143 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile.dev
+      args:
+        GO_VERSION: ${GO_VERSION?Set in versions.env}
+    container_name: oreader-backend
+    ports:
+      - "0.0.0.0:${PORT:-8080}:8080"
+    environment:
+      ENV: ${ENV:-development}
+      DATABASE_URL: mysql://oreader:${OREADER_DB_PASSWORD:-oreader}@db:3306/oreader?parseTime=true
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      PORT: "8080"
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      FRONTEND_URL: http://${HOST_IP:-localhost}:5173
+      PAPER_GRPC_ADDR: converter:50051
+      PAPER_UPLOAD_DIR: /data/uploads/papers
+      PAPER_MAX_UPLOAD_SIZE: ${PAPER_MAX_UPLOAD_SIZE:-52428800}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    volumes:
+      - ..:/project
+      - go-module-cache:/root/go/pkg/mod
+      - dev-uploads:/data/uploads
+    working_dir: /project/backend
+    command: >
+      air
+      --build.cmd "go build -o /tmp/oreader ./cmd/server"
+      --build.bin "/tmp/oreader"
+      --build.delay "1000"
+    depends_on:
+      db:
+        condition: service_healthy
+      converter:
+        condition: service_started
+        required: false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - oreader-net
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+      args:
+        NODE_VERSION: ${NODE_VERSION?Set in versions.env}
+    container_name: oreader-frontend
+    ports:
+      - "0.0.0.0:${FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_API_TARGET: http://backend:8080
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - oreader-net
+
+  converter:
+    build:
+      context: ..
+      dockerfile: services/converter/Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION?Set in versions.env}
+    container_name: oreader-converter
+    ports:
+      - "0.0.0.0:${GRPC_PORT:-50051}:50051"
+    environment:
+      GRPC_PORT: "50051"
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+    volumes:
+      - converter-model-cache:/root/.cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 50051)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - oreader-net
+
+  db:
+    image: mysql:${MYSQL_VERSION?Set in versions.env}
+    container_name: oreader-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: oreader
+      MYSQL_USER: oreader
+      MYSQL_PASSWORD: ${OREADER_DB_PASSWORD:-oreader}
+    ports:
+      - "0.0.0.0:${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - oreader-net
+
+  phpmyadmin:
+    image: phpmyadmin:${PHPMYADMIN_VERSION:-5.2}
+    container_name: oreader-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+    ports:
+      - "0.0.0.0:${PMA_PORT:-8081}:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+    profiles:
+      - tools
+    networks:
+      - oreader-net
+
+volumes:
+  mysql-data:
+  go-module-cache:
+  dev-uploads:
+  converter-model-cache:
+
+networks:
+  oreader-net:
+    driver: bridge

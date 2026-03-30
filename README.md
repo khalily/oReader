@@ -67,7 +67,7 @@ cp .env.example .env
 
 3. **Start development environment**:
 ```bash
-docker compose up
+make docker-dev
 ```
 
 This starts all services:
@@ -82,8 +82,7 @@ This starts all services:
 ```bash
 git clone https://github.com/yourusername/oreader.git
 cd oreader
-go mod download
-cd web && npm install
+make install
 ```
 
 2. **Set up MySQL database** and configure `.env`:
@@ -95,10 +94,10 @@ JWT_SECRET_KEY=your-secret-key-minimum-32-characters
 3. **Run the application**:
 ```bash
 # Backend
-make dev
+cd backend && go run ./cmd/server
 
 # Frontend (separate terminal)
-make frontend-dev
+cd frontend && npm run dev
 ```
 
 **Required Environment Variables**:
@@ -139,7 +138,7 @@ cd web && npm run dev
 
 3. **Start converter service** (optional, for Paper Import — separate terminal):
 ```bash
-cd converter && python server.py
+cd services/converter && uv sync && python src/server.py
 ```
 
 **Required Environment Variables**:
@@ -149,17 +148,17 @@ cd converter && python server.py
 ### Running Tests
 
 ```bash
+# Run backend tests (requires MySQL)
+cd backend && make test
+
+# Run frontend tests
+cd frontend && npm test -- --run
+
+# Run converter tests
+cd services/converter && uv run pytest tests/ -v
+
 # Run all tests
-make test
-
-# Run tests with coverage
-go test -cover ./internal/...
-
-# Run specific package tests
-go test ./internal/service
-
-# Run tests without race detection
-make test-short
+make test-all
 ```
 
 ### Running Converter Tests
@@ -285,29 +284,22 @@ All environments are managed through a single `docker-compose.yml` using profile
 ### Development (Default)
 
 ```bash
-docker compose up              # Start dev environment
-docker compose up --build      # Rebuild and start
-docker compose down            # Stop
+make docker-dev          # Start dev environment
+make docker-down         # Stop
+make docker-logs         # Follow logs
+make docker-clean        # Remove all resources
 ```
 
 ### Production
 
 ```bash
-docker compose --profile prod up -d      # Start production
-docker compose --profile prod down       # Stop
+make docker-prod         # Start production
 ```
 
 ### Testing
 
 ```bash
-docker compose --profile test up --abort-on-container-exit   # Run tests
-```
-
-### Tools (phpMyAdmin)
-
-```bash
-docker compose --profile tools up phpmyadmin                # Standalone
-docker compose --profile prod --profile tools up            # With production
+make docker-test         # Run tests in Docker
 ```
 
 ### Access Points
@@ -354,35 +346,48 @@ See [SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) for comprehensive security rev
 
 ```
 oreader/
-├── cmd/
-│   └── server/          # Application entry point
-├── converter/           # Python gRPC Paper converter service
-│   ├── server.py        # gRPC server entry point
-│   ├── converter.py     # PDF conversion & LLM metadata extraction
-│   ├── requirements.txt # Python dependencies
-│   ├── proto/           # Protobuf definitions & generated code
-│   └── tests/           # Converter unit tests
-├── internal/
-│   ├── config/          # Configuration management
-│   ├── handler/         # HTTP request handlers (feeds, items, papers)
-│   ├── infra/
-│   │   ├── grpc/        # gRPC client for paper converter
-│   │   └── markdown/    # Markdown conversion infrastructure
-│   ├── middleware/       # Auth, CSRF, logging middleware
-│   ├── model/           # Domain models (User, Feed, Item, Paper)
-│   ├── repository/      # Database repositories (including paper_repository)
-│   ├── service/         # Business logic (including paper_service)
-│   └── worker/          # Background feed refresh worker
-├── web/                 # React frontend
+├── backend/                # Go backend (module: github.com/khalily/oreader)
+│   ├── cmd/
+│   │   └── server/          # Application entry point
+│   │   └── migrate-to-markdown/  # HTML→Markdown migration tool
+│   ├── internal/
+│   │   ├── config/          # Configuration management
+│   │   ├── handler/         # HTTP request handlers (feeds, items, papers)
+│   │   ├── infra/
+│   │   │   ├── grpc/        # gRPC client for paper converter
+│   │   │   └── markdown/    # Markdown conversion infrastructure
+│   │   ├── middleware/       # Auth, CSRF, logging middleware
+│   │   ├── model/           # Domain models (User, Feed, Item, Paper)
+│   │   ├── repository/      # Database repositories
+│   │   ├── service/         # Business logic
+│   │   └── worker/          # Background feed refresh worker
+│   ├── migrations/          # Database migrations
+│   ├── Dockerfile           # Production build
+│   └── Makefile             # Backend build commands
+├── frontend/               # React frontend
 │   └── src/
-│       ├── components/papers/  # Paper UI components
-│       ├── pages/papers/       # Paper pages
-│       └── hooks/              # Custom hooks (useAuth, useFeeds, useItems, usePapers)
-├── migrations/          # Database migrations
-├── docs/                # Documentation
-├── Makefile             # Build commands
-├── go.mod               # Go module definition
-└── .env.example         # Environment variables template
+│       ├── components/      # UI components (papers, auth, feed, items)
+│       ├── pages/           # Page components
+│       ├── hooks/           # Custom hooks (useAuth, useFeeds, useItems, usePapers)
+│       └── lib/api/         # Axios API client
+├── services/
+│   └── converter/           # Python gRPC Paper converter service
+│       ├── src/             # server.py, converter.py
+│       ├── tests/           # Converter unit tests
+│       └── pyproject.toml   # uv project config
+├── proto/                  # Protobuf definitions & generated code
+│   ├── paper.proto          # Service definition
+│   ├── go/                  # Generated Go code (independent module)
+│   └── python/              # Generated Python code
+├── docker/                 # Docker Compose configurations
+│   ├── docker-compose.yml       # Development
+│   ├── docker-compose.prod.yml  # Production
+│   └── docker-compose.test.yml  # Testing
+├── docs/                   # Documentation
+├── scripts/                # Build/utility scripts
+├── Makefile                # Root build commands (delegates to sub-Makefiles)
+├── versions.env            # Tool version management
+└── .env.example            # Environment variables template
 ```
 
 ## Contributing
@@ -412,7 +417,7 @@ Contributions are welcome! Please follow these steps:
 - **Solution**: Ensure `DATABASE_URL` is correctly set and database exists
 
 **Issue**: Frontend build fails
-- **Solution**: Run `npm install` in the `web/` directory
+- **Solution**: Run `cd frontend && npm install`
 
 **Issue**: JWT secret key error
 - **Solution**: Set `JWT_SECRET_KEY` to a value with at least 32 characters
@@ -421,10 +426,10 @@ Contributions are welcome! Please follow these steps:
 - **Solution**: Ensure you're using Go 1.25 or higher (`go version`)
 
 **Issue**: Paper upload returns "converter service not available"
-- **Solution**: Start the converter service: `cd converter && python server.py`
+- **Solution**: Start the converter service: `cd services/converter && uv sync && python src/server.py`
 
 **Issue**: Paper conversion fails with "MinerU conversion failed"
-- **Solution**: Ensure MinerU is installed: `pip install -r converter/requirements.txt`
+- **Solution**: Ensure MinerU is installed: `cd services/converter && uv sync`
 
 **Issue**: Paper metadata is empty after conversion
 - **Solution**: Set `LLM_API_KEY` in the converter's environment. Without it, metadata extraction is skipped.

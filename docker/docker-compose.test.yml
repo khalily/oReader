@@ -1,0 +1,69 @@
+services:
+  backend-test:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile.dev
+      args:
+        GO_VERSION: ${GO_VERSION?Set in versions.env}
+    container_name: oreader-test
+    environment:
+      ENV: testing
+      DATABASE_URL: mysql://oreader:${OREADER_DB_PASSWORD:-oreader}@db:3306/oreader_test?parseTime=true
+      TEST_DATABASE_URL: oreader:${OREADER_DB_PASSWORD:-oreader}@tcp(db:3306)/oreader_test?charset=utf8mb4&parseTime=True&loc=Local
+      JWT_SECRET_KEY: test-jwt-secret-for-testing-minimum-32-characters
+      PORT: "8080"
+      LOG_LEVEL: debug
+      PAPER_GRPC_ADDR: converter:50051
+    volumes:
+      - ..:/project
+      - go-module-cache:/root/go/pkg/mod
+    working_dir: /project/backend
+    command: ["go", "test", "-v", "-race", "./internal/..."]
+    depends_on:
+      db:
+        condition: service_healthy
+      converter:
+        condition: service_started
+        required: true
+    networks:
+      - oreader-net
+
+  converter:
+    build:
+      context: ..
+      dockerfile: services/converter/Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION?Set in versions.env}
+    container_name: oreader-test-converter
+    environment:
+      GRPC_PORT: "50051"
+    networks:
+      - oreader-net
+
+  db:
+    image: mysql:${MYSQL_VERSION?Set in versions.env}
+    container_name: oreader-test-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: oreader_test
+      MYSQL_USER: oreader
+      MYSQL_PASSWORD: ${OREADER_DB_PASSWORD:-oreader}
+    volumes:
+      - test-mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - oreader-net
+
+volumes:
+  go-module-cache:
+  test-mysql-data:
+
+networks:
+  oreader-net:
+    driver: bridge

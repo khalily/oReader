@@ -1,0 +1,126 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION?Set in versions.env}
+        ALPINE_VERSION: ${ALPINE_VERSION?Set in versions.env}
+    image: oreader:latest
+    container_name: oreader-backend
+    ports:
+      - "0.0.0.0:${PORT:-8080}:8080"
+    environment:
+      ENV: production
+      DATABASE_URL: mysql://oreader:${OREADER_DB_PASSWORD:-oreader}@db:3306/oreader?parseTime=true
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      PORT: "8080"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PAPER_GRPC_ADDR: converter:50051
+      PAPER_UPLOAD_DIR: /data/uploads/papers
+      PAPER_MAX_UPLOAD_SIZE: ${PAPER_MAX_UPLOAD_SIZE:-52428800}
+    volumes:
+      - prod-uploads:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      converter:
+        condition: service_started
+        required: false
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - oreader-net
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION?Set in versions.env}
+    image: oreader-frontend:latest
+    container_name: oreader-frontend
+    ports:
+      - "0.0.0.0:${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - oreader-net
+
+  converter:
+    build:
+      context: ..
+      dockerfile: services/converter/Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION?Set in versions.env}
+    image: oreader-converter:latest
+    container_name: oreader-converter
+    environment:
+      GRPC_PORT: "50051"
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+    volumes:
+      - converter-model-cache:/root/.cache
+    restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 50051)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - oreader-net
+
+  db:
+    image: mysql:${MYSQL_VERSION?Set in versions.env}
+    container_name: oreader-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: oreader
+      MYSQL_USER: oreader
+      MYSQL_PASSWORD: ${OREADER_DB_PASSWORD:-oreader}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - oreader-net
+
+  redis:
+    image: redis:${REDIS_VERSION?Set in versions.env}-alpine
+    container_name: oreader-redis
+    ports:
+      - "0.0.0.0:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+    networks:
+      - oreader-net
+
+volumes:
+  mysql-data:
+  prod-uploads:
+  converter-model-cache:
+  redis-data:
+
+networks:
+  oreader-net:
+    driver: bridge

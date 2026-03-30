@@ -4,14 +4,16 @@ on:
   pull_request:
     branches: ['**']
     paths:
-      - 'internal/**'
-      - 'cmd/**'
-      - 'converter/**'
-      - 'docker-compose.yml'
-      - 'Dockerfile*'
-      - 'go.mod'
-      - 'go.sum'
-      - 'migrations/**'
+      - 'backend/internal/**'
+      - 'backend/cmd/**'
+      - 'services/converter/**'
+      - 'proto/**'
+      - 'docker/docker-compose.test.yml'
+      - 'backend/Dockerfile*'
+      - 'backend/go.mod'
+      - 'backend/go.sum'
+      - 'backend/migrations/**'
+      - 'versions.env'
   workflow_dispatch:
 
 concurrency:
@@ -19,9 +21,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  load-versions:
+    name: "Load Versions"
+    runs-on: ubuntu-latest
+    outputs:
+      GO_VERSION: ${{ steps.export.outputs.GO_VERSION }}
+      NODE_VERSION: ${{ steps.export.outputs.NODE_VERSION }}
+      PYTHON_VERSION: ${{ steps.export.outputs.PYTHON_VERSION }}
+      MYSQL_VERSION: ${{ steps.export.outputs.MYSQL_VERSION }}
+      ALPINE_VERSION: ${{ steps.export.outputs.ALPINE_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export versions.env to job outputs
+        id: export
+        run: |
+          while IFS='=' read -r key value; do
+            [[ "$key" =~ ^#.*$ ]] && continue
+            [[ -z "$key" ]] && continue
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done < versions.env
+
   integration-test:
     name: "Integration: Docker Compose"
     runs-on: ubuntu-latest
+    needs: [load-versions]
     timeout-minutes: 20
 
     steps:
@@ -34,7 +57,13 @@ jobs:
           export JWT_SECRET_KEY=test-jwt-secret-for-testing-minimum-32-characters
           export DOCKER_BUILDKIT=1
 
-          docker compose --profile test up \
+          export GO_VERSION=${{ needs.load-versions.outputs.GO_VERSION }}
+          export NODE_VERSION=${{ needs.load-versions.outputs.NODE_VERSION }}
+          export PYTHON_VERSION=${{ needs.load-versions.outputs.PYTHON_VERSION }}
+          export MYSQL_VERSION=${{ needs.load-versions.outputs.MYSQL_VERSION }}
+          export ALPINE_VERSION=${{ needs.load-versions.outputs.ALPINE_VERSION }}
+
+          docker compose -f docker/docker-compose.test.yml up \
             --build \
             --abort-on-container-exit \
             --exit-code-from backend-test \
@@ -43,7 +72,7 @@ jobs:
       - name: Collect logs on failure
         if: failure()
         run: |
-          docker compose --profile test logs --no-color > integration-test.log 2>&1 || true
+          docker compose -f docker/docker-compose.test.yml logs --no-color > integration-test.log 2>&1 || true
 
       - name: Upload test logs
         if: failure()
@@ -55,4 +84,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose --profile test down -v --remove-orphans
+        run: docker compose -f docker/docker-compose.test.yml down -v --remove-orphans

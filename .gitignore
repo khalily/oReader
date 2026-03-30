@@ -27,14 +27,19 @@ htmlcov/
 go.work
 go.work.sum
 
-# Build
-build/
-dist/
-server
-cmd/server/server
+# Backend
+backend/build/
+backend/coverage/
 
-# Coverage
-coverage/
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Converter
+services/converter/.venv/
+
+# Proto
+proto/go/go.sum
 
 # Database
 *.db
@@ -45,24 +50,18 @@ coverage/
 .env
 .env.local
 .env.*.local
-
-# Keep test environment template
 !.env.test
 
 # Node
 node_modules/
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
+yarn-error-log*
 
 # OS
 .DS_Store
 Thumbs.db
 
-# test
-internal/repository/test_*
-
 # other
 .superpowers
 uploads
-package-lock.json

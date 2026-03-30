@@ -11,78 +11,115 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # =============================================================================
-  # OpenAPI: Lint
-  # =============================================================================
+  load-versions:
+    name: "Load Versions"
+    runs-on: ubuntu-latest
+    outputs:
+      GO_VERSION: ${{ steps.export.outputs.GO_VERSION }}
+      NODE_VERSION: ${{ steps.export.outputs.NODE_VERSION }}
+      PYTHON_VERSION: ${{ steps.export.outputs.PYTHON_VERSION }}
+      MYSQL_VERSION: ${{ steps.export.outputs.MYSQL_VERSION }}
+      REDIS_VERSION: ${{ steps.export.outputs.REDIS_VERSION }}
+      GOLANGCI_LINT_VERSION: ${{ steps.export.outputs.GOLANGCI_LINT_VERSION }}
+      ALPINE_VERSION: ${{ steps.export.outputs.ALPINE_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export versions.env to job outputs
+        id: export
+        run: |
+          while IFS='=' read -r key value; do
+            [[ "$key" =~ ^#.*$ ]] && continue
+            [[ -z "$key" ]] && continue
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+            echo "  $key=$value"
+          done < versions.env
+
+  version-drift:
+    name: "Version Consistency"
+    runs-on: ubuntu-latest
+    needs: [load-versions]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: bash scripts/check-versions.sh
+
   openapi-lint:
     name: "OpenAPI: Lint"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ needs.load-versions.outputs.NODE_VERSION }}
 
       - name: Lint OpenAPI spec
         run: npx @redocly/cli lint docs/openapi.yaml --config .redocly.yaml
 
-  # =============================================================================
-  # OpenAPI: Route & Contract Tests (no MySQL required)
-  # =============================================================================
   openapi-test:
     name: "OpenAPI: Route & Contract Tests"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: ${{ needs.load-versions.outputs.GO_VERSION }}
           cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Download Go modules
+        working-directory: backend
+        run: go mod download
 
       - name: Run OpenAPI route consistency test
+        working-directory: backend
         run: go test -v -run TestOpenAPIRoutes ./internal/testutil/
 
       - name: Run OpenAPI contract tests
+        working-directory: backend
         run: go test -v -run TestContract_ ./internal/testutil/
 
-  # =============================================================================
-  # Backend: Lint
-  # =============================================================================
   backend-lint:
     name: "Backend: Lint"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: ${{ needs.load-versions.outputs.GO_VERSION }}
           cache: true
+          cache-dependency-path: backend/go.sum
 
       - name: Download Go modules
+        working-directory: backend
         run: go mod download
 
       - name: Go vet
+        working-directory: backend
         run: go vet ./internal/...
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v2.11.4
+          version: ${{ needs.load-versions.outputs.GOLANGCI_LINT_VERSION }}
           install-mode: goinstall
+          working-directory: backend
           args: --timeout=5m
 
-  # =============================================================================
-  # Backend: Test (requires MySQL)
-  # =============================================================================
   backend-test:
     name: "Backend: Test"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     services:
       mysql:
-        image: mysql:9.0
+        image: mysql:${{ needs.load-versions.outputs.MYSQL_VERSION }}
         env:
           MYSQL_ROOT_PASSWORD: rootpassword
           MYSQL_DATABASE: oreader_test
@@ -104,20 +141,22 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: ${{ needs.load-versions.outputs.GO_VERSION }}
           cache: true
+          cache-dependency-path: backend/go.sum
 
       - name: Install MySQL client
         run: sudo apt-get update && sudo apt-get install -y mysql-client
 
       - name: Run database migrations
         run: |
-          for f in migrations/*.up.sql; do
+          for f in backend/migrations/*.up.sql; do
             echo "Applying $f..."
             mysql -h 127.0.0.1 -u root -prootpassword oreader_test < "$f"
           done
 
       - name: Run Go tests
+        working-directory: backend
         run: |
           mkdir -p coverage
           go test -v -p 1 -race -coverprofile=coverage/coverage.out -covermode=atomic ./internal/...
@@ -127,52 +166,48 @@ jobs:
         if: always()
         with:
           name: go-coverage
-          path: coverage/coverage.out
+          path: backend/coverage/coverage.out
 
-  # =============================================================================
-  # Frontend: Lint
-  # =============================================================================
   frontend-lint:
     name: "Frontend: Lint"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ needs.load-versions.outputs.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        working-directory: web
+        working-directory: frontend
         run: npm ci
 
       - name: ESLint
-        working-directory: web
+        working-directory: frontend
         run: npm run lint
 
-  # =============================================================================
-  # Frontend: Test
-  # =============================================================================
   frontend-test:
     name: "Frontend: Test"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ needs.load-versions.outputs.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        working-directory: web
+        working-directory: frontend
         run: npm ci
 
       - name: Run Vitest
-        working-directory: web
+        working-directory: frontend
         run: npm test -- --run --coverage
 
       - name: Upload coverage
@@ -180,131 +215,154 @@ jobs:
         if: always()
         with:
           name: frontend-coverage
-          path: web/coverage/
+          path: frontend/coverage/
 
-  # =============================================================================
-  # Frontend: Build
-  # =============================================================================
   frontend-build:
     name: "Frontend: Build"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ needs.load-versions.outputs.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        working-directory: web
+        working-directory: frontend
         run: npm ci
 
       - name: TypeScript check + Vite build
-        working-directory: web
+        working-directory: frontend
         run: npm run build
 
       - name: Upload dist
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: web/dist/
+          path: frontend/dist/
           retention-days: 1
 
-  # =============================================================================
-  # Converter: Lint
-  # =============================================================================
   converter-lint:
     name: "Converter: Lint"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ needs.load-versions.outputs.PYTHON_VERSION }}
 
-      - name: Install lint tools
-        run: pip install flake8 black
+      - name: Install uv and ruff
+        run: pip install uv ruff
 
-      - name: Run flake8
-        run: flake8 converter/ --max-line-length=120 --exclude=converter/proto/,converter/__pycache__
+      - name: Run ruff check
+        working-directory: services/converter
+        run: ruff check src/ tests/
 
-      - name: Check black formatting
-        run: black --check --line-length=120 converter/ --exclude '(proto|__pycache__)'
+      - name: Check ruff formatting
+        working-directory: services/converter
+        run: ruff format --check src/ tests/
 
-  # =============================================================================
-  # Converter: Test
-  # =============================================================================
   converter-test:
     name: "Converter: Test"
     runs-on: ubuntu-latest
+    needs: [load-versions, version-drift]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: converter/requirements.txt
+          python-version: ${{ needs.load-versions.outputs.PYTHON_VERSION }}
 
-      - name: Install test dependencies
-        run: pip install pytest grpcio grpcio-tools
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        working-directory: services/converter
+        run: uv sync
 
       - name: Run converter tests
-        run: cd converter && python -m pytest tests/ -v --tb=short
+        working-directory: services/converter
+        run: uv run pytest tests/ -v --tb=short
 
-  # =============================================================================
-  # Docker: Build (validates production multi-stage build)
-  # =============================================================================
   docker-build:
     name: "Docker: Build"
     runs-on: ubuntu-latest
-    needs: [frontend-build]
+    needs: [load-versions, version-drift, frontend-build]
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build production image
+      - name: Build backend production image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: backend/Dockerfile
           push: false
           load: true
           tags: oreader:ci-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            GO_VERSION=${{ needs.load-versions.outputs.GO_VERSION }}
+            ALPINE_VERSION=${{ needs.load-versions.outputs.ALPINE_VERSION }}
 
-      - name: Verify binary runs
+      - name: Build frontend production image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          push: false
+          load: true
+          tags: oreader-frontend:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_VERSION=${{ needs.load-versions.outputs.NODE_VERSION }}
+
+      - name: Build converter production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/converter/Dockerfile
+          push: false
+          load: true
+          tags: oreader-converter:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            PYTHON_VERSION=${{ needs.load-versions.outputs.PYTHON_VERSION }}
+
+      - name: Verify backend binary runs
         run: docker run --rm oreader:ci-test --help || true
 
-  # =============================================================================
-  # Security: Scan
-  # =============================================================================
   security-scan:
     name: "Security: Scan"
     runs-on: ubuntu-latest
-    needs: [backend-lint]
+    needs: [load-versions, version-drift, backend-lint]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: ${{ needs.load-versions.outputs.GO_VERSION }}
           cache: true
+          cache-dependency-path: backend/go.sum
 
       - name: govulncheck
         uses: golang/govulncheck-action@v1
         with:
-          go-version-input: '1.25'
-          repo-path: .
+          go-version-input: ${{ needs.load-versions.outputs.GO_VERSION }}
+          repo-path: backend
 
       - name: npm audit
-        working-directory: web
+        working-directory: frontend
         run: |
           npm ci
           npm audit --audit-level=high

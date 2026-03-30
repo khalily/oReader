@@ -1,0 +1,11 @@
+ARG NODE_VERSION
+
+FROM node:${NODE_VERSION}-alpine AS frontend-dev
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm config set registry https://registry.npmmirror.com
+RUN npm install
+COPY . .
+EXPOSE 5173
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

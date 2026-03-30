@@ -1,0 +1,22 @@
+[project]
+name = "oreader-converter"
+version = "0.1.0"
+description = "PDF to Markdown converter gRPC service for oReader"
+requires-python = ">=3.11"
+dependencies = [
+    "grpcio~=1.60.0",
+    "grpcio-tools~=1.60.0",
+    "magic-pdf[full]>=0.10.0",
+    "openai>=1.0.0",
+    "python-dotenv~=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest~=8.3.0",
+    "ruff>=0.4.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120

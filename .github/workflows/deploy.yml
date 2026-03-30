@@ -16,15 +16,29 @@ on:
           - production
 
 jobs:
-  # =============================================================================
-  # Build & Push Docker images
-  # =============================================================================
+  load-versions:
+    name: "Load Versions"
+    runs-on: ubuntu-latest
+    outputs:
+      GO_VERSION: ${{ steps.export.outputs.GO_VERSION }}
+      NODE_VERSION: ${{ steps.export.outputs.NODE_VERSION }}
+      PYTHON_VERSION: ${{ steps.export.outputs.PYTHON_VERSION }}
+      ALPINE_VERSION: ${{ steps.export.outputs.ALPINE_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export versions.env to job outputs
+        id: export
+        run: |
+          while IFS='=' read -r key value; do
+            [[ "$key" =~ ^#.*$ ]] && continue
+            [[ -z "$key" ]] && continue
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done < versions.env
+
   build-and-push:
     name: "Build & Push Images"
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
-      image_digest: ${{ steps.build.outputs.digest }}
+    needs: [load-versions]
     permissions:
       contents: read
       packages: write
@@ -55,11 +69,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push backend image
-        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -67,20 +80,33 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             VERSION=${{ github.ref_name }}
+            GO_VERSION=${{ needs.load-versions.outputs.GO_VERSION }}
+            ALPINE_VERSION=${{ needs.load-versions.outputs.ALPINE_VERSION }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}-frontend
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_VERSION=${{ needs.load-versions.outputs.NODE_VERSION }}
 
       - name: Build and push converter image
         uses: docker/build-push-action@v6
         with:
-          context: ./converter
-          file: ./converter/Dockerfile
+          context: .
+          file: services/converter/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}-converter
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            PYTHON_VERSION=${{ needs.load-versions.outputs.PYTHON_VERSION }}
 
-  # =============================================================================
-  # Deploy (template — uncomment and configure for your deployment target)
-  # =============================================================================
   deploy:
     name: "Deploy to ${{ inputs.environment || 'staging' }}"
     runs-on: ubuntu-latest
@@ -92,21 +118,5 @@ jobs:
       - name: Deploy info
         run: |
           echo "=== Deployment ==="
-          echo "Image: ${{ needs.build-and-push.outputs.image_tag }}"
-          echo "Digest: ${{ needs.build-and-push.outputs.image_digest }}"
           echo "Environment: ${{ inputs.environment || 'staging' }}"
           echo "Ref: ${{ github.ref_name }}"
-
-      # Uncomment and configure for your deployment target:
-      #
-      # - name: Deploy via SSH
-      #   uses: appleboy/ssh-action@v1
-      #   with:
-      #     host: ${{ secrets.DEPLOY_HOST }}
-      #     username: ${{ secrets.DEPLOY_USER }}
-      #     key: ${{ secrets.DEPLOY_SSH_KEY }}
-      #     script: |
-      #       cd /opt/oreader
-      #       docker compose --profile prod pull
-      #       docker compose --profile prod up -d --remove-orphans
-      #       docker compose --profile prod ps

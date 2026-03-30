@@ -1,0 +1,22 @@
+ARG GO_VERSION
+
+FROM golang:${GO_VERSION}-alpine AS development
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+RUN apk add --no-cache git make wget bash ca-certificates
+ENV CGO_ENABLED=0
+ENV GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
+
+# 构建 context 是项目根目录
+WORKDIR /project
+
+# 先复制 proto module（replace directive 需要）
+COPY proto/go/ /project/proto/go/
+COPY backend/go.mod backend/go.sum /project/backend/
+
+WORKDIR /project/backend
+RUN go mod download
+
+RUN go install github.com/air-verse/air@latest
+ENV PATH="${PATH}:${HOME}/go/bin"
+
+CMD ["air"]
