@@ -1,7 +1,4 @@
-version: "2"
-
 issues:
-  # Exclude test files from errcheck
   exclude-rules:
     - path: _test\.go
       linters:
@@ -14,8 +11,3 @@ linters:
     - staticcheck
     - unused
     - ineffassign
-
-linters-settings:
-  errcheck:
-    # Ignore common Close/Print patterns in all files
-    ignore: ""
