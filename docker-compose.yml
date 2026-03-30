@@ -122,7 +122,8 @@ services:
       - "0.0.0.0:${DB_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
+    # MySQL 9.0 removed default-authentication-plugin; caching_sha2_password is default
+    # go-sql-driver/mysql v1.8.1+ supports it natively
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]

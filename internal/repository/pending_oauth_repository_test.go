@@ -32,7 +32,7 @@ func TestPendingOAuthRepository_Create(t *testing.T) {
 
 	t.Run("create pending oauth successfully", func(t *testing.T) {
 		pending := &model.PendingOAuth{
-			Token:       "test-token-64-chars-padding-padding-padding-padding-padding-padding",
+			Token:       "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 			GitHubID:    "12345",
 			GitHubLogin: "testuser",
 			Nickname:    "Test User",
@@ -49,14 +49,14 @@ func TestPendingOAuthRepository_Create(t *testing.T) {
 		var found model.PendingOAuth
 		err = db.First(&found, "id = ?", pending.ID).Error
 		assert.NoError(t, err)
-		assert.Equal(t, "test-token-64-chars-padding-padding-padding-padding-padding-padding", found.Token)
+		assert.Equal(t, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", found.Token)
 		assert.Equal(t, "12345", found.GitHubID)
 		assert.Equal(t, "testuser", found.GitHubLogin)
 	})
 
 	t.Run("create with duplicate token fails", func(t *testing.T) {
 		pending1 := &model.PendingOAuth{
-			Token:       "duplicate-token-padding-padding-padding-padding-padding-padding-12",
+			Token:       "b1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 			GitHubID:    "11111",
 			GitHubLogin: "user1",
 			ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -67,7 +67,7 @@ func TestPendingOAuthRepository_Create(t *testing.T) {
 		require.NoError(t, err)
 
 		pending2 := &model.PendingOAuth{
-			Token:       "duplicate-token-padding-padding-padding-padding-padding-padding-12",
+			Token:       "b1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 			GitHubID:    "22222",
 			GitHubLogin: "user2",
 			ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -86,7 +86,7 @@ func TestPendingOAuthRepository_GetByToken(t *testing.T) {
 
 	t.Run("get pending oauth by token", func(t *testing.T) {
 		pending := &model.PendingOAuth{
-			Token:       "get-test-token-padding-padding-padding-padding-padding-padding-34",
+			Token:       "c1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 			GitHubID:    "12345",
 			GitHubLogin: "testuser",
 			Nickname:    "Test User",
@@ -106,14 +106,14 @@ func TestPendingOAuthRepository_GetByToken(t *testing.T) {
 	})
 
 	t.Run("get non-existent token returns nil", func(t *testing.T) {
-		found, err := repo.GetByToken(ctx, "non-existent-token-padding-padding-padding-padding-padding")
+		found, err := repo.GetByToken(ctx, "f1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2")
 		assert.NoError(t, err)
 		assert.Nil(t, found)
 	})
 
 	t.Run("get expired pending oauth still returns it", func(t *testing.T) {
 		pending := &model.PendingOAuth{
-			Token:       "expired-token-padding-padding-padding-padding-padding-padding-56",
+			Token:       "e1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 			GitHubID:    "99999",
 			GitHubLogin: "expireduser",
 			ExpiresAt:   time.Now().Add(-1 * time.Hour), // Expired
@@ -136,7 +136,7 @@ func TestPendingOAuthRepository_Delete(t *testing.T) {
 
 	t.Run("delete pending oauth successfully", func(t *testing.T) {
 		pending := &model.PendingOAuth{
-			Token:       "delete-test-token-padding-padding-padding-padding-padding-padding",
+			Token:       "d1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 			GitHubID:    "12345",
 			GitHubLogin: "testuser",
 			ExpiresAt:   time.Now().Add(5 * time.Minute),
@@ -155,7 +155,7 @@ func TestPendingOAuthRepository_Delete(t *testing.T) {
 	})
 
 	t.Run("delete non-existent token returns no error", func(t *testing.T) {
-		err := repo.Delete(ctx, "non-existent-token-padding-padding-padding-padding-padding")
+		err := repo.Delete(ctx, "f1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2")
 		assert.NoError(t, err)
 	})
 }

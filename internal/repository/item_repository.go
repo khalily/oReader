@@ -130,10 +130,10 @@ func (r *itemRepository) ListByFeedID(ctx context.Context, feedID, userID string
 	}
 
 	// Get items with pagination (preload Feed for frontend display)
-	// Sort by pub_date DESC NULLS LAST (spec-compliant sorting)
+	// Sort by COALESCE(pub_date, '0001-01-01') DESC (spec-compliant sorting)
 	offsetQuery := baseQuery.
 		Preload("Feed").
-		Order("pub_date DESC NULLS LAST").
+		Order("COALESCE(pub_date, '0001-01-01') DESC").
 		Offset(opts.Offset)
 
 	if opts.Limit > 0 {
@@ -198,13 +198,13 @@ func (r *itemRepository) ListStarred(ctx context.Context, userID string, opts se
 		return nil, 0, err
 	}
 
-	// Get states with items, sorted by pub_date DESC NULLS LAST
+	// Get states with items, sorted by COALESCE(pub_date, '0001-01-01') DESC
 	// Only get items from feeds the user is subscribed to
 	query := r.db.WithContext(ctx).
 		Joins("JOIN items ON items.id = user_item_states.item_id").
 		Joins("JOIN user_feeds ON user_feeds.feed_id = items.feed_id AND user_feeds.user_id = ? AND user_feeds.deleted_at IS NULL", userID).
 		Where("user_item_states.user_id = ? AND user_item_states.is_starred = ?", userID, true).
-		Order("items.pub_date DESC NULLS LAST").
+		Order("COALESCE(items.pub_date, '0001-01-01') DESC").
 		Offset(opts.Offset)
 
 	if opts.Limit > 0 {
@@ -260,13 +260,13 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 
 	total += itemsWithoutState
 
-	// Get unread items with states first (sorted by pub_date DESC NULLS LAST)
+	// Get unread items with states first (sorted by COALESCE(pub_date, '0001-01-01') DESC)
 	// Only get items from feeds the user is subscribed to
 	query := r.db.WithContext(ctx).
 		Joins("JOIN items ON items.id = user_item_states.item_id").
 		Joins("JOIN user_feeds ON user_feeds.feed_id = items.feed_id AND user_feeds.user_id = ? AND user_feeds.deleted_at IS NULL", userID).
 		Where("user_item_states.user_id = ? AND user_item_states.is_read = ?", userID, false).
-		Order("items.pub_date DESC NULLS LAST").
+		Order("COALESCE(items.pub_date, '0001-01-01') DESC").
 		Offset(opts.Offset)
 
 	if opts.Limit > 0 {
@@ -301,7 +301,7 @@ func (r *itemRepository) ListUnread(ctx context.Context, userID string, opts ser
 					Model(&model.UserItemState{}).
 					Select("item_id").
 					Where("user_id = ?", userID)).
-			Order("pub_date DESC NULLS LAST").
+			Order("COALESCE(pub_date, '0001-01-01') DESC").
 			Limit(remaining)
 
 		if err := itemQuery.Find(&items).Error; err != nil {

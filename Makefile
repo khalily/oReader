@@ -9,6 +9,9 @@ GOCMD=go
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
+
+# Python: prefer pyenv over system/venv python
+PYTHON=$(shell $(HOME)/.pyenv/shims/python3 -m pytest --version >/dev/null 2>&1 && echo "$(HOME)/.pyenv/shims/python3" || echo "python3")
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 
@@ -35,7 +38,7 @@ all: test build
 ## test: Run all tests with coverage (requires MySQL)
 test:
 	@mkdir -p $(COVERAGE_DIR)
-	$(GOTEST) -v -race -coverprofile=$(COVERAGE_FILE) ./internal/... || true
+	$(GOTEST) -v -race -p 1 -coverprofile=$(COVERAGE_FILE) ./internal/... || true
 	$(GOCMD) tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_DIR)/coverage.html || true
 
 ## test-short: Run short tests
@@ -145,18 +148,18 @@ converter-dev:
 ## converter-test: Run converter unit tests
 converter-test:
 	@echo "Running converter tests..."
-	cd converter && python -m pytest tests/ -v
+	cd converter && $(PYTHON) -m pytest tests/ -v
 
 ## test-all: Run all tests (Go + Frontend + Converter)
 test-all:
 	@echo "========== Running Go Tests =========="
-	$(GOTEST) -v -race ./internal/...
+	$(GOTEST) -v -race -p 1 ./internal/...
 	@echo ""
 	@echo "========== Running Frontend Tests =========="
 	cd web && npm test -- --run
 	@echo ""
 	@echo "========== Running Converter Tests =========="
-	cd converter && python -m pytest tests/ -v
+	cd converter && $(PYTHON) -m pytest tests/ -v
 	@echo ""
 	@echo "========== All Tests Complete =========="
 
