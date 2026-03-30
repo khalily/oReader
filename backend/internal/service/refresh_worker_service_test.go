@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 // refreshMockFeedRepository is a mock specifically for refresh worker tests
 type refreshMockFeedRepository struct {
+	mu          sync.Mutex
 	feeds       []*model.Feed
 	listAllErr  error
 	updateErr   error
@@ -39,6 +41,8 @@ func (m *refreshMockFeedRepository) ListByUserID(ctx context.Context, userID str
 }
 
 func (m *refreshMockFeedRepository) Update(ctx context.Context, feed *model.Feed) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.updateCalls = append(m.updateCalls, feed)
 	if m.updateErr != nil {
 		return m.updateErr

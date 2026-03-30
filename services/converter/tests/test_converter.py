@@ -4,7 +4,7 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))  # noqa: E402
 
 # Mock openai before importing converter (not installed in test env)
 sys.modules["openai"] = MagicMock()
