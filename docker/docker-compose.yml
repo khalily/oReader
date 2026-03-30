@@ -27,7 +27,7 @@ services:
     working_dir: /project/backend
     command: >
       air
-      --build.cmd "go build -o /tmp/oreader ./cmd/server"
+      --build.cmd "go build -buildvcs=false -o /tmp/oreader ./cmd/server"
       --build.bin "/tmp/oreader"
       --build.delay "1000"
     depends_on:

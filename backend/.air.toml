@@ -3,7 +3,7 @@ root = "."
 tmp_dir = "/tmp"
 
 [build]
-  cmd = "go build -o /tmp/oreader ./cmd/server"
+  cmd = "go build -buildvcs=false -o /tmp/oreader ./cmd/server"
   bin = "/tmp/oreader"
   include_ext = ["go"]
   exclude_ext = ["_test.go"]

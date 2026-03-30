@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Development Workflow
+
+- 代码变更后，同步更新 README.md 和 CLAUDE.md
+- 构建/开发/运行方式修改后，同步更新 Makefile、Dockerfile、CI 配置（.github/workflows/）和 versions.env，保障多环境一致性
+- 统一日志格式，API 出入口、关键流程、错误场景添加日志
+- 修改代码时基于 TDD 方式走完整验证流程（Red-Green-Refactor）
+  - 例外：配置文件、纯文案/注释修改、文档类改动可简化流程
+- 脚本/配置中使用绝对路径，脚本自动获取路径
+- 二进制、构建文件等添加到 .gitignore，避免 commit
+- docs/superpowers/ 下的文件也需要 commit（plans、specs 等）
+- 代码 commit 时自动触发 pre-commit lint 检查（`.claude/hooks/pre-commit-lint.sh`）：按暂存文件类型运行 golangci-lint / eslint / flake8+black / redocly。lint 失败会阻止 commit，可用 `--no-verify` 跳过
+
 ## Project Overview
 
 oReader is a modern RSS reader with Go backend and React frontend. It supports multiple users, OAuth (GitHub), feed subscriptions, article management, and academic paper import with PDF-to-Markdown conversion.
@@ -12,14 +24,14 @@ oReader is a modern RSS reader with Go backend and React frontend. It supports m
 backend/                    # Go backend (module: github.com/khalily/oreader)
   cmd/server/               # Main application entry point
   cmd/migrate-to-markdown/  # HTML→Markdown migration tool
-  internal/                 # Internal packages (handler, service, repository, etc.)
+  internal/                 # handler, service, repository, model, middleware, worker, infra, testutil
   migrations/               # SQL migration files
   Dockerfile                # Production build (pure Go, CGO_ENABLED=0)
   Dockerfile.dev            # Development build (air hot-reload)
   Makefile                  # Backend-specific targets
 
 frontend/                   # React frontend (Vite + TypeScript)
-  src/                      # Source code
+  src/                      # components, hooks, pages, stores, lib, types, test
   Dockerfile                # Production build (nginx)
   Dockerfile.dev            # Development build (Vite dev server)
   nginx.conf                # Nginx config for SPA + API proxy
@@ -37,14 +49,16 @@ proto/                      # Protobuf definitions & generated code
   go/                       # Generated Go code (independent Go module)
   python/                   # Generated Python code
 
-docker/                     # Docker Compose configurations
+docker/                     # Docker Compose + environment configs
   docker-compose.yml        # Development environment
   docker-compose.prod.yml   # Production environment
   docker-compose.test.yml   # Test environment
+  .env.example              # Production env template
+  .env.test                 # Test environment overrides
 
 versions.env                # Single source of truth for tool versions
-scripts/                    # Build/utility scripts
-docs/                       # Documentation
+scripts/                    # check-versions.sh, ci-load-versions.sh
+docs/                       # API docs, OpenAPI spec, deployment guide
 ```
 
 ### Environment Setup
@@ -53,47 +67,55 @@ docs/                       # Documentation
 cp .env.example .env   # Required before first run
 ```
 
+## Quick Reference
+
 ### Development Commands
 
 ```bash
 # === Docker Compose (Recommended) ===
 
-make docker-dev          # Start dev environment (backend + frontend + converter + MySQL)
-make docker-prod         # Start prod environment
+make docker-dev          # Start dev (backend + frontend + converter + MySQL)
+make docker-prod         # Start prod
 make docker-test         # Run tests in Docker
 make docker-down         # Stop development
 make docker-logs         # Follow logs
 make docker-clean        # Remove containers + volumes + images
 
 # === Local Development (Without Docker) ===
-# Requires: Go 1.25+, Node.js 22+, MySQL 8.0+, Python 3.11+
+# Requires: Go 1.25+, Node.js 22+, MySQL 9.0, Python 3.11+
 
-# Backend
-cd backend && go run ./cmd/server
+cd backend && go run ./cmd/server                    # Backend
+cd frontend && npm run dev                           # Frontend
+cd services/converter && uv sync && python src/server.py  # Converter
+```
 
-# Frontend
-cd frontend && npm run dev
+### Testing
 
-# Converter service (Python gRPC)
-cd services/converter && uv sync && python src/server.py
-
-# === Testing ===
-
+```bash
 make test                # Backend tests (requires MySQL)
 make test-all            # All tests (backend + frontend + converter)
 
-cd backend && make test  # Backend tests directly
-cd frontend && npm test  # Frontend tests
-cd services/converter && uv run pytest tests/ -v  # Converter tests
+cd backend && make test                            # Backend directly
+cd frontend && npm test -- --run                   # Frontend (Vitest)
+cd frontend && npm run test:e2e                    # E2E (Playwright)
+cd services/converter && uv run pytest tests/ -v   # Converter
+```
 
-# === Lint & Format ===
+- Backend tests require MySQL (`testutil.SetupTestDB()`)
+- Backend test types: unit, security (`*_security_test.go`), integration (`*_integration_test.go`), OpenAPI contract
+- Coverage threshold: 80% (`.testcoverage.yml`)
 
-make lint                # Backend linter
-make lint-all            # All linters
+### Lint & Format
+
+```bash
+make lint                # Backend linter (golangci-lint v2)
+make lint-all            # All linters (backend + frontend + converter)
 make fmt                 # Format all code
+```
 
-# === Database Migrations ===
+### Database Migrations
 
+```bash
 make migrate-up                # Apply migrations
 make migrate-down              # Rollback
 make migrate-create name=xxx   # Create new migration
@@ -103,81 +125,88 @@ make migrate-create name=xxx   # Create new migration
 
 ### Key Patterns
 
-1. **Authentication**: Dual-token JWT system (access + refresh tokens) stored in HttpOnly cookies. CSRF protection via double-submit cookie pattern.
+1. **Authentication**: Dual-token JWT (access + refresh) in HttpOnly cookies. CSRF via double-submit cookie pattern. OAuth (GitHub) supported.
 
-2. **Repository Pattern**: Services depend on repository interfaces, not concrete implementations. This enables testing with mocks.
+2. **Repository Pattern**: Services depend on repository interfaces, not implementations. Enables mock-based testing.
 
-3. **Database**: MySQL only (all environments). No SQLite — pure Go, no CGO dependency (`CGO_ENABLED=0`). Docker Compose provides MySQL for development.
+3. **Database**: MySQL 9.0 only. Pure Go build (`CGO_ENABLED=0`), no CGO dependency. Docker Compose provides MySQL.
 
-4. **Go Module Path**: `github.com/khalily/oreader` (in `backend/go.mod`). Proto generated code is in a separate Go module `github.com/khalily/oreader/proto/go` (in `proto/go/go.mod`), referenced via `replace` directive.
+4. **Go Modules**: Main module `github.com/khalily/oreader` (`backend/go.mod`). Proto code in separate module `github.com/khalily/oreader/proto/go` (`proto/go/go.mod`), linked via `replace` directive.
 
-5. **Docker Compose**: Three compose files in `docker/` — dev, prod, test. Build context is project root for backend and converter (needed for proto replace directive). Frontend uses `frontend/` as context.
+5. **API Proxy**: Vite proxies `/auth`, `/api`, `/health` to backend in dev. Nginx handles proxying in prod. Configurable via `VITE_API_TARGET`.
 
-6. **API Proxy**: In development, Vite proxies `/api/*` requests to the Go backend. In production, nginx handles proxying. Target is configurable via `VITE_API_TARGET` env var.
+6. **Frontend State**: Zustand for client state. TanStack Query for server state via custom hooks. react-router-dom for routing.
 
-7. **Frontend State**: Zustand stores manage client-side state. TanStack Query handles server state via custom hooks.
+7. **Background Worker**: `internal/worker/` runs feed refresh as goroutine with configurable interval (`REFRESH_INTERVAL`).
 
-8. **Background Worker**: `internal/worker/` implements feed refresh as a background goroutine with configurable interval.
+### Docker Services
 
-9. **Pure Go Build**: `CGO_ENABLED=0` — all drivers pure Go. Static binary suitable for `scratch`/`alpine` images.
+| Service | Dev | Prod | Test | Port |
+|---------|-----|------|------|------|
+| backend | air hot-reload | static binary | go test -race | 8080 |
+| frontend | Vite dev server | nginx | — | 5173 (dev) / 80 (prod) |
+| converter | gRPC server | gRPC server | gRPC server | 50051 |
+| db (MySQL 9.0) | required | required | required | 3306 |
+| Redis 7 | — | rate limiting | — | 6379 |
+| phpMyAdmin | `--profile tools` | — | — | 8081 |
 
-## Papers Feature Architecture
+### CI/CD Pipeline
 
-The Papers feature allows users to upload PDF academic papers, auto-convert to Markdown, and extract metadata via a Python gRPC converter service.
+All workflows read versions from `versions.env` via `scripts/ci-load-versions.sh`.
 
-### Architecture Flow
+| Workflow | Trigger | Jobs |
+|----------|---------|------|
+| `ci.yml` | Push/PR any branch | load-versions → version-drift → openapi-lint → openapi-test → backend-lint → backend-test → frontend-lint → frontend-test → converter-lint → converter-test → docker-build → security-scan (govulncheck + npm audit) |
+| `integration.yml` | PR with path filters | Docker Compose integration test |
+| `deploy.yml` | Push to main/master, tags | Build & push images to GHCR → deploy staging/production |
+
+### Version Management
+
+`versions.env` is the single source of truth for tool versions. Propagation:
 
 ```
-User uploads PDF → Go handler validates & saves to disk → Go service spawns goroutine
-  → gRPC Convert() call to Python converter → MinerU parses PDF → LLM refines Markdown
-  → gRPC ExtractMetadata() → Go service updates Paper record → Frontend polls status
+versions.env → Makefile (include) → docker compose (env vars)
+             → Dockerfiles (ARG defaults)
+             → CI workflows (scripts/ci-load-versions.sh)
 ```
+
+Run `make check-versions` to verify consistency across all config files.
+
+### OpenAPI
+
+- Spec: `docs/openapi.yaml` (OpenAPI 3.1)
+- Lint: `.redocly.yaml` — CI runs `openapi-lint` job
+- Contract tests: `backend/internal/testutil/openapi_contract_test.go` validates routes against spec
+
+## Papers Feature
+
+Upload PDF academic papers, auto-convert to Markdown, and extract metadata via Python gRPC converter.
+
+**Flow**: Upload PDF → Go handler saves to disk → goroutine calls gRPC Convert() → MinerU parses + LLM refines → gRPC ExtractMetadata() → update record → frontend polls status.
 
 ### Key Environment Variables
 
-| Component | Variable | Description |
-|-----------|----------|-------------|
-| Go backend | `PAPER_GRPC_ADDR` | Converter service address (default: `localhost:50051`; Docker: `converter:50051`) |
-| Go backend | `PAPER_UPLOAD_DIR` | PDF storage directory (default: `uploads/papers`) |
-| Go backend | `PAPER_MAX_UPLOAD_SIZE` | Max upload size in bytes (default: 52428800 = 50MB) |
-| Python converter | `LLM_API_KEY` | OpenAI-compatible API key (optional, skips LLM if not set) |
-| Python converter | `LLM_BASE_URL` | API base URL (default: OpenAI) |
-| Python converter | `GRPC_PORT` | Server port (default: 50051) |
+| Component | Variable | Default | Description |
+|-----------|----------|---------|-------------|
+| Go backend | `PAPER_GRPC_ADDR` | `localhost:50051` | Converter address (Docker: `converter:50051`) |
+| Go backend | `PAPER_UPLOAD_DIR` | `uploads/papers` | PDF storage directory |
+| Go backend | `PAPER_MAX_UPLOAD_SIZE` | `52428800` (50MB) | Max upload size |
+| Go backend | `PAPER_GRPC_TIMEOUT` | `5m` | gRPC call timeout |
+| Converter | `LLM_API_KEY` | — | OpenAI-compatible key (optional, skips LLM if unset) |
+| Converter | `LLM_BASE_URL` | OpenAI | API base URL |
+| Converter | `LLM_MODEL` | `gpt-4o-mini` | Model for Markdown refinement |
+| Converter | `GRPC_PORT` | `50051` | Server port |
 
-## Markdown Rendering Pipeline
+## Markdown Rendering
 
-### Backend (Go) - `backend/internal/infra/markdown/converter.go`
-
-The backend converts HTML to Markdown before storing in database:
-
-1. **LaTeX delimiter conversion**: Pandoc style `\(...\)` → `$...$` (inline), `\[...\]` → `$$...$$` (block)
-2. **Table support**: `plugin.Table()` enabled for proper Markdown table generation
-3. **Code cleanup**: Removes extra backticks from Jekyll/Rouge syntax highlighting
-4. **Language identifiers are NOT preserved**: Output is ````\ncode\n``` `` instead of ````python\ncode\n``` ``. The frontend must handle this.
-
-### Frontend (React) - `frontend/src/components/ui/MarkdownRenderer.tsx`
-
-Uses `MarkdownHooks` from react-markdown v10 (required for async plugins like Shiki).
-
-Plugin pipeline: `remarkGfm`, `remarkMath`, `rehypeKatex`, `rehypeAddDefaultLang`, `rehypeShiki`
-
-**Critical**: Plugin arrays MUST be module-level constants (not created inside component) to prevent infinite re-processing.
+- Backend (`internal/infra/markdown/converter.go`): HTML → Markdown with LaTeX support (`\(...\)` → `$...$`, `\[...\]` → `$$...$$`). Language identifiers are NOT preserved in code blocks.
+- Frontend (`MarkdownRenderer.tsx`): react-markdown v10 with `MarkdownHooks` (required for async Shiki). Plugins: `remarkGfm`, `remarkMath`, `rehypeKatex`, `rehypeAddDefaultLang`, `rehypeShiki`.
+- **Critical**: Plugin arrays MUST be module-level constants to prevent infinite re-processing.
 
 ## Known Gotchas
 
-### All Go tests require MySQL
-
-Tests use `testutil.SetupTestDB()` which connects to a real MySQL instance. Use `make docker-test` or run against a local MySQL.
-
-### MinerU API changed in v1.3.12+
-
-The `magic_pdf.pipe` module no longer exists. New API uses `PymuDocDataset` and `read_api`.
-
-### Converter requires `magic-pdf.json`
-
-MinerU expects `~/magic-pdf.json` config file. The Docker image generates a default CPU-mode config at build time.
-
-### Vite proxy target depends on environment
-
-- Local dev: `VITE_API_TARGET=http://localhost:8080` (default)
-- Docker Compose: `VITE_API_TARGET=http://backend:8080` (Docker DNS)
+- **Go tests require MySQL**: `testutil.SetupTestDB()` connects to real MySQL. Use `make docker-test` or local MySQL.
+- **MinerU API v1.3.12+**: `magic_pdf.pipe` no longer exists. Use `PymuDocDataset` and `read_api`.
+- **Converter needs `magic-pdf.json`**: MinerU expects `~/magic-pdf.json`. Docker image generates default CPU-mode config.
+- **Vite proxy target**: Local dev `http://localhost:8080`, Docker Compose `http://backend:8080`.
+- **Dependabot paths**: Uses monorepo structure — Go `backend/`, npm `frontend/`, pip `services/converter/`.

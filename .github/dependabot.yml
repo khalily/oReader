@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: "gomod"
-    directory: "/"
+    directory: "/backend"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -9,7 +9,7 @@ updates:
       prefix: "deps(go)"
 
   - package-ecosystem: "npm"
-    directory: "/web"
+    directory: "/frontend"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -17,7 +17,7 @@ updates:
       prefix: "deps(frontend)"
 
   - package-ecosystem: "pip"
-    directory: "/converter"
+    directory: "/services/converter"
     schedule:
       interval: "weekly"
       day: "monday"

@@ -48,7 +48,7 @@ A modern RSS reader built with Go (backend) and React (frontend), featuring a cl
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) (recommended)
 - Go 1.25 or higher (for local development without Docker)
 - Node.js 22+ and npm (for local frontend development)
-- MySQL 8.0+ (for local development without Docker)
+- MySQL 9.0+ (for local development without Docker)
 - Python 3.11+ and pip (for Paper converter service without Docker)
 
 ### Using Docker Compose (Recommended)
@@ -133,7 +133,7 @@ JWT_SECRET_KEY=dev-secret-key-min-32-chars make dev
 
 2. **Start frontend** (separate terminal):
 ```bash
-cd web && npm run dev
+cd frontend && npm run dev
 ```
 
 3. **Start converter service** (optional, for Paper Import — separate terminal):
@@ -164,8 +164,7 @@ make test-all
 ### Running Converter Tests
 
 ```bash
-cd converter
-python -m pytest tests/ -v
+cd services/converter && uv run pytest tests/ -v
 ```
 
 ### Running All Tests
@@ -173,9 +172,6 @@ python -m pytest tests/ -v
 ```bash
 # Run Go + Frontend + Converter tests together
 make test-all
-
-# Or use the convenience script
-./test-all.sh
 ```
 
 ### Running E2E Tests
@@ -184,7 +180,7 @@ End-to-end API tests use Playwright to validate the full request/response cycle:
 
 ```bash
 # Install Playwright browsers (first time only)
-cd web
+cd frontend
 npx playwright install chromium
 
 # Run all E2E tests
@@ -197,7 +193,7 @@ npm run test:e2e:ui
 npx playwright test --config=tests/e2e/playwright.config.ts tests/e2e/auth.spec.ts
 ```
 
-See [web/tests/e2e/README.md](web/tests/e2e/README.md) for detailed E2E testing documentation.
+See [frontend/tests/e2e/README.md](frontend/tests/e2e/README.md) for detailed E2E testing documentation.
 
 
 ### Building for Production
@@ -457,7 +453,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
+See git log for version history and changes.
 
 ---
 
