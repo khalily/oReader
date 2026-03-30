@@ -1,7 +1,7 @@
 .PHONY: install test lint fmt
 
 install:
-	uv sync
+	uv sync --prerelease=allow
 
 test:
 	uv run pytest tests/ -v

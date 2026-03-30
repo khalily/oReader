@@ -54,8 +54,8 @@ migrate-create:
 	$(MAKE) -C backend migrate-create name=$(name)
 
 # === Docker Compose ===
-# ⚠️ --env-file ../.env: Docker Compose 从 docker/ 运行，需要显式指定根目录 .env
-DC_ENV   = --env-file ../.env
+# ⚠️ --env-file.env: Docker Compose 从 docker/ 运行，需要显式指定根目录 .env
+DC_ENV   = --env-file .env
 DC_DEV   = docker compose $(DC_ENV) -f docker/docker-compose.yml
 DC_PROD  = docker compose $(DC_ENV) -f docker/docker-compose.prod.yml
 DC_TEST  = docker compose $(DC_ENV) -f docker/docker-compose.test.yml

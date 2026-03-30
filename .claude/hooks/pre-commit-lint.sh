@@ -110,19 +110,19 @@ fi
 # ---------------------------------------------------------------------------
 
 if [ -n "$STAGED_TS" ]; then
-  # Only lint files under web/.
-  TS_IN_WEB=$(echo "$STAGED_TS" | grep '^web/' || true)
+  # Only lint files under frontend/.
+  TS_IN_WEB=$(echo "$STAGED_TS" | grep '^frontend/' || true)
 
   if [ -n "$TS_IN_WEB" ]; then
     if ! require_tool npx; then
       HAS_FAILURE=1
     else
       log "--- TypeScript/React (eslint) ---"
-      # Strip web/ prefix since eslint runs inside web/ to pick up the flat config.
-      TS_RELATIVE=$(echo "$TS_IN_WEB" | sed 's|^web/||')
+      # Strip frontend/ prefix since eslint runs inside frontend/ to pick up the flat config.
+      TS_RELATIVE=$(echo "$TS_IN_WEB" | sed 's|^frontend/||')
       log "Linting files: $(echo $TS_RELATIVE | tr '\n' ' ')"
 
-      if ! (cd web && npx eslint $TS_RELATIVE); then
+      if ! (cd frontend && npx eslint $TS_RELATIVE); then
         HAS_FAILURE=1
       else
         log "ESLint passed."
@@ -137,7 +137,7 @@ fi
 
 if [ -n "$STAGED_PY" ]; then
   # Only lint files under converter/, excluding generated protobuf code.
-  PY_LINTABLE=$(echo "$STAGED_PY" | grep '^converter/' | grep -v '^converter/proto/' || true)
+  PY_LINTABLE=$(echo "$STAGED_PY" | grep '^services/converter/' | grep -v '^services/converter/proto/' || true)
 
   if [ -n "$PY_LINTABLE" ]; then
     log "--- Python (flake8 + black) ---"
