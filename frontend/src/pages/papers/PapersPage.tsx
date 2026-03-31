@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PaperList } from '@/components/papers/PaperList'
 import { PaperUpload } from '@/components/papers/PaperUpload'
+import { PaperFilters } from '@/components/papers/PaperFilters'
 import { usePapers } from '@/hooks/usePapers'
 import { useToast } from '@/components/ui/toast'
-import type { ListPapersOptions } from '@/types/paper'
+import type { ListPapersOptions, PaperStatus } from '@/types/paper'
 
 export function PapersPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -19,13 +20,20 @@ export function PapersPage() {
 
   const { useListPapers, useDeletePaper, useRetryPaper, useListTags } = usePapers()
 
+  const selectedStatus = (searchParams.get('status') as PaperStatus | '') || ''
+  const selectedYear = searchParams.get('year') || ''
+  const sortField = searchParams.get('sort') || 'created_at'
+  const sortOrder = (searchParams.get('order') as 'asc' | 'desc') || 'desc'
+
   const listOptions: ListPapersOptions = {
     page: parseInt(searchParams.get('page') || '1'),
     per_page: 20,
     q: searchQuery || undefined,
     tag: selectedTag || undefined,
-    sort: 'created_at',
-    order: 'desc',
+    status: (selectedStatus || undefined) as PaperStatus | undefined,
+    year: selectedYear || undefined,
+    sort: sortField,
+    order: sortOrder,
   }
 
   const { data: papersData, isLoading, refetch } = useListPapers(listOptions)
@@ -84,6 +92,36 @@ export function PapersPage() {
     })
   }
 
+  const handleStatusChange = useCallback((status: PaperStatus | '') => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (status) next.set('status', status)
+      else next.delete('status')
+      next.set('page', '1')
+      return next
+    })
+  }, [setSearchParams])
+
+  const handleYearChange = useCallback((year: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (year) next.set('year', year)
+      else next.delete('year')
+      next.set('page', '1')
+      return next
+    })
+  }, [setSearchParams])
+
+  const handleSortChange = useCallback((sort: string, order: 'asc' | 'desc') => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('sort', sort)
+      next.set('order', order)
+      next.set('page', '1')
+      return next
+    })
+  }, [setSearchParams])
+
   const currentPage = parseInt(searchParams.get('page') || '1')
   const totalPages = Math.ceil(total / 20)
 
@@ -106,7 +144,7 @@ export function PapersPage() {
       </div>
 
       {/* Search & Filters */}
-      <div className="flex gap-3 mb-6">
+      <div className="flex gap-3 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -116,6 +154,19 @@ export function PapersPage() {
             className="pl-10"
           />
         </div>
+      </div>
+
+      {/* Filter & Sort Controls */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <PaperFilters
+          status={selectedStatus}
+          onStatusChange={handleStatusChange}
+          year={selectedYear}
+          onYearChange={handleYearChange}
+          sort={sortField}
+          order={sortOrder}
+          onSortChange={handleSortChange}
+        />
         {tagsData?.tags && tagsData.tags.length > 0 && (
           <div className="flex gap-2 overflow-x-auto">
             {tagsData.tags.slice(0, 5).map((tag) => (

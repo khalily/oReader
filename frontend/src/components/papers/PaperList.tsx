@@ -5,7 +5,7 @@ import type { Paper, PaperStatus } from '@/types/paper'
 import { parseJsonArray } from '@/lib/utils'
 
 interface PaperListProps {
-  papers: Paper[]
+  papers?: Paper[] | null
   isLoading?: boolean
   onPaperClick: (paperId: string) => void
   onRetry: (paperId: string) => void
@@ -27,7 +27,7 @@ function StatusBadge({ status }: { status: PaperStatus }) {
   }
 }
 
-export function PaperList({ papers, isLoading, onPaperClick, onRetry, onDelete }: PaperListProps) {
+export function PaperList({ papers = [], isLoading, onPaperClick, onRetry, onDelete }: PaperListProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -36,7 +36,7 @@ export function PaperList({ papers, isLoading, onPaperClick, onRetry, onDelete }
     )
   }
 
-  if (papers.length === 0) {
+  if (!papers || papers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
         <FileText className="h-12 w-12 mb-4" />

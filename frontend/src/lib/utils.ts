@@ -7,5 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export function parseJsonArray(str: string | null): string[] {
   if (!str) return []
-  try { return JSON.parse(str) } catch { return [] }
+  try {
+    const result = JSON.parse(str)
+    return Array.isArray(result) ? result : []
+  } catch { return [] }
 }

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useItems } from '@/hooks/useItems'
 import { useFeeds } from '@/hooks/useFeeds'
 import { useStats } from '@/hooks/useStats'
+import { useOPML } from '@/hooks/useOPML'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useToast } from '@/components/ui/toast'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
@@ -12,6 +13,7 @@ import { ItemList } from '@/components/items/ItemList'
 import { ArticlePanel } from '@/components/items/ArticlePanel'
 import { Sidebar, SidebarContent, MobileMenuButton, type FilterType } from '@/components/feed/Sidebar'
 import { AddFeedDialog } from '@/components/feed/AddFeedDialog'
+import { OpmlImportDialog } from '@/components/feed/OpmlImportDialog'
 import { useItemsStore } from '@/stores/itemsStore'
 import type { ListItemsOptions } from '@/types/feed'
 
@@ -26,14 +28,14 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
   const [isAddFeedOpen, setIsAddFeedOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false)
+  const [isOpmlImportOpen, setIsOpmlImportOpen] = useState(false)
   const [refreshingFeedIds, setRefreshingFeedIds] = useState<Set<string>>(new Set())
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const observerTarget = useRef<HTMLDivElement>(null)
   const toast = useToast()
 
   const { useListFeeds, useRefreshFeed, useDeleteFeed } = useFeeds()
-  const { useListItems, useToggleStar, useToggleRead, useMarkAllRead } = useItems()
+  const { useListItemsInfinite, useToggleStar, useToggleRead, useMarkAllRead } = useItems()
   const { useGetStats } = useStats()
 
   // Fetch stats for sidebar badges
@@ -47,7 +49,14 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
   if (filterType === 'today') listOptions.published_today = true
   listOptions.limit = 20
 
-  const { data: itemsData, isLoading: itemsLoading, refetch } = useListItems(listOptions)
+  const {
+    data: infiniteData,
+    isLoading: itemsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useListItemsInfinite(listOptions)
   const { data: feedsData, refetch: refetchFeeds } = useListFeeds()
 
   const toggleStar = useToggleStar()
@@ -56,10 +65,29 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
   const deleteFeed = useDeleteFeed()
   const markAllRead = useMarkAllRead()
 
-  const items = itemsData?.items ?? []
-  const hasMore = itemsData?.has_more ?? false
-  const nextCursor = itemsData?.next_cursor
+  const items = infiniteData?.pages.flatMap(page => page.items) ?? []
+  const hasMore = hasNextPage ?? false
   const feeds = feedsData?.feeds ?? []
+
+  // OPML import/export
+  const { useExportOpml, triggerDownload: triggerFileDownload } = useOPML()
+  const exportOpmlMutation = useExportOpml()
+
+  const handleImportOpml = useCallback(() => {
+    setIsOpmlImportOpen(true)
+  }, [])
+
+  const handleExportOpml = useCallback(() => {
+    exportOpmlMutation.mutate(undefined, {
+      onSuccess: (blob) => {
+        triggerFileDownload(blob, 'oreader-subscriptions.xml')
+        toast.showSuccess('OPML exported successfully')
+      },
+      onError: () => {
+        toast.showError('Failed to export OPML')
+      },
+    })
+  }, [exportOpmlMutation, triggerFileDownload, toast])
 
   // Calculate total unread count
   const totalUnread = feeds.reduce((sum, feed) => sum + feed.unread_count, 0)
@@ -224,14 +252,8 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
-          setIsLoadingMore(true)
-          // In a real implementation, we would fetch the next page using nextCursor
-          // For now, we'll just refetch with the updated cursor
-          if (nextCursor) {
-            // This would be handled by a more sophisticated pagination hook
-            setIsLoadingMore(false)
-          }
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
         }
       },
       { threshold: 0.1 }
@@ -247,7 +269,7 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         observer.unobserve(currentTarget)
       }
     }
-  }, [hasMore, isLoadingMore, nextCursor])
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   // Get selected feed ID from URL or state
   const selectedFeedId = feedId ?? null
@@ -355,6 +377,9 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         onFilterChange={handleFilterChange}
         totalUnread={totalUnread}
         stats={statsData}
+        onImportOpml={handleImportOpml}
+        onExportOpml={handleExportOpml}
+        isExporting={exportOpmlMutation.isPending}
       />
 
       {/* Mobile Drawer */}
@@ -374,6 +399,9 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           onFilterChange={handleFilterChange}
           totalUnread={totalUnread}
           stats={statsData}
+          onImportOpml={handleImportOpml}
+          onExportOpml={handleExportOpml}
+          isExporting={exportOpmlMutation.isPending}
         />
       </MobileDrawer>
 
@@ -416,7 +444,7 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
 
           {hasMore && (
             <div ref={observerTarget} className="py-8 text-center">
-              {isLoadingMore && (
+              {isFetchingNextPage && (
                 <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               )}
             </div>
@@ -487,6 +515,15 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
       <KeyboardShortcutsModal
         isOpen={isShortcutsModalOpen}
         onClose={() => setIsShortcutsModalOpen(false)}
+      />
+
+      <OpmlImportDialog
+        open={isOpmlImportOpen}
+        onOpenChange={setIsOpmlImportOpen}
+        onSuccess={() => {
+          refetchFeeds()
+          refetch()
+        }}
       />
     </div>
   )

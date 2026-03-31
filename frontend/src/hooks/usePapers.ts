@@ -69,6 +69,13 @@ async function listTags(): Promise<{ tags: string[] }> {
   return response.data
 }
 
+async function downloadPaper(paperId: string): Promise<Blob> {
+  const response = await apiClient.get(`/papers/${paperId}/download`, {
+    responseType: 'blob',
+  })
+  return response.data as Blob
+}
+
 // React Query hooks
 export function usePapers() {
   const useUploadPaper = () =>
@@ -132,6 +139,11 @@ export function usePapers() {
       staleTime: 5 * 60 * 1000,
     })
 
+  const useDownloadPaper = () =>
+    useMutation({
+      mutationFn: downloadPaper,
+    })
+
   return {
     useUploadPaper,
     useListPapers,
@@ -142,5 +154,6 @@ export function usePapers() {
     useDeletePaper,
     useRetryPaper,
     useListTags,
+    useDownloadPaper,
   }
 }

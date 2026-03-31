@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import apiClient from '@/lib/api/axios'
 import type {
   Article,
@@ -74,8 +74,21 @@ export function useItems() {
       mutationFn: markAllRead,
     })
 
+  const useListItemsInfinite = (options?: Omit<ListItemsOptions, 'cursor'>) =>
+    useInfiniteQuery({
+      queryKey: ['items', 'infinite', options],
+      queryFn: ({ pageParam }) =>
+        listItems({ ...options, cursor: pageParam as string | undefined }),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (lastPage: ListItemsResponse) =>
+        lastPage.has_more ? lastPage.next_cursor : undefined,
+      staleTime: 2 * 60 * 1000,
+      maxPages: 10,
+    })
+
   return {
     useListItems,
+    useListItemsInfinite,
     useGetItem,
     useToggleStar,
     useToggleRead,

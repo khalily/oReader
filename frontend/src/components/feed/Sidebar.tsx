@@ -1,4 +1,4 @@
-import { Home, Star, Rss, Menu, Calendar, BookOpen } from 'lucide-react'
+import { Home, Star, Rss, Menu, Calendar, BookOpen, Upload, Download } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +29,9 @@ interface SidebarProps {
   stats?: StatsResponse
   isMobileOpen?: boolean
   onMobileClose?: () => void
+  onImportOpml?: () => void
+  onExportOpml?: () => void
+  isExporting?: boolean
 }
 
 /**
@@ -46,6 +49,9 @@ export function SidebarContent({
   onFilterChange,
   totalUnread = 0,
   stats,
+  onImportOpml,
+  onExportOpml,
+  isExporting,
 }: Omit<SidebarProps, 'isMobileOpen' | 'onMobileClose'>) {
   const navigate = useNavigate()
 
@@ -114,7 +120,30 @@ export function SidebarContent({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <h3 className="text-sm font-medium text-muted-foreground mb-2">Feeds</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-muted-foreground">Feeds</h3>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onImportOpml}
+              title="Import OPML"
+            >
+              <Upload className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onExportOpml}
+              disabled={isExporting}
+              title="Export OPML"
+            >
+              <Download className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
         <FeedList
           feeds={feeds}
           onDelete={handleDelete}
@@ -152,6 +181,9 @@ export function Sidebar({
   stats,
   isMobileOpen: _isMobileOpen = false, // eslint-disable-line @typescript-eslint/no-unused-vars
   onMobileClose: _onMobileClose, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onImportOpml,
+  onExportOpml,
+  isExporting,
 }: SidebarProps) {
   return (
     <>
@@ -169,6 +201,9 @@ export function Sidebar({
           onFilterChange={onFilterChange}
           totalUnread={totalUnread}
           stats={stats}
+          onImportOpml={onImportOpml}
+          onExportOpml={onExportOpml}
+          isExporting={isExporting}
         />
       </aside>
 

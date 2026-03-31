@@ -5,21 +5,38 @@ import { Card, CardContent } from '@/components/ui/card'
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
 import { PaperMeta } from '@/components/papers/PaperMeta'
 import { usePapers } from '@/hooks/usePapers'
+import { useToast } from '@/components/ui/toast'
 
 export default function PaperViewPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { useGetPaper, useGetPaperStatus } = usePapers()
+  const toast = useToast()
+  const { useGetPaper, useGetPaperStatus, useDownloadPaper } = usePapers()
 
   const { data, isLoading, error } = useGetPaper(id ?? null)
   const { data: statusData } = useGetPaperStatus(id ?? null)
+  const downloadMutation = useDownloadPaper()
 
   const paper = data ?? null
   const status = statusData ?? null
 
   const handleDownload = () => {
     if (!id) return
-    window.open(`/api/v1/papers/${id}/download`, '_blank')
+    downloadMutation.mutate(id, {
+      onSuccess: (blob) => {
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = paper?.original_filename || 'paper.pdf'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.URL.revokeObjectURL(url)
+      },
+      onError: () => {
+        toast.showError('Failed to download paper')
+      },
+    })
   }
 
   if (isLoading) {

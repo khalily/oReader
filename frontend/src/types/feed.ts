@@ -106,9 +106,20 @@ export interface MarkAllReadResponse {
 
 // OPML types
 export interface OpmlImportResponse {
+  message: string
   job_id: string
   status: 'pending' | 'processing' | 'completed' | 'failed'
   total_feeds: number
-  processed_feeds: number
-  failed_feeds: number
+}
+
+export interface OpmlImportJobStatus {
+  job_id: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  total: number
+  processed: number
+  failed: number
+  progress: number
+  started_at: string | null
+  ended_at: string | null
+  error: string | null
 }
