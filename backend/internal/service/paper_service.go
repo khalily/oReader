@@ -181,6 +181,12 @@ func (s *paperService) processConversion(paperID string, filename string) {
 	paper.PublishedYear = metadata.PublishedYear
 	paper.DOI = metadata.DOI
 
+	// Fallback: when LLM is unavailable, metadata fields will be empty;
+	// use original filename as title so the paper always has a display name.
+	if paper.Title == "" {
+		paper.Title = paper.OriginalFilename
+	}
+
 	if err := s.paperRepo.Update(ctx, paper); err != nil {
 		logger.Error().Err(err).Str("paper_id", paperID).Msg("Failed to update paper with conversion results")
 		return

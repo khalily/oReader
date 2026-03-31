@@ -149,6 +149,11 @@ config['formula-config']['enable'] = formula_enable
 config['table-config'] = config.get('table-config', {})
 config['table-config']['enable'] = table_enable
 
+# Force correct model names (rapidtable → rapid_table) to match model_configs.yaml keys
+if config['table-config'].get('model') == 'rapidtable':
+    config['table-config']['model'] = 'rapid_table'
+    print('Fixed table model name: rapidtable -> rapid_table')
+
 with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
 print(f'Updated magic-pdf.json: formula={formula_enable}, table={table_enable}')

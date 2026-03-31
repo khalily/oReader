@@ -137,41 +137,94 @@ def extract_metadata(markdown: str) -> PaperMetadataResult:
         return PaperMetadataResult()
 
 
+def _split_markdown_chunks(markdown: str, chunk_size: int = 5000) -> list[str]:
+    """Split markdown into chunks at paragraph boundaries, each ~chunk_size bytes."""
+    if len(markdown) <= chunk_size:
+        return [markdown]
+
+    chunks: list[str] = []
+    lines = markdown.split("\n")
+    current: list[str] = []
+    current_len = 0
+
+    for line in lines:
+        line_len = len(line) + 1  # +1 for newline
+        if current_len + line_len > chunk_size and current:
+            chunks.append("\n".join(current))
+            current = []
+            current_len = 0
+        current.append(line)
+        current_len += line_len
+
+    if current:
+        chunks.append("\n".join(current))
+
+    return chunks
+
+
+_REFINE_SYSTEM_PROMPT = (
+    "You are a Markdown formatter for academic papers. "
+    "Fix formatting issues in the given Markdown chunk.\n"
+    "Rules:\n"
+    "- Restore mathematical formulas as LaTeX: $...$ for inline, $$...$$ for display.\n"
+    "  Garbled chars near math operators, subscripts/superscripts rendered as plain text,\n"
+    "  or symbols like ×, ≤, ≥, →, α, β, γ should become LaTeX commands.\n"
+    "  Examples: '1.6×' → '$1.6\\times$', 'awin' → '$a_{win}$',\n"
+    "  'Dmax' → '$D_{max}$', '2 s' → '$2\\mu s$'.\n"
+    "- Fix broken LaTeX ($...$ and $$...$$ properly paired)\n"
+    "- Convert HTML tables to GFM pipe tables where possible.\n"
+    "- Remove page numbers, headers, footers\n"
+    "- Fix paragraph breaks\n"
+    "- Keep all content and <!--IMG_N--> image placeholders\n"
+    "- Return ONLY the corrected markdown, nothing else\n"
+)
+
+
+def _refine_chunk(client: openai.OpenAI, chunk: str) -> str:
+    """Refine a single markdown chunk via LLM."""
+    try:
+        response = client.chat.completions.create(
+            model=_get_llm_model(),
+            messages=[
+                {"role": "system", "content": _REFINE_SYSTEM_PROMPT},
+                {"role": "user", "content": chunk},
+            ],
+            temperature=0.0,
+            max_tokens=16000,
+        )
+        return response.choices[0].message.content or chunk
+    except Exception as e:
+        logger.error("LLM chunk refinement failed: %s", e)
+        return chunk
+
+
 def refine_markdown(markdown: str) -> str:
-    """Call LLM to fix formatting issues in the markdown."""
+    """Call LLM to fix formatting issues, splitting into ~5KB chunks."""
     client = _get_openai_client()
     if client is None:
         return markdown
 
-    prompt = (
-        "Fix formatting issues in this Markdown converted from a PDF academic paper.\n"
-        "Rules:\n"
-        "- Restore mathematical formulas as LaTeX: use $...$ for inline and $$...$$ for display math.\n"
-        "  The PDF-to-text conversion often destroys formulas. Look for patterns like\n"
-        "  garbled characters near math operators, subscripts/superscripts rendered as plain text,\n"
-        "  or symbols like ×, ≤, ≥, →, α, β, γ that should be LaTeX commands.\n"
-        "  Examples: '1.6×' → '$1.6\\times$', 'awin' → '$a_{win}$',\n"
-        "  'Dmax' → '$D_{max}$', '2 s' → '$2\\mu s$'.\n"
-        "- Fix broken LaTeX formulas (ensure $...$ and $$...$$ are properly paired)\n"
-        "- Convert any HTML tables to GFM pipe tables (| col1 | col2 |) where possible.\n"
-        "  If a table is too complex for GFM, keep it as HTML.\n"
-        "- Remove page numbers, headers, footers\n"
-        "- Fix paragraph breaks\n"
-        "- Keep all content, don't remove anything important\n"
-        "- Keep all <!--IMG_N--> placeholders exactly as they are (image references)\n"
-        "- Return the corrected markdown only\n"
-        "\n"
-        f"Markdown:\n{markdown[:30000]}"
-    )
+    chunks = _split_markdown_chunks(markdown, chunk_size=5000)
 
-    try:
-        response = client.chat.completions.create(
-            model=_get_llm_model(),
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=32000,
+    # LLM_REFINE_MAX_CHUNKS limits how many chunks to refine (default: all).
+    # Set to 1 for fast/test mode; unset or 0 for full refinement.
+    max_chunks = int(os.environ.get("LLM_REFINE_MAX_CHUNKS", "0"))
+    if max_chunks > 0 and len(chunks) > max_chunks:
+        logger.info(
+            "LLM_REFINE_MAX_CHUNKS=%d, refining first %d of %d chunks",
+            max_chunks,
+            max_chunks,
+            len(chunks),
         )
-        return response.choices[0].message.content or markdown
-    except Exception as e:
-        logger.error("LLM markdown refinement failed: %s", e)
-        return markdown
+        refined = [_refine_chunk(client, c) for c in chunks[:max_chunks]]
+        return "\n".join(refined + chunks[max_chunks:])
+
+    logger.info("Refining markdown: %d chars split into %d chunks", len(markdown), len(chunks))
+
+    refined_parts: list[str] = []
+    for i, chunk in enumerate(chunks):
+        logger.info("Refining chunk %d/%d (%d chars)", i + 1, len(chunks), len(chunk))
+        refined = _refine_chunk(client, chunk)
+        refined_parts.append(refined)
+
+    return "\n".join(refined_parts)

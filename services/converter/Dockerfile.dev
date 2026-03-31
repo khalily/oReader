@@ -15,7 +15,7 @@ RUN uv pip install --system --no-cache --prerelease=allow \
 RUN uv pip install --system --no-cache watchfiles modelscope
 
 # Configure MinerU: models-dir points to persistent volume path
-RUN echo '{"layout-config":{"model":"doclayout_yolo"},"formula-config":{"mfd_model":"yolo_v8_mfd","mfr_model":"unimernet_small","enable":true},"table-config":{"model":"rapidtable","enable":false,"max_time":60},"device-mode":"cpu","models-dir":"/root/.cache/magic-pdf/models"}' > /root/magic-pdf.json
+RUN echo '{"layout-config":{"model":"doclayout_yolo"},"formula-config":{"mfd_model":"yolo_v8_mfd","mfr_model":"unimernet_small","enable":true},"table-config":{"model":"rapid_table","enable":false,"max_time":60},"llm-aided-config":{"enable":false},"device-mode":"cpu","models-dir":"/root/.cache/magic-pdf/models"}' > /root/magic-pdf.json
 
 COPY services/converter/src/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

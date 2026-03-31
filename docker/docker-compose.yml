@@ -83,6 +83,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_REFINE_MAX_CHUNKS: ${LLM_REFINE_MAX_CHUNKS:-1}
       HF_ENDPOINT: https://hf-mirror.com
     volumes:
       - ../services/converter/src:/app/src
