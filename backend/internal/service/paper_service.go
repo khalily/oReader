@@ -14,15 +14,13 @@ import (
 	"github.com/khalily/oreader/internal/model"
 )
 
-const defaultConversionTimeout = 10 * time.Minute
-
 type paperService struct {
-	paperRepo     PaperRepository
-	tagRepo       PaperTagRepository
-	grpcClient    pbgrpc.PaperConverterClient
-	uploadDir     string
-	grpcTimeout   time.Duration
-	conversionMu  sync.Mutex // B4: prevent concurrent updates on same paper
+	paperRepo    PaperRepository
+	tagRepo      PaperTagRepository
+	grpcClient   pbgrpc.PaperConverterClient
+	uploadDir    string
+	grpcTimeout  time.Duration
+	conversionMu sync.Mutex // B4: prevent concurrent updates on same paper
 }
 
 // NewPaperService creates a new paper service
@@ -31,13 +29,14 @@ func NewPaperService(
 	tagRepo PaperTagRepository,
 	grpcClient pbgrpc.PaperConverterClient,
 	uploadDir string,
+	grpcTimeout time.Duration,
 ) PaperService {
 	return &paperService{
 		paperRepo:   paperRepo,
 		tagRepo:     tagRepo,
 		grpcClient:  grpcClient,
 		uploadDir:   uploadDir,
-		grpcTimeout: defaultConversionTimeout,
+		grpcTimeout: grpcTimeout,
 	}
 }
 

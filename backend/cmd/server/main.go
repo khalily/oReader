@@ -124,7 +124,7 @@ func main() {
 		log.Warn().Err(err).Msg("Paper converter gRPC service not available, paper upload will be limited")
 	}
 
-	paperService := service.NewPaperService(paperRepo, paperTagRepo, paperGRPCClient, cfg.Paper.UploadDir)
+	paperService := service.NewPaperService(paperRepo, paperTagRepo, paperGRPCClient, cfg.Paper.UploadDir, grpcTimeout)
 
 	// Initialize rate limiter
 	rateLimiter := ratelimit.NewMemoryLimiter()

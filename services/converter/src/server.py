@@ -1,6 +1,5 @@
 import logging
 import os
-import shutil
 import sys
 import tempfile
 from concurrent import futures
@@ -8,7 +7,10 @@ from concurrent import futures
 import grpc
 
 # Add proto to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../proto/python"))
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(__file__), "../../../proto/python"),
+)
 import paper_pb2  # noqa: E402
 import paper_pb2_grpc  # noqa: E402
 
@@ -24,58 +26,35 @@ logger = logging.getLogger(__name__)
 class PaperConverterServicer(paper_pb2_grpc.PaperConverterServicer):
     def Convert(self, request, context):
         """Convert PDF to Markdown with streaming progress."""
-        logger.info("Converting PDF: %s (%d bytes)", request.filename, len(request.pdf_content))
+        logger.info(
+            "Converting PDF: %s (%d bytes)",
+            request.filename,
+            len(request.pdf_content),
+        )
 
         # Phase 1: Mining (MinerU)
         yield paper_pb2.ConvertProgress(status="mining", progress=10)
         try:
-            # Save PDF to temp file
-            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                tmp.write(request.pdf_content)
-                tmp_path = tmp.name
+            from magic_pdf.data.dataset import PymuDocDataset
+            from magic_pdf.data.data_reader_writer.filebase import (
+                FileBasedDataWriter,
+            )
+            from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 
-            output_dir = tempfile.mkdtemp()
-            try:
-                from magic_pdf.data.data_reader_writer import (
-                    FileBasedDataReader,
-                    FileBasedDataWriter,
-                )
-                from magic_pdf.pipe.UNIPipe import UNIPipe
+            ds = PymuDocDataset(request.pdf_content)
+            if ds.classify() == "ocr":
+                infer_result = ds.apply(doc_analyze, ocr=True)
+            else:
+                infer_result = ds.apply(doc_analyze, ocr=False)
 
-                # Use MinerU to convert
-                reader = FileBasedDataReader("")
-                writer = FileBasedDataWriter(output_dir)
-
-                pipe = UNIPipe(tmp_path, "", reader, writer)
-                pipe.pipe_classify()
-                pipe.pipe_parse()
-                pipe.pipe_mk_markdown(output_dir, drop_mode="none")
-
-                # Read generated markdown
-                md_path = os.path.join(
-                    output_dir,
-                    "auto",
-                    os.path.splitext(request.filename)[0] + ".md",
-                )
-                if os.path.exists(md_path):
-                    with open(md_path) as f:
-                        markdown = f.read()
+            # InferenceResult → pipe mode → PipeResult → get_markdown
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                image_writer = FileBasedDataWriter(tmp_dir)
+                if ds.classify() == "ocr":
+                    pipe_result = infer_result.pipe_ocr_mode(image_writer)
                 else:
-                    # Fallback: try to find any .md file
-                    md_files = []
-                    for root, dirs, files in os.walk(output_dir):
-                        for f in files:
-                            if f.endswith(".md"):
-                                md_files.append(os.path.join(root, f))
-                    if md_files:
-                        with open(md_files[0]) as f:
-                            markdown = f.read()
-                    else:
-                        markdown = "# Conversion Error\n\nMinerU did not produce markdown output."
-            finally:
-                # B5: Clean up both temp PDF and output directory
-                os.unlink(tmp_path)
-                shutil.rmtree(output_dir, ignore_errors=True)
+                    pipe_result = infer_result.pipe_txt_mode(image_writer)
+                markdown = pipe_result.get_markdown(tmp_dir)
 
             yield paper_pb2.ConvertProgress(status="mining", progress=50)
 
@@ -103,7 +82,10 @@ class PaperConverterServicer(paper_pb2_grpc.PaperConverterServicer):
 
     def ExtractMetadata(self, request, context):
         """Extract metadata from markdown content."""
-        logger.info("Extracting metadata from markdown (%d chars)", len(request.markdown))
+        logger.info(
+            "Extracting metadata from markdown (%d chars)",
+            len(request.markdown),
+        )
 
         result = extract_metadata(request.markdown)
 

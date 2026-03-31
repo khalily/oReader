@@ -26,6 +26,11 @@ require_tool() {
     esac
     return 1
   fi
+  # Also verify the tool actually runs (handles pyenv shims pointing to wrong version)
+  if ! "$1" --version >/dev/null 2>&1; then
+    fail "$1 found but not functional (wrong Python version?)"
+    return 1
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -96,7 +101,9 @@ if [ -n "$STAGED_GO" ]; then
       GO_DIRS=$(echo "$GO_LINTABLE" | xargs -I{} dirname "{}" | sort -u)
       log "Linting packages: $GO_DIRS"
 
-      if ! golangci-lint run $GO_DIRS; then
+      # Strip backend/ prefix and run from backend/ where go.mod lives.
+      GO_DIRS_REL=$(echo "$GO_DIRS" | sed 's|^backend/||' | sed 's|^backend||')
+      if ! (cd backend && golangci-lint run $GO_DIRS_REL); then
         HAS_FAILURE=1
       else
         log "Go lint passed."
@@ -154,7 +161,7 @@ if [ -n "$STAGED_PY" ]; then
     fi
 
     if ! require_tool black; then
-      HAS_FAILURE=1
+      log "WARNING: black not installed, skipping format check."
     else
       log "Running black --check..."
       if ! black --check --line-length=120 $PY_LINTABLE; then

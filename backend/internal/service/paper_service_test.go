@@ -185,7 +185,7 @@ func TestPaperService_UploadPaper(t *testing.T) {
 
 	paperRepo := &gormPaperRepo{db: db}
 	tagRepo := &gormPaperTagRepo{db: db}
-	svc := NewPaperService(paperRepo, tagRepo, mockClient, tmpDir)
+	svc := NewPaperService(paperRepo, tagRepo, mockClient, tmpDir, 10*time.Minute)
 
 	paper, err := svc.UploadPaper(context.Background(), userID, "test.pdf", []byte("fake-pdf-content"))
 	require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestPaperService_UploadPaper_GRPCFailed(t *testing.T) {
 
 	paperRepo := &gormPaperRepo{db: db}
 	tagRepo := &gormPaperTagRepo{db: db}
-	svc := NewPaperService(paperRepo, tagRepo, mockClient, tmpDir)
+	svc := NewPaperService(paperRepo, tagRepo, mockClient, tmpDir, 10*time.Minute)
 
 	paper, err := svc.UploadPaper(context.Background(), userID, "test.pdf", []byte("fake-pdf-content"))
 	require.NoError(t, err)
@@ -239,7 +239,7 @@ func TestPaperService_GetPaper(t *testing.T) {
 	require.NoError(t, db.Create(paper).Error)
 
 	paperRepo := &gormPaperRepo{db: db}
-	svc := NewPaperService(paperRepo, nil, nil, t.TempDir())
+	svc := NewPaperService(paperRepo, nil, nil, t.TempDir(), 10*time.Minute)
 
 	found, err := svc.GetPaper(context.Background(), userID, paper.ID)
 	require.NoError(t, err)
@@ -258,7 +258,7 @@ func TestPaperService_GetPaper_NotOwner(t *testing.T) {
 	require.NoError(t, db.Create(paper).Error)
 
 	paperRepo := &gormPaperRepo{db: db}
-	svc := NewPaperService(paperRepo, nil, nil, t.TempDir())
+	svc := NewPaperService(paperRepo, nil, nil, t.TempDir(), 10*time.Minute)
 
 	_, err := svc.GetPaper(context.Background(), "other-user-id", paper.ID)
 	require.Error(t, err)
@@ -284,7 +284,7 @@ func TestPaperService_DeletePaper(t *testing.T) {
 	require.NoError(t, db.Create(paper).Error)
 
 	paperRepo := &gormPaperRepo{db: db}
-	svc := NewPaperService(paperRepo, nil, nil, tmpDir)
+	svc := NewPaperService(paperRepo, nil, nil, tmpDir, 10*time.Minute)
 
 	err := svc.DeletePaper(context.Background(), userID, paper.ID)
 	require.NoError(t, err)
@@ -304,7 +304,7 @@ func TestPaperService_UpdateTags(t *testing.T) {
 
 	paperRepo := &gormPaperRepo{db: db}
 	tagRepo := &gormPaperTagRepo{db: db}
-	svc := NewPaperService(paperRepo, tagRepo, nil, t.TempDir())
+	svc := NewPaperService(paperRepo, tagRepo, nil, t.TempDir(), 10*time.Minute)
 
 	err := svc.UpdateTags(context.Background(), userID, paper.ID, []string{"AI", "ML"})
 	require.NoError(t, err)

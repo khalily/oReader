@@ -16,10 +16,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       FRONTEND_URL: http://${HOST_IP:-localhost}:5173
       PAPER_GRPC_ADDR: converter:50051
+      PAPER_GRPC_TIMEOUT: ${PAPER_GRPC_TIMEOUT:-30m}
       PAPER_UPLOAD_DIR: /data/uploads/papers
       PAPER_MAX_UPLOAD_SIZE: ${PAPER_MAX_UPLOAD_SIZE:-52428800}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_CALLBACK_HOST: ${GITHUB_CALLBACK_HOST:-}
     volumes:
       - ..:/project
       - go-module-cache:/root/go/pkg/mod
@@ -69,7 +71,7 @@ services:
   converter:
     build:
       context: ..
-      dockerfile: services/converter/Dockerfile
+      dockerfile: services/converter/Dockerfile.dev
       args:
         PYTHON_VERSION: ${PYTHON_VERSION?Set in versions.env}
     container_name: oreader-converter
@@ -80,7 +82,10 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      HF_ENDPOINT: https://hf-mirror.com
     volumes:
+      - ../services/converter/src:/app/src
+      - ../proto/python:/proto/python
       - converter-model-cache:/root/.cache
     restart: unless-stopped
     healthcheck:
