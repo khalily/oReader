@@ -5,8 +5,8 @@ export interface User {
   nickname: string | null
   avatar_url: string | null
   auth_provider: 'email' | 'github'
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 // Auth types
@@ -39,11 +39,15 @@ export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'UNAUTHORIZED'
   | 'TOKEN_EXPIRED'
+  | 'TOKEN_INVALID'
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'RATE_LIMIT_EXCEEDED'
   | 'INTERNAL_ERROR'
+  | 'SERVICE_UNAVAILABLE'
+  | 'CSRF_MISSING'
+  | 'CSRF_MISMATCH'
 
 // Feed types (for reference)
 export interface Feed {

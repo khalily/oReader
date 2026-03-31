@@ -37,8 +37,8 @@ async function listPapers(options?: ListPapersOptions): Promise<ListPapersRespon
 }
 
 async function getPaper(paperId: string): Promise<Paper> {
-  const response = await apiClient.get<Paper>(`/papers/${paperId}`)
-  return response.data
+  const response = await apiClient.get<{ paper: Paper }>(`/papers/${paperId}`)
+  return response.data.paper
 }
 
 async function getPaperStatus(paperId: string): Promise<PaperStatusResponse> {
@@ -47,8 +47,8 @@ async function getPaperStatus(paperId: string): Promise<PaperStatusResponse> {
 }
 
 async function updatePaper(paperId: string, data: UpdatePaperRequest): Promise<Paper> {
-  const response = await apiClient.put<Paper>(`/papers/${paperId}`, data)
-  return response.data
+  const response = await apiClient.put<{ paper: Paper }>(`/papers/${paperId}`, data)
+  return response.data.paper
 }
 
 async function updateTags(paperId: string, data: UpdateTagsRequest): Promise<void> {
@@ -60,8 +60,8 @@ async function deletePaper(paperId: string): Promise<void> {
 }
 
 async function retryPaper(paperId: string): Promise<Paper> {
-  const response = await apiClient.post<Paper>(`/papers/${paperId}/retry`)
-  return response.data
+  const response = await apiClient.post<{ paper: Paper }>(`/papers/${paperId}/retry`)
+  return response.data.paper
 }
 
 async function listTags(): Promise<{ tags: string[] }> {

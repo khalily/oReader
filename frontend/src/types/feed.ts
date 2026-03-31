@@ -9,10 +9,11 @@ export interface Feed {
   created_at: string
 }
 
-// Feed with user-specific data
+// Feed with user-specific data (matches OpenAPI FeedListItem)
 export interface UserFeed extends Feed {
+  item_count: number
   unread_count: number
-  position?: number
+  position: number
 }
 
 // Item types
@@ -64,7 +65,6 @@ export interface GetFeedResponse {
 }
 
 export interface RefreshFeedResponse {
-  updated: boolean
   new_item_count: number
 }
 
@@ -77,7 +77,7 @@ export interface ListItemsOptions {
   published_today?: boolean
 }
 
-// Stats types
+// Stats types (matches OpenAPI UserStats)
 export interface StatsResponse {
   total: number
   unread: number

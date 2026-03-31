@@ -14,14 +14,14 @@ async function register(data: RegisterRequest): Promise<AuthResponse> {
   return response.data
 }
 
-async function logout(): Promise<{ success: boolean }> {
-  const response = await apiClient.post<{ success: boolean }>('/auth/logout')
+async function logout(): Promise<{ message: string }> {
+  const response = await apiClient.post<{ message: string }>('/auth/logout')
   return response.data
 }
 
 async function getCurrentUser(): Promise<User> {
-  const response = await apiClient.get<User>('/auth/me')
-  return response.data
+  const response = await apiClient.get<{ user: User }>('/auth/me')
+  return response.data.user
 }
 
 // React Query hooks

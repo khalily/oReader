@@ -38,7 +38,7 @@ async function toggleRead({ itemId, read }: { itemId: string; read: boolean }): 
 }
 
 async function markAllRead(feedId: string): Promise<MarkAllReadResponse> {
-  const response = await apiClient.post<MarkAllReadResponse>(`/feeds/${feedId}/read-all`)
+  const response = await apiClient.post<MarkAllReadResponse>(`/feeds/${feedId}/mark-all-read`)
   return response.data
 }
 

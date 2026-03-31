@@ -67,21 +67,23 @@ const handlers = [
     })
   }),
 
-  // Logout
+  // Logout — backend returns { message: string }
   http.post(`${API_BASE_URL}/auth/logout`, () => {
-    return HttpResponse.json({ success: true })
+    return HttpResponse.json({ message: 'Logged out successfully' })
   }),
 
-  // Get current user (me)
+  // Get current user (me) — backend returns { user: {...} }
   http.get(`${API_BASE_URL}/auth/me`, () => {
     return HttpResponse.json({
-      id: '550e8400-e29b-41d4-a716-446655440000',
-      email: 'test@example.com',
-      nickname: null,
-      avatar_url: null,
-      auth_provider: 'email' as const,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
+      user: {
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        email: 'test@example.com',
+        nickname: null,
+        avatar_url: null,
+        auth_provider: 'email' as const,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
     })
   }),
 ]

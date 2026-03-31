@@ -280,7 +280,7 @@ const handlers = [
   }),
 
   // Mark all read
-  http.post(`${API_BASE_URL}/feeds/:id/read-all`, ({ params }) => {
+  http.post(`${API_BASE_URL}/feeds/:id/mark-all-read`, ({ params }) => {
     if (params.id === 'feed-1') {
       return HttpResponse.json({
         count: 5,

@@ -7,7 +7,6 @@ export interface Paper {
   keywords: string | null       // JSON array string
   published_year: string | null
   doi: string | null
-  pdf_path: string | null
   pdf_size: number
   markdown_content: string | null
   cover_image: string | null
@@ -62,8 +61,5 @@ export interface UpdateTagsRequest {
   tags: string[]
 }
 
-export interface UploadPaperResponse {
-  id: string
-  status: PaperStatus
-  original_filename: string
-}
+// Upload returns the full Paper object (202 Accepted)
+export type UploadPaperResponse = Paper
