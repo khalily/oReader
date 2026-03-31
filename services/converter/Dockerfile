@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY services/converter/pyproject.toml .
 RUN uv pip install --system --no-cache --prerelease=allow -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com .
 
-RUN echo '{"layout-config":{"model":"doclayout_yolo"},"formula-config":{"mfd_model":"yolo_v8_mfd","mfr_model":"unimernet_small","enable":false},"table-config":{"model":"tablemaster","enable":false,"max_time":60},"device-mode":"cpu","models-dir":"/root/.cache/magic-pdf/models"}' > /root/magic-pdf.json
+RUN echo '{"layout-config":{"model":"doclayout_yolo"},"formula-config":{"mfd_model":"yolo_v8_mfd","mfr_model":"unimernet_small","enable":true},"table-config":{"model":"rapidtable","enable":false,"max_time":60},"device-mode":"cpu","models-dir":"/root/.cache/magic-pdf/models"}' > /root/magic-pdf.json
 
 # Copy proto generated Python code (context is project root)
 # server.py 在 /app/src/，其 ../../../proto/python 解析为 /proto/python

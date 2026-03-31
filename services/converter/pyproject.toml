@@ -9,6 +9,7 @@ dependencies = [
     "magic-pdf[full]>=1.0.1",
     "openai>=1.0.0",
     "python-dotenv~=1.0.0",
+    "transformers>=4.42,<4.50",
 ]
 
 [dependency-groups]

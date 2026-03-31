@@ -8,6 +8,30 @@ import openai
 
 logger = logging.getLogger(__name__)
 
+
+def fix_utf8_mojibake(text: str) -> str:
+    """Fix double-encoded UTF-8 mojibake produced by MinerU PDF extraction.
+
+    MinerU sometimes outputs text where UTF-8 bytes (e.g. en-dash E2 80 93)
+    were incorrectly decoded as Windows-1252, producing 3-char sequences
+    like â€" (U+00E2 U+20AC U+201C) instead of – (U+2013).
+    """
+    # UTF-8 bytes → Windows-1252 misinterpretation → correct Unicode
+    replacements = {
+        "\u00e2\u20ac\u201c": "\u2013",  # â€" → – (en-dash)
+        "\u00e2\u20ac\u201d": "\u2014",  # â€" → — (em-dash)
+        "\u00e2\u20ac\u0153": "\u201c",  # â€œ → " (left double quote)
+        "\u00e2\u20ac\u02dc": "\u2018",  # â€˜ → ' (left single quote)
+        "\u00e2\u20ac\u2122": "\u2019",  # â€™ → ' (right single quote)
+        "\u00e2\u20ac\u00a6": "\u2026",  # â€¦ → … (ellipsis)
+        "\u00e2\u20ac\u00b8": "\u2032",  # â€¸ → ′ (prime)
+        "\u00e2\u20ac\u00b9": "\u2033",  # â€¹ → ″ (double prime)
+    }
+    for broken, correct in replacements.items():
+        text = text.replace(broken, correct)
+    return text
+
+
 # Q6: Reuse OpenAI client instead of creating per-request
 _openai_client = None
 
@@ -122,14 +146,22 @@ def refine_markdown(markdown: str) -> str:
     prompt = (
         "Fix formatting issues in this Markdown converted from a PDF academic paper.\n"
         "Rules:\n"
+        "- Restore mathematical formulas as LaTeX: use $...$ for inline and $$...$$ for display math.\n"
+        "  The PDF-to-text conversion often destroys formulas. Look for patterns like\n"
+        "  garbled characters near math operators, subscripts/superscripts rendered as plain text,\n"
+        "  or symbols like ×, ≤, ≥, →, α, β, γ that should be LaTeX commands.\n"
+        "  Examples: '1.6×' → '$1.6\\times$', 'awin' → '$a_{win}$',\n"
+        "  'Dmax' → '$D_{max}$', '2 s' → '$2\\mu s$'.\n"
         "- Fix broken LaTeX formulas (ensure $...$ and $$...$$ are properly paired)\n"
-        "- Fix table formatting\n"
+        "- Convert any HTML tables to GFM pipe tables (| col1 | col2 |) where possible.\n"
+        "  If a table is too complex for GFM, keep it as HTML.\n"
         "- Remove page numbers, headers, footers\n"
         "- Fix paragraph breaks\n"
         "- Keep all content, don't remove anything important\n"
+        "- Keep all <!--IMG_N--> placeholders exactly as they are (image references)\n"
         "- Return the corrected markdown only\n"
         "\n"
-        f"Markdown:\n{markdown[:20000]}"
+        f"Markdown:\n{markdown[:30000]}"
     )
 
     try:
@@ -137,7 +169,7 @@ def refine_markdown(markdown: str) -> str:
             model=_get_llm_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=16000,
+            max_tokens=32000,
         )
         return response.choices[0].message.content or markdown
     except Exception as e:

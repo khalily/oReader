@@ -1,4 +1,4 @@
-import { MarkdownHooks } from 'react-markdown'
+import { MarkdownHooks, defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -57,6 +57,17 @@ function rehypeAddDefaultLang() {
 // 每次 render 创建新数组会导致不必要的重新处理。
 // ────────────────────────────────────────────────────────────────────
 const remarkPlugins = [remarkGfm, remarkMath]
+
+/**
+ * URL transform: allow data: URIs for inline images (base64 embedded by MinerU).
+ * react-markdown v10's defaultUrlTransform blocks data: URIs for security,
+ * returning empty strings that strip src from <img> elements.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const urlTransform = (url: string, key: string): string => {
+  if (url.startsWith('data:')) return url
+  return defaultUrlTransform(url)
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rehypePlugins: any[] = [
   rehypeKatex,
@@ -94,6 +105,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
         fallback={<div>{content}</div>}
+        urlTransform={urlTransform}
         components={{
           pre({ children, node: _node, ...props }) { // eslint-disable-line @typescript-eslint/no-unused-vars
             const code = extractCodeFromChildren(children)
@@ -107,12 +119,17 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
           img({ src, alt, title, ...restProps }) {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
             const { node: _node, ...props } = restProps as any
+            // data: URIs must not use loading="lazy": Chromium defers decoding
+            // until the element enters the viewport, but with height:auto and
+            // naturalHeight=0 (not yet decoded) the computed height is 0px.
+            // The image never "enters the viewport", creating a dead-lock.
+            const isDataUri = src?.startsWith('data:')
             return (
               <img
                 src={src}
                 alt={alt || ''}
                 title={title}
-                loading="lazy"
+                loading={isDataUri ? undefined : 'lazy'}
                 className="rounded-lg max-w-full h-auto"
                 onError={(e) => {
                   e.currentTarget.src = '/image-placeholder.svg'

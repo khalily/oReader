@@ -121,4 +121,37 @@ else
     echo "Models already exist at $MODELS_DIR, skipping download."
 fi
 
+# ── Override MinerU config based on environment variables ─────────
+# FORMULA_ENABLE: set to "true" to enable formula detection (default: true)
+# TABLE_ENABLE: set to "true" to enable table detection (default: true)
+# ────────────────────────────────────────────────────────────────────────
+FORMULA_ENABLE="${FORMULA_ENABLE:-true}"
+TABLE_ENABLE="${TABLE_ENABLE:-true}"
+
+echo "Configuring MinerU: formula=$FORMULA_ENABLE, table=$TABLE_ENABLE"
+
+python3 -c "
+import json, os, sys
+
+config_path = os.path.expandvars('\$HOME/magic-pdf.json')
+if not os.path.exists(config_path):
+    print(f'WARNING: {config_path} not found, skipping config update')
+    sys.exit(0)
+
+with open(config_path) as f:
+    config = json.load(f)
+
+formula_enable = os.environ.get('FORMULA_ENABLE', 'true').lower() == 'true'
+table_enable = os.environ.get('TABLE_ENABLE', 'true').lower() == 'true'
+
+config['formula-config'] = config.get('formula-config', {})
+config['formula-config']['enable'] = formula_enable
+config['table-config'] = config.get('table-config', {})
+config['table-config']['enable'] = table_enable
+
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=2)
+print(f'Updated magic-pdf.json: formula={formula_enable}, table={table_enable}')
+"
+
 exec "$@"
