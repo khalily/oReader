@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 脚本/配置中使用绝对路径，脚本自动获取路径
 - 二进制、构建文件等添加到 .gitignore，避免 commit
 - docs/superpowers/ 下的文件也需要 commit（plans、specs 等）
+- uv.lock 文件需要提交
 - 代码 commit 时自动触发 pre-commit lint 检查（`.claude/hooks/pre-commit-lint.sh`）：按暂存文件类型运行 golangci-lint / eslint / flake8+black / redocly。lint 失败会阻止 commit，可用 `--no-verify` 跳过
 
 ## Project Overview

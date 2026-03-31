@@ -21,8 +21,7 @@ require_tool() {
     case "$1" in
       golangci-lint) log "  Install: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest" ;;
       npx)           log "  Install: npm install -g npx (or install Node.js)" ;;
-      flake8)        log "  Install: pip install flake8" ;;
-      black)         log "  Install: pip install black" ;;
+      ruff)          log "  Install: pip install ruff" ;;
     esac
     return 1
   fi
@@ -139,35 +138,33 @@ if [ -n "$STAGED_TS" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Phase 3: Python (flake8 + black)
+# Phase 3: Python (ruff)
 # ---------------------------------------------------------------------------
 
 if [ -n "$STAGED_PY" ]; then
-  # Only lint files under converter/, excluding generated protobuf code.
+  # Only lint files under services/converter/, excluding generated protobuf code.
   PY_LINTABLE=$(echo "$STAGED_PY" | grep '^services/converter/' | grep -v '^services/converter/proto/' || true)
 
   if [ -n "$PY_LINTABLE" ]; then
-    log "--- Python (flake8 + black) ---"
-
-    if ! require_tool flake8; then
+    if ! require_tool ruff; then
       HAS_FAILURE=1
     else
-      log "Running flake8..."
-      if ! flake8 $PY_LINTABLE --max-line-length=120; then
-        HAS_FAILURE=1
-      else
-        log "flake8 passed."
-      fi
-    fi
+      log "--- Python (ruff) ---"
 
-    if ! require_tool black; then
-      log "WARNING: black not installed, skipping format check."
-    else
-      log "Running black --check..."
-      if ! black --check --line-length=120 $PY_LINTABLE; then
+      # ruff check (replaces flake8)
+      log "Running ruff check..."
+      if ! ruff check $PY_LINTABLE; then
         HAS_FAILURE=1
       else
-        log "black check passed."
+        log "ruff check passed."
+      fi
+
+      # ruff format --check (replaces black)
+      log "Running ruff format --check..."
+      if ! ruff format --check $PY_LINTABLE; then
+        HAS_FAILURE=1
+      else
+        log "ruff format check passed."
       fi
     fi
   fi

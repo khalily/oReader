@@ -35,10 +35,10 @@ class PaperConverterServicer(paper_pb2_grpc.PaperConverterServicer):
         # Phase 1: Mining (MinerU)
         yield paper_pb2.ConvertProgress(status="mining", progress=10)
         try:
-            from magic_pdf.data.dataset import PymuDocDataset
             from magic_pdf.data.data_reader_writer.filebase import (
                 FileBasedDataWriter,
             )
+            from magic_pdf.data.dataset import PymuDocDataset
             from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 
             ds = PymuDocDataset(request.pdf_content)
