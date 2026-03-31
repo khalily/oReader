@@ -16,6 +16,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       PORT: "8080"
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       PAPER_GRPC_ADDR: converter:50051
       PAPER_UPLOAD_DIR: /data/uploads/papers
       PAPER_MAX_UPLOAD_SIZE: ${PAPER_MAX_UPLOAD_SIZE:-52428800}

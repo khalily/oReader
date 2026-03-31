@@ -141,6 +141,8 @@ func main() {
 		Default: middleware.RouteLimit{Requests: 60, Window: time.Minute},
 	}
 
+	log.Info().Bool("enabled", cfg.RateLimit.Enabled).Msg("Rate limiting")
+
 	// Initialize handlers
 	authHandler := handler.NewHandler(cfg, jwtService, userRepo, tokenRepo)
 	feedHandler := handler.NewFeedHandler(feedService)
@@ -163,7 +165,9 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(middleware.SecurityHeadersMiddleware())
 	router.Use(middleware.RequestLoggerMiddleware())
-	router.Use(middleware.RateLimitMiddleware(rateLimiter, rateLimits))
+	if cfg.RateLimit.Enabled {
+		router.Use(middleware.RateLimitMiddleware(rateLimiter, rateLimits))
+	}
 
 	// CORS configuration
 	allowOrigins := []string{"*"}
