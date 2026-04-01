@@ -1,22 +1,26 @@
+import base64
+import io
 import json
-import logging
 import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 
 import openai
+from PIL import Image
 
-logger = logging.getLogger(__name__)
+from logging_config import get_logger  # noqa: E402
+
+logger = get_logger(__name__)
 
 
 def fix_utf8_mojibake(text: str) -> str:
-    """Fix double-encoded UTF-8 mojibake produced by MinerU PDF extraction.
+    """Fix double-encoded UTF-8 mojibake produced by PDF extraction tools.
 
-    MinerU sometimes outputs text where UTF-8 bytes (e.g. en-dash E2 80 93)
+    Some PDF extractors output text where UTF-8 bytes (e.g. en-dash E2 80 93)
     were incorrectly decoded as Windows-1252, producing 3-char sequences
     like â€" (U+00E2 U+20AC U+201C) instead of – (U+2013).
     """
-    # UTF-8 bytes → Windows-1252 misinterpretation → correct Unicode
     replacements = {
         "\u00e2\u20ac\u201c": "\u2013",  # â€" → – (en-dash)
         "\u00e2\u20ac\u201d": "\u2014",  # â€" → — (em-dash)
@@ -32,7 +36,106 @@ def fix_utf8_mojibake(text: str) -> str:
     return text
 
 
-# Q6: Reuse OpenAI client instead of creating per-request
+# --- Marker PDF conversion ---
+
+_marker_converter = None
+
+
+def _get_marker_converter():
+    """Lazily initialize Marker PdfConverter (model loading is expensive)."""
+    global _marker_converter
+    if _marker_converter is not None:
+        return _marker_converter
+    from marker.converters.pdf import PdfConverter
+    from marker.models import create_model_dict
+
+    logger.info("Initializing Marker converter and loading models...")
+    model_dict = create_model_dict()
+    _marker_converter = PdfConverter(artifact_dict=model_dict)
+    logger.info("Marker converter initialized")
+    return _marker_converter
+
+
+def pil_image_to_base64(img: Image.Image, filename: str) -> str:
+    """Convert a PIL Image to a base64 data URL.
+
+    Args:
+        img: PIL Image object
+        filename: Original filename (used to determine format)
+
+    Returns:
+        data:image/...;base64,... string
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    fmt = "PNG" if ext == ".png" else "JPEG"
+    mime = "image/png" if ext == ".png" else "image/jpeg"
+
+    buf = io.BytesIO()
+    img.save(buf, format=fmt)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
+
+def images_to_base64(markdown: str, images: list[tuple[str, str]]) -> str:
+    """Replace image filename references in markdown with base64 data URLs.
+
+    Args:
+        markdown: Markdown text with image references like ![](filename.jpeg)
+        images: List of (filename, base64_data_url) tuples
+
+    Returns:
+        Markdown with image references replaced by base64 data URLs
+    """
+    for filename, data_url in images:
+        markdown = markdown.replace(f"]({filename})", f"]({data_url})")
+    return markdown
+
+
+def convert_with_marker(
+    pdf_content: bytes,
+    filename: str,
+) -> tuple[str, list[tuple[str, str]]]:
+    """Convert PDF to Markdown using Marker.
+
+    Args:
+        pdf_content: Raw PDF bytes
+        filename: Original filename for logging
+
+    Returns:
+        Tuple of (markdown_text, [(image_filename, base64_data_url), ...])
+    """
+    converter = _get_marker_converter()
+
+    # Marker requires a file path, so write to temp file
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(pdf_content)
+        tmp_path = tmp.name
+
+    try:
+        logger.info("Starting Marker conversion", filename=filename)
+        rendered = converter(tmp_path)
+
+        markdown = rendered.markdown
+        logger.info(
+            "Marker conversion complete",
+            markdown_length=len(markdown),
+            image_count=len(rendered.images),
+        )
+
+        # Convert PIL images to base64 data URLs
+        image_data: list[tuple[str, str]] = []
+        for img_name, pil_img in rendered.images.items():
+            data_url = pil_image_to_base64(pil_img, img_name)
+            image_data.append((img_name, data_url))
+
+        return markdown, image_data
+
+    finally:
+        os.unlink(tmp_path)
+
+
+# --- LLM metadata extraction (unchanged) ---
+
 _openai_client = None
 
 
@@ -100,7 +203,7 @@ def parse_metadata_response(response: str) -> PaperMetadataResult | None:
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError:
-        logger.error("Failed to parse metadata JSON: %s", cleaned[:200])
+        logger.error("Failed to parse metadata JSON", response_preview=cleaned[:200])
         return None
 
     return PaperMetadataResult(
@@ -131,100 +234,14 @@ def extract_metadata(markdown: str) -> PaperMetadataResult:
         )
         content = response.choices[0].message.content or ""
         result = parse_metadata_response(content)
-        return result if result is not None else PaperMetadataResult()
-    except Exception as e:
-        logger.error("LLM metadata extraction failed: %s", e)
+        if result is not None:
+            logger.info(
+                "Metadata extracted",
+                title=result.title[:50] if result.title else "",
+                author_count=len(result.authors),
+            )
+            return result
         return PaperMetadataResult()
-
-
-def _split_markdown_chunks(markdown: str, chunk_size: int = 5000) -> list[str]:
-    """Split markdown into chunks at paragraph boundaries, each ~chunk_size bytes."""
-    if len(markdown) <= chunk_size:
-        return [markdown]
-
-    chunks: list[str] = []
-    lines = markdown.split("\n")
-    current: list[str] = []
-    current_len = 0
-
-    for line in lines:
-        line_len = len(line) + 1  # +1 for newline
-        if current_len + line_len > chunk_size and current:
-            chunks.append("\n".join(current))
-            current = []
-            current_len = 0
-        current.append(line)
-        current_len += line_len
-
-    if current:
-        chunks.append("\n".join(current))
-
-    return chunks
-
-
-_REFINE_SYSTEM_PROMPT = (
-    "You are a Markdown formatter for academic papers. "
-    "Fix formatting issues in the given Markdown chunk.\n"
-    "Rules:\n"
-    "- Restore mathematical formulas as LaTeX: $...$ for inline, $$...$$ for display.\n"
-    "  Garbled chars near math operators, subscripts/superscripts rendered as plain text,\n"
-    "  or symbols like ×, ≤, ≥, →, α, β, γ should become LaTeX commands.\n"
-    "  Examples: '1.6×' → '$1.6\\times$', 'awin' → '$a_{win}$',\n"
-    "  'Dmax' → '$D_{max}$', '2 s' → '$2\\mu s$'.\n"
-    "- Fix broken LaTeX ($...$ and $$...$$ properly paired)\n"
-    "- Convert HTML tables to GFM pipe tables where possible.\n"
-    "- Remove page numbers, headers, footers\n"
-    "- Fix paragraph breaks\n"
-    "- Keep all content and <!--IMG_N--> image placeholders\n"
-    "- Return ONLY the corrected markdown, nothing else\n"
-)
-
-
-def _refine_chunk(client: openai.OpenAI, chunk: str) -> str:
-    """Refine a single markdown chunk via LLM."""
-    try:
-        response = client.chat.completions.create(
-            model=_get_llm_model(),
-            messages=[
-                {"role": "system", "content": _REFINE_SYSTEM_PROMPT},
-                {"role": "user", "content": chunk},
-            ],
-            temperature=0.0,
-            max_tokens=16000,
-        )
-        return response.choices[0].message.content or chunk
     except Exception as e:
-        logger.error("LLM chunk refinement failed: %s", e)
-        return chunk
-
-
-def refine_markdown(markdown: str) -> str:
-    """Call LLM to fix formatting issues, splitting into ~5KB chunks."""
-    client = _get_openai_client()
-    if client is None:
-        return markdown
-
-    chunks = _split_markdown_chunks(markdown, chunk_size=5000)
-
-    # LLM_REFINE_MAX_CHUNKS limits how many chunks to refine (default: all).
-    # Set to 1 for fast/test mode; unset or 0 for full refinement.
-    max_chunks = int(os.environ.get("LLM_REFINE_MAX_CHUNKS", "0"))
-    if max_chunks > 0 and len(chunks) > max_chunks:
-        logger.info(
-            "LLM_REFINE_MAX_CHUNKS=%d, refining first %d of %d chunks",
-            max_chunks,
-            max_chunks,
-            len(chunks),
-        )
-        refined = [_refine_chunk(client, c) for c in chunks[:max_chunks]]
-        return "\n".join(refined + chunks[max_chunks:])
-
-    logger.info("Refining markdown: %d chars split into %d chunks", len(markdown), len(chunks))
-
-    refined_parts: list[str] = []
-    for i, chunk in enumerate(chunks):
-        logger.info("Refining chunk %d/%d (%d chars)", i + 1, len(chunks), len(chunk))
-        refined = _refine_chunk(client, chunk)
-        refined_parts.append(refined)
-
-    return "\n".join(refined_parts)
+        logger.error("LLM metadata extraction failed", error=str(e))
+        return PaperMetadataResult()
