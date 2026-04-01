@@ -14,6 +14,38 @@ from logging_config import get_logger  # noqa: E402
 logger = get_logger(__name__)
 
 
+def sanitize_markdown(markdown: str) -> str:
+    """Remove HTML tags produced by Marker that don't render in Markdown.
+
+    Marker outputs HTML tags like page anchors, superscripts, line breaks,
+    and spans that react-markdown doesn't render. This function strips them
+    while preserving their text content.
+
+    Transforms:
+        <span id="page-X-Y"></span>  → removed (empty page anchors)
+        <sup>content</sup>            → content
+        <sub>content</sub>            → content
+        <br>, <br/>, <br />           → newline
+        <span ...>content</span>      → content
+    """
+    # Remove empty page anchor spans (no content between tags)
+    markdown = re.sub(r'<span\s+id="[^"]*">\s*</span>', "", markdown)
+
+    # Unwrap <sup>content</sup> → content (superscript / footnote refs)
+    markdown = re.sub(r"<sup>(.*?)</sup>", r"\1", markdown)
+
+    # Unwrap <sub>content</sub> → content (subscript / chemical formulas)
+    markdown = re.sub(r"<sub>(.*?)</sub>", r"\1", markdown)
+
+    # Convert <br>, <br/>, <br /> to newline
+    markdown = re.sub(r"<br\s*/?>", "\n", markdown)
+
+    # Remove any remaining <span ...> or </span> tags, keep content
+    markdown = re.sub(r"</?span[^>]*>", "", markdown)
+
+    return markdown
+
+
 def fix_utf8_mojibake(text: str) -> str:
     """Fix double-encoded UTF-8 mojibake produced by PDF extraction tools.
 
@@ -46,13 +78,27 @@ def _get_marker_converter():
     global _marker_converter
     if _marker_converter is not None:
         return _marker_converter
+    from marker.config.parser import ConfigParser
     from marker.converters.pdf import PdfConverter
     from marker.models import create_model_dict
 
     logger.info("Initializing Marker converter and loading models...")
+
+    # Disable OCR — academic papers are text-based PDFs with embedded text;
+    # OCR is the bottleneck on CPU (15+ seconds per text block). Skipping it
+    # reduces conversion from 30+ minutes to 1-2 minutes.
+    config = {"disable_ocr": True, "output_format": "markdown"}
+    config_parser = ConfigParser(config)
+
     model_dict = create_model_dict()
-    _marker_converter = PdfConverter(artifact_dict=model_dict)
-    logger.info("Marker converter initialized")
+    _marker_converter = PdfConverter(
+        config=config_parser.generate_config_dict(),
+        artifact_dict=model_dict,
+        processor_list=config_parser.get_processors(),
+        renderer=config_parser.get_renderer(),
+        llm_service=config_parser.get_llm_service(),
+    )
+    logger.info("Marker converter initialized", config=config)
     return _marker_converter
 
 
@@ -116,11 +162,23 @@ def convert_with_marker(
         rendered = converter(tmp_path)
 
         markdown = rendered.markdown
+        markdown = sanitize_markdown(markdown)
         logger.info(
             "Marker conversion complete",
             markdown_length=len(markdown),
             image_count=len(rendered.images),
         )
+
+        # Diagnostic: log each image's name and dimensions to debug
+        # image merging issues (e.g., multiple PDF figures merged into one)
+        for img_name, pil_img in rendered.images.items():
+            logger.info(
+                "Extracted image",
+                name=img_name,
+                width=pil_img.width,
+                height=pil_img.height,
+                format=pil_img.format,
+            )
 
         # Convert PIL images to base64 data URLs
         image_data: list[tuple[str, str]] = []

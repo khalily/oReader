@@ -168,12 +168,14 @@
     width: 100%;
     border-collapse: collapse;
     margin: 1.5em 0;
+    font-size: 0.875em;
   }
 
   .prose th, .prose td {
     border: 1px solid hsl(var(--border));
-    padding: 0.75em;
+    padding: 0.5em 0.75em;
     text-align: left;
+    white-space: nowrap;
   }
 
   .prose th {

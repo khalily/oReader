@@ -34,7 +34,7 @@ func NewRefreshWorkerService(
 	userFeedRepo UserFeedRepository,
 ) RefreshWorkerService {
 	// Create a default HTTP fetcher with 30 second timeout
-	fetcher := rss.NewHTTPFetcher(DefaultFeedTimeout)
+	fetcher := rss.NewHTTPFetcher(DefaultFeedTimeout, 0) // uses default 5MB limit
 	parser := rss.NewParser(fetcher)
 
 	return &refreshWorkerService{

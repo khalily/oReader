@@ -24,6 +24,7 @@ from converter import (  # noqa: E402
     fix_utf8_mojibake,
     images_to_base64,
     parse_metadata_response,
+    sanitize_markdown,
 )
 
 
@@ -108,6 +109,75 @@ class TestFixUtf8Mojibake(unittest.TestCase):
         result = fix_utf8_mojibake(broken)
         self.assertIn("\u2013", result)  # en-dash present
         self.assertNotIn("\u00e2\u20ac\u201c", result)  # mojibake removed
+
+
+class TestSanitizeMarkdown(unittest.TestCase):
+    """Test HTML tag cleanup from Marker output."""
+
+    def test_removes_empty_page_anchor_spans(self):
+        """<span id="page-X-Y"></span> should be removed entirely."""
+        md = 'Some text<span id="page-13-21"></span> more text'
+        result = sanitize_markdown(md)
+        self.assertEqual(result, "Some text more text")
+
+    def test_removes_page_anchor_with_whitespace(self):
+        """Page anchors with internal whitespace should be removed."""
+        md = '<span id="page-0-0">  </span>Content'
+        result = sanitize_markdown(md)
+        self.assertEqual(result, "Content")
+
+    def test_unwraps_sup_tags(self):
+        """<sup>1</sup> should become plain text 1."""
+        md = "RDMA<sup>1</sup> is a technology"
+        result = sanitize_markdown(md)
+        self.assertEqual(result, "RDMA1 is a technology")
+
+    def test_unwraps_sub_tags(self):
+        """<sub>2</sub> should become plain text 2."""
+        md = "H<sub>2</sub>O is water"
+        result = sanitize_markdown(md)
+        self.assertEqual(result, "H2O is water")
+
+    def test_converts_br_to_newline(self):
+        """<br> should become newline."""
+        md = "Line one<br>Line two"
+        result = sanitize_markdown(md)
+        self.assertEqual(result, "Line one\nLine two")
+
+    def test_converts_br_self_closing(self):
+        """<br/> and <br /> should also become newline."""
+        md = "Line one<br/>Line two<br />Line three"
+        result = sanitize_markdown(md)
+        self.assertEqual(result, "Line one\nLine two\nLine three")
+
+    def test_removes_remaining_span_tags(self):
+        """Non-anchor span tags should be stripped, content preserved."""
+        md = '<span class="bold">Important</span> point'
+        result = sanitize_markdown(md)
+        self.assertEqual(result, "Important point")
+
+    def test_combined_html_cleanup(self):
+        """Real-world Marker output with multiple HTML tags."""
+        md = (
+            "# Introduction\n"
+            '<span id="page-1-0"></span>\n'
+            "RDMA<sup>1</sup> allows H<sub>2</sub>O<br>\n"
+            'Next line<span class="foo">styled</span>.'
+        )
+        result = sanitize_markdown(md)
+        self.assertNotIn("<span", result)
+        self.assertNotIn("</span>", result)
+        self.assertNotIn("<sup>", result)
+        self.assertNotIn("<br>", result)
+        self.assertIn("RDMA1", result)
+        self.assertIn("H2O", result)
+        self.assertIn("\n", result)
+
+    def test_preserves_plain_markdown(self):
+        """Clean Markdown should pass through unchanged."""
+        md = "# Title\n\nParagraph with **bold** and *italic*.\n\n- List item"
+        result = sanitize_markdown(md)
+        self.assertEqual(result, md)
 
 
 class TestImagesToBase64(unittest.TestCase):

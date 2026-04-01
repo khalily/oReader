@@ -158,6 +158,95 @@ class TestMarkerImageConversion(unittest.TestCase):
         self.assertTrue(data_url.startswith("data:image/png;base64,"))
 
 
+class TestMarkerConverterOCRDisabled(unittest.TestCase):
+    """Test that Marker converter is initialized with disable_ocr=True.
+
+    This is the primary performance optimization: academic papers are text-based
+    PDFs and do not need OCR. Skipping OCR reduces conversion from 30+ minutes
+    to 1-2 minutes on CPU.
+    """
+
+    def setUp(self):
+        import converter
+
+        # Reset singleton so _get_marker_converter re-initializes
+        self._saved = converter._marker_converter
+        converter._marker_converter = None
+
+        # Create mock marker modules so `from marker.X import Y` works
+        import types
+
+        self._mock_config_parser_cls = MagicMock()
+        mod_parser = types.ModuleType("marker.config.parser")
+        mod_parser.ConfigParser = self._mock_config_parser_cls
+
+        self._mock_pdf_converter_cls = MagicMock()
+        mod_converter = types.ModuleType("marker.converters.pdf")
+        mod_converter.PdfConverter = self._mock_pdf_converter_cls
+
+        self._mock_create_model_dict = MagicMock(return_value={"mock": True})
+        mod_models = types.ModuleType("marker.models")
+        mod_models.create_model_dict = self._mock_create_model_dict
+
+        # Inject into sys.modules so lazy imports in _get_marker_converter resolve
+        self._mocked_keys = [
+            "marker.config",
+            "marker.config.parser",
+            "marker.converters",
+            "marker.converters.pdf",
+            "marker.models",
+        ]
+        for key in self._mocked_keys:
+            sys.modules.setdefault(key, types.ModuleType(key))
+        sys.modules["marker.config.parser"] = mod_parser
+        sys.modules["marker.converters.pdf"] = mod_converter
+        sys.modules["marker.models"] = mod_models
+
+    def tearDown(self):
+        import converter
+
+        converter._marker_converter = self._saved
+        for key in self._mocked_keys:
+            sys.modules.pop(key, None)
+
+    def test_config_parser_called_with_disable_ocr(self):
+        """ConfigParser should be initialized with {'disable_ocr': True}."""
+        from converter import _get_marker_converter
+
+        # Setup mock parser instance
+        mock_parser = MagicMock()
+        mock_parser.generate_config_dict.return_value = {}
+        mock_parser.get_processors.return_value = []
+        mock_parser.get_renderer.return_value = None
+        mock_parser.get_llm_service.return_value = None
+        self._mock_config_parser_cls.return_value = mock_parser
+
+        _get_marker_converter()
+
+        self._mock_config_parser_cls.assert_called_once_with({"disable_ocr": True, "output_format": "markdown"})
+
+    def test_pdf_converter_receives_config(self):
+        """PdfConverter should receive config from ConfigParser.generate_config_dict()."""
+        from converter import _get_marker_converter
+
+        mock_parser = MagicMock()
+        mock_parser.generate_config_dict.return_value = {"disable_ocr": True, "output_format": "markdown"}
+        mock_parser.get_processors.return_value = "procs"
+        mock_parser.get_renderer.return_value = "renderer"
+        mock_parser.get_llm_service.return_value = "llm"
+        self._mock_config_parser_cls.return_value = mock_parser
+
+        _get_marker_converter()
+
+        self._mock_pdf_converter_cls.assert_called_once_with(
+            config={"disable_ocr": True, "output_format": "markdown"},
+            artifact_dict={"mock": True},
+            processor_list="procs",
+            renderer="renderer",
+            llm_service="llm",
+        )
+
+
 class TestExistingFunctions(unittest.TestCase):
     """Test that existing functions still work after refactor."""
 

@@ -192,7 +192,7 @@ Upload PDF academic papers, auto-convert to Markdown, and extract metadata via P
 | Go backend | `PAPER_GRPC_ADDR` | `localhost:50051` | Converter address (Docker: `converter:50051`) |
 | Go backend | `PAPER_UPLOAD_DIR` | `uploads/papers` | PDF storage directory |
 | Go backend | `PAPER_MAX_UPLOAD_SIZE` | `52428800` (50MB) | Max upload size |
-| Go backend | `PAPER_GRPC_TIMEOUT` | `5m` | gRPC call timeout |
+| Go backend | `PAPER_GRPC_TIMEOUT` | `30m` | gRPC call timeout |
 | Converter | `LLM_API_KEY` | — | OpenAI-compatible key (optional, skips LLM if unset) |
 | Converter | `LLM_BASE_URL` | OpenAI | API base URL |
 | Converter | `LLM_MODEL` | `gpt-4o-mini` | Model for Markdown refinement |

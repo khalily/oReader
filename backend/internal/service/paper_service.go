@@ -98,16 +98,16 @@ func (s *paperService) UploadPaper(ctx context.Context, userID string, filename 
 
 // processConversion runs in a goroutine to convert PDF and extract metadata
 func (s *paperService) processConversion(paperID string, filename string) {
-	// P3: Use a context with timeout for all RPC calls
-	ctx, cancel := context.WithTimeout(context.Background(), s.grpcTimeout)
-	defer cancel()
-
 	// B4: Lock to prevent concurrent conversion updates on same paper
 	s.conversionMu.Lock()
 	defer s.conversionMu.Unlock()
 
+	// Use a fresh context for initial DB operations (separate from gRPC timeout)
+	initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer initCancel()
+
 	// Update status to processing
-	paper, err := s.paperRepo.GetByID(ctx, paperID)
+	paper, err := s.paperRepo.GetByID(initCtx, paperID)
 	if err != nil {
 		logger.Error().Err(err).Str("paper_id", paperID).Msg("Failed to get paper for conversion")
 		return
@@ -118,7 +118,7 @@ func (s *paperService) processConversion(paperID string, filename string) {
 	}
 
 	paper.Status = model.PaperStatusProcessing
-	if err := s.paperRepo.Update(ctx, paper); err != nil {
+	if err := s.paperRepo.Update(initCtx, paper); err != nil {
 		logger.Error().Err(err).Str("paper_id", paperID).Msg("Failed to update paper status to processing")
 		return
 	}
@@ -126,14 +126,18 @@ func (s *paperService) processConversion(paperID string, filename string) {
 	// P1: Read PDF from disk instead of holding bytes in memory
 	pdfContent, err := os.ReadFile(paper.PDFPath)
 	if err != nil {
-		s.failPaper(ctx, paperID, fmt.Sprintf("failed to read PDF file: %v", err))
+		s.failPaper(paperID, fmt.Sprintf("failed to read PDF file: %v", err))
 		return
 	}
 
+	// P3: Use a dedicated context with timeout for gRPC calls only
+	grpcCtx, grpcCancel := context.WithTimeout(context.Background(), s.grpcTimeout)
+	defer grpcCancel()
+
 	// Call gRPC Convert (streaming)
-	progresses, err := s.grpcClient.Convert(ctx, pdfContent, filename)
+	progresses, err := s.grpcClient.Convert(grpcCtx, pdfContent, filename)
 	if err != nil {
-		s.failPaper(ctx, paperID, fmt.Sprintf("conversion failed: %v", err))
+		s.failPaper(paperID, fmt.Sprintf("conversion failed: %v", err))
 		return
 	}
 
@@ -144,31 +148,26 @@ func (s *paperService) processConversion(paperID string, filename string) {
 			markdown = p.Markdown
 		}
 		if p.Error != "" {
-			s.failPaper(ctx, paperID, fmt.Sprintf("conversion error: %s", p.Error))
+			s.failPaper(paperID, fmt.Sprintf("conversion error: %s", p.Error))
 			return
 		}
 	}
 
 	if markdown == "" {
-		s.failPaper(ctx, paperID, "conversion returned empty markdown")
+		s.failPaper(paperID, "conversion returned empty markdown")
 		return
 	}
 
 	// Extract metadata
-	metadata, err := s.grpcClient.ExtractMetadata(ctx, markdown)
+	metadata, err := s.grpcClient.ExtractMetadata(grpcCtx, markdown)
 	if err != nil {
 		logger.Warn().Err(err).Str("paper_id", paperID).Msg("Metadata extraction failed, saving markdown without metadata")
-		// Save markdown without metadata
-		paper.MarkdownContent = markdown
-		paper.Status = model.PaperStatusCompleted
-		paper.Title = paper.OriginalFilename
-		if err := s.paperRepo.Update(ctx, paper); err != nil {
-			logger.Error().Err(err).Str("paper_id", paperID).Msg("Failed to update paper after metadata extraction failure")
-		}
+		// Save markdown without metadata using fresh context
+		s.savePaperResult(paper, markdown, paper.OriginalFilename)
 		return
 	}
 
-	// Update paper with conversion results
+	// Update paper with conversion results using fresh context
 	authorsJSON, _ := json.Marshal(metadata.Authors)
 	keywordsJSON, _ := json.Marshal(metadata.Keywords)
 
@@ -187,10 +186,7 @@ func (s *paperService) processConversion(paperID string, filename string) {
 		paper.Title = paper.OriginalFilename
 	}
 
-	if err := s.paperRepo.Update(ctx, paper); err != nil {
-		logger.Error().Err(err).Str("paper_id", paperID).Msg("Failed to update paper with conversion results")
-		return
-	}
+	s.savePaperResult(paper, markdown, paper.Title)
 
 	logger.Info().
 		Str("paper_id", paperID).
@@ -198,8 +194,13 @@ func (s *paperService) processConversion(paperID string, filename string) {
 		Msg("Paper conversion completed")
 }
 
-// failPaper marks a paper as failed with the given error message
-func (s *paperService) failPaper(ctx context.Context, paperID string, errMsg string) {
+// failPaper marks a paper as failed with the given error message.
+// Uses a fresh context so it works even when the gRPC context has expired.
+func (s *paperService) failPaper(paperID string, errMsg string) {
+	// Use a fresh context — never inherit a potentially expired context
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	paper, err := s.paperRepo.GetByID(ctx, paperID)
 	if err != nil || paper == nil {
 		logger.Error().Err(err).Str("paper_id", paperID).Msg("Failed to get paper for marking as failed")
@@ -216,6 +217,26 @@ func (s *paperService) failPaper(ctx context.Context, paperID string, errMsg str
 		Str("paper_id", paperID).
 		Str("error", errMsg).
 		Msg("Paper conversion failed")
+}
+
+// savePaperResult saves paper conversion results using a fresh context.
+// Used after gRPC calls complete to ensure DB updates succeed even if
+// the gRPC context is near expiry.
+func (s *paperService) savePaperResult(paper *model.Paper, markdown string, title string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	paper.MarkdownContent = markdown
+	paper.Status = model.PaperStatusCompleted
+	paper.Title = title
+
+	if paper.Title == "" {
+		paper.Title = paper.OriginalFilename
+	}
+
+	if err := s.paperRepo.Update(ctx, paper); err != nil {
+		logger.Error().Err(err).Str("paper_id", paper.ID).Msg("Failed to save paper conversion result")
+	}
 }
 
 // GetPaper retrieves a paper with ownership check

@@ -102,7 +102,7 @@ func main() {
 	jwtService := jwt.NewService(cfg.Auth.SecretKey, accessTTL, refreshTTL)
 
 	// Initialize RSS parser
-	fetcher := rss.NewHTTPFetcher(30 * time.Second)
+	fetcher := rss.NewHTTPFetcher(30*time.Second, cfg.Refresh.MaxBodySize)
 	parser := rss.NewParser(fetcher)
 
 	// Initialize services

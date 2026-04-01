@@ -41,7 +41,8 @@ type AuthConfig struct {
 
 // RefreshConfig holds RSS refresh configuration
 type RefreshConfig struct {
-	Interval string
+	Interval    string
+	MaxBodySize int64 // Maximum feed response body size in bytes
 }
 
 // RateLimitConfig holds rate limiting configuration
@@ -85,6 +86,7 @@ func Load() (*Config, error) {
 	v.SetDefault("JWT_ACCESS_TTL", "15m")
 	v.SetDefault("JWT_REFRESH_TTL", "168h")
 	v.SetDefault("REFRESH_INTERVAL", "15m")
+	v.SetDefault("FEED_MAX_BODY_SIZE", 5242880) // 5MB
 	v.SetDefault("RATE_LIMIT_ENABLED", true)
 	v.SetDefault("LOG_LEVEL", "info")
 
@@ -92,7 +94,7 @@ func Load() (*Config, error) {
 	v.SetDefault("PAPER_GRPC_ADDR", "localhost:50051")
 	v.SetDefault("PAPER_UPLOAD_DIR", "uploads/papers")
 	v.SetDefault("PAPER_MAX_UPLOAD_SIZE", 52428800) // 50MB
-	v.SetDefault("PAPER_GRPC_TIMEOUT", "5m")
+	v.SetDefault("PAPER_GRPC_TIMEOUT", "30m")
 
 	// Bind environment variables
 	_ = v.BindEnv("DATABASE_URL")
@@ -103,6 +105,7 @@ func Load() (*Config, error) {
 	_ = v.BindEnv("JWT_ACCESS_TTL")
 	_ = v.BindEnv("JWT_REFRESH_TTL")
 	_ = v.BindEnv("REFRESH_INTERVAL")
+	_ = v.BindEnv("FEED_MAX_BODY_SIZE")
 	_ = v.BindEnv("RATE_LIMIT_ENABLED")
 	_ = v.BindEnv("RATE_LIMIT_REDIS_URL")
 	_ = v.BindEnv("LOG_LEVEL")
@@ -129,7 +132,8 @@ func Load() (*Config, error) {
 			RefreshTTL: v.GetString("JWT_REFRESH_TTL"),
 		},
 		Refresh: RefreshConfig{
-			Interval: v.GetString("REFRESH_INTERVAL"),
+			Interval:    v.GetString("REFRESH_INTERVAL"),
+			MaxBodySize: v.GetInt64("FEED_MAX_BODY_SIZE"),
 		},
 		RateLimit: RateLimitConfig{
 			Enabled:  v.GetBool("RATE_LIMIT_ENABLED"),

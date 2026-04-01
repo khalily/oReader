@@ -154,6 +154,15 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
               </a>
             )
           },
+          table({ children, ...restProps }) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+            const { node: _node, ...props } = restProps as any
+            return (
+              <div className="overflow-x-auto -mx-1 px-1">
+                <table {...props}>{children}</table>
+              </div>
+            )
+          },
         }}
       >
         {content}

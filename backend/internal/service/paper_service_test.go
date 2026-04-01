@@ -294,6 +294,96 @@ func TestPaperService_DeletePaper(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
+func TestPaperService_ContextExpiry_UpdatesDBWithFreshContext(t *testing.T) {
+	// Bug: When gRPC call exceeds the context timeout, failPaper uses the
+	// same expired context for DB updates, leaving the paper stuck in "processing".
+	// Fix: failPaper and final DB update should use a fresh context.
+	db := setupPaperServiceDB(t)
+	userID := createPaperUser(t, db)
+
+	tmpDir := t.TempDir()
+	mockClient := new(mockPaperConverterClient)
+	// Simulate slow conversion that exceeds the 1ms timeout
+	mockClient.On("Convert", mock.Anything, mock.Anything, "slow.pdf").
+		Run(func(args mock.Arguments) {
+			ctx := args.Get(0).(context.Context)
+			select {
+			case <-time.After(500 * time.Millisecond): // Exceeds the 50ms timeout
+			case <-ctx.Done():
+			}
+		}).
+		Return(nil, context.DeadlineExceeded)
+
+	paperRepo := &gormPaperRepo{db: db}
+	tagRepo := &gormPaperTagRepo{db: db}
+	// Use short timeout: enough for initial DB ops, but gRPC call will exceed it
+	svc := NewPaperService(paperRepo, tagRepo, mockClient, tmpDir, 50*time.Millisecond)
+
+	// Create paper and PDF file
+	paper := &model.Paper{
+		UserID:           userID,
+		OriginalFilename: "slow.pdf",
+		Status:           model.PaperStatusPending,
+	}
+	require.NoError(t, paper.GenerateID())
+	pdfPath := filepath.Join(tmpDir, "slow.pdf")
+	require.NoError(t, os.MkdirAll(filepath.Dir(pdfPath), 0755))
+	require.NoError(t, os.WriteFile(pdfPath, []byte("%PDF-1.4 fake"), 0644))
+	paper.PDFPath = pdfPath
+	require.NoError(t, db.Create(paper).Error)
+
+	// Call processConversion directly (normally runs in goroutine)
+	svc.(*paperService).processConversion(paper.ID, "slow.pdf")
+
+	// CRITICAL: Paper must NOT be stuck in "processing"
+	updated, err := paperRepo.GetByID(context.Background(), paper.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.Equal(t, model.PaperStatusFailed, updated.Status,
+		"paper should be marked as failed, not stuck in processing")
+	assert.Contains(t, updated.Error, "context deadline exceeded")
+}
+
+func TestPaperService_MetadataExtractionFailure_SavesMarkdown(t *testing.T) {
+	// When ExtractMetadata fails, markdown should still be saved
+	db := setupPaperServiceDB(t)
+	userID := createPaperUser(t, db)
+
+	tmpDir := t.TempDir()
+	mockClient := new(mockPaperConverterClient)
+	mockClient.On("Convert", mock.Anything, mock.Anything, "test.pdf").
+		Return([]grpc.ConvertProgress{
+			{Status: "completed", Progress: 100, Markdown: "# Paper\n\nAbstract here."},
+		}, nil)
+	mockClient.On("ExtractMetadata", mock.Anything, mock.Anything).
+		Return(nil, context.DeadlineExceeded)
+
+	paperRepo := &gormPaperRepo{db: db}
+	tagRepo := &gormPaperTagRepo{db: db}
+	svc := NewPaperService(paperRepo, tagRepo, mockClient, tmpDir, 10*time.Minute)
+
+	paper := &model.Paper{
+		UserID:           userID,
+		OriginalFilename: "test.pdf",
+		Status:           model.PaperStatusPending,
+	}
+	require.NoError(t, paper.GenerateID())
+	pdfPath := filepath.Join(tmpDir, "test.pdf")
+	require.NoError(t, os.MkdirAll(filepath.Dir(pdfPath), 0755))
+	require.NoError(t, os.WriteFile(pdfPath, []byte("%PDF-1.4 fake"), 0644))
+	paper.PDFPath = pdfPath
+	require.NoError(t, db.Create(paper).Error)
+
+	svc.(*paperService).processConversion(paper.ID, "test.pdf")
+
+	updated, err := paperRepo.GetByID(context.Background(), paper.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.Equal(t, model.PaperStatusCompleted, updated.Status)
+	assert.Equal(t, "# Paper\n\nAbstract here.", updated.MarkdownContent)
+	assert.Equal(t, "test.pdf", updated.Title) // Fallback to filename
+}
+
 func TestPaperService_UpdateTags(t *testing.T) {
 	db := setupPaperServiceDB(t)
 	userID := createPaperUser(t, db)

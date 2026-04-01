@@ -11,6 +11,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+const (
+	// maxRecvMsgSize is the maximum gRPC message size (64MB).
+	// Papers with many images embedded as base64 can exceed the default 4MB limit.
+	maxRecvMsgSize = 64 * 1024 * 1024
+)
+
 // ConvertProgress represents a progress update from the converter
 type ConvertProgress struct {
 	Status   string
@@ -45,6 +51,9 @@ type paperClient struct {
 func NewPaperClient(addr string, timeout time.Duration) (PaperConverterClient, error) {
 	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(maxRecvMsgSize),
+		),
 	)
 	if err != nil {
 		return nil, err
