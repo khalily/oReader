@@ -2,9 +2,12 @@ package rss
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // Mock fetcher for testing
@@ -300,6 +303,74 @@ func TestTruncateContent(t *testing.T) {
 			result := truncateContent(tc.input, tc.maxLen)
 			if len(result) > int(tc.maxLen) {
 				t.Errorf("truncateContent() result length %d exceeds maxLen %d", len(result), tc.maxLen)
+			}
+		})
+	}
+}
+
+func TestTruncateContent_MultibyteUTF8(t *testing.T) {
+	// "AAAA" = 4 bytes, "世" = 3 bytes (E4 B8 96), "界" = 3 bytes (E7 95 8C), "BBBB" = 4 bytes
+	// Total = 14 bytes
+	input := "AAAA世界BBBB"
+
+	tests := []struct {
+		name         string
+		maxLen       int64
+		wantValid    bool   // result must be valid UTF-8
+		wantPrefix   string // result must start with this
+		wantMaxBytes int64  // result must not exceed this many bytes
+	}{
+		{
+			name:         "maxLen 6 splits 世 (bytes: AAAA + E4 B8)",
+			maxLen:       6,
+			wantValid:    true,
+			wantPrefix:   "AAAA",
+			wantMaxBytes: 6,
+		},
+		{
+			name:         "maxLen 9 splits 界 (bytes: AAAA + 世(3) + E7)",
+			maxLen:       9,
+			wantValid:    true,
+			wantPrefix:   "AAAA世",
+			wantMaxBytes: 9,
+		},
+		{
+			name:         "maxLen 7 splits 世 last byte (bytes: AAAA + E4 B8 96 + E7)",
+			maxLen:       7,
+			wantValid:    true,
+			wantPrefix:   "AAAA世",
+			wantMaxBytes: 7,
+		},
+		{
+			name:         "exact boundary at rune end",
+			maxLen:       8,
+			wantValid:    true,
+			wantPrefix:   "AAAA世",
+			wantMaxBytes: 8,
+		},
+		{
+			name:         "realistic: Chinese description truncated to 200 bytes",
+			maxLen:       200,
+			wantValid:    true,
+			wantMaxBytes: 200,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := truncateContent(input, tc.maxLen)
+
+			if !utf8.ValidString(result) {
+				t.Errorf("truncateContent() produced invalid UTF-8: %x", result)
+			}
+			if !tc.wantValid {
+				t.Errorf("truncateContent() = %q, wantValid %v", result, tc.wantValid)
+			}
+			if tc.wantPrefix != "" && !strings.HasPrefix(result, tc.wantPrefix) {
+				t.Errorf("truncateContent() = %q, want prefix %q", result, tc.wantPrefix)
+			}
+			if int64(len(result)) > tc.wantMaxBytes {
+				t.Errorf("truncateContent() result length %d exceeds maxBytes %d", len(result), tc.wantMaxBytes)
 			}
 		})
 	}
@@ -604,4 +675,87 @@ func TestSanitizeFeed_ConvertsToMarkdown(t *testing.T) {
 	if strings.Contains(feed.Items[0].Title, "<script>") {
 		t.Errorf("Expected script tag to be removed from title, got: %s", feed.Items[0].Title)
 	}
+}
+
+func TestHTTPFetcher_MaxBodySize(t *testing.T) {
+	tests := []struct {
+		name        string
+		maxBodySize int64
+		contentSize int
+		wantLimited bool
+	}{
+		{
+			name:        "content fits within limit",
+			maxBodySize: 5 * 1024 * 1024,
+			contentSize: 1024, // 1KB
+			wantLimited: false,
+		},
+		{
+			name:        "content exceeds limit gets truncated",
+			maxBodySize: 1024, // 1KB limit
+			contentSize: 2048, // 2KB content
+			wantLimited: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create fetcher with custom maxBodySize and a mock round tripper
+			largeContent := strings.Repeat("x", tc.contentSize)
+			fetcher := &HTTPFetcher{
+				client: &http.Client{
+					Transport: &mockRoundTripper{
+						body:    largeContent,
+						contentLength: int64(tc.contentSize),
+					},
+					// Override with dummy timeout
+					Timeout: 30 * time.Second,
+				},
+				timeout:     30 * time.Second,
+				maxBodySize: tc.maxBodySize,
+			}
+
+			// Use a public URL that passes SSRF validation
+			content, err := fetcher.Fetch("https://example.com/feed.xml")
+			if err != nil {
+				t.Fatalf("Fetch() returned error: %v", err)
+			}
+
+			if tc.wantLimited {
+				if int64(len(content)) > tc.maxBodySize {
+					t.Errorf("Content length %d should be <= maxBodySize %d", len(content), tc.maxBodySize)
+				}
+				if len(content) == tc.contentSize {
+					t.Errorf("Content should have been truncated but wasn't")
+				}
+			} else {
+				if len(content) != tc.contentSize {
+					t.Errorf("Content length %d should equal original %d", len(content), tc.contentSize)
+				}
+			}
+		})
+	}
+}
+
+func TestHTTPFetcher_MaxBodySizeDefault(t *testing.T) {
+	// Verify that NewHTTPFetcher with 0 maxBodySize uses a sensible default
+	fetcher := NewHTTPFetcher(30*time.Second, 0)
+	if fetcher.maxBodySize != defaultMaxBodySize {
+		t.Errorf("Expected default maxBodySize %d, got %d", defaultMaxBodySize, fetcher.maxBodySize)
+	}
+}
+
+// mockRoundTripper implements http.RoundTripper for testing without SSRF issues
+type mockRoundTripper struct {
+	body          string
+	contentLength int64
+}
+
+func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode:    200,
+		Header:        map[string][]string{"Content-Type": {"application/xml"}},
+		Body:          io.NopCloser(strings.NewReader(m.body)),
+		ContentLength: m.contentLength,
+	}, nil
 }

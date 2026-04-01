@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mmcdole/gofeed"
 	"github.com/khalily/oreader/internal/infra/logger"
@@ -31,19 +32,28 @@ type FeedFetcher interface {
 	Fetch(url string) (string, error)
 }
 
+// defaultMaxBodySize is the default maximum response body size (5MB)
+const defaultMaxBodySize int64 = 5 * 1024 * 1024
+
 // HTTPFetcher implements FeedFetcher using HTTP client
 type HTTPFetcher struct {
-	client  *http.Client
-	timeout time.Duration
+	client      *http.Client
+	timeout     time.Duration
+	maxBodySize int64
 }
 
-// NewHTTPFetcher creates a new HTTP fetcher with configurable timeout
-func NewHTTPFetcher(timeout time.Duration) *HTTPFetcher {
+// NewHTTPFetcher creates a new HTTP fetcher with configurable timeout and max body size.
+// If maxBodySize is 0, it defaults to 5MB.
+func NewHTTPFetcher(timeout time.Duration, maxBodySize int64) *HTTPFetcher {
+	if maxBodySize <= 0 {
+		maxBodySize = defaultMaxBodySize
+	}
 	return &HTTPFetcher{
 		client: &http.Client{
 			Timeout: timeout,
 		},
-		timeout: timeout,
+		timeout:     timeout,
+		maxBodySize: maxBodySize,
 	}
 }
 
@@ -81,8 +91,8 @@ func (f *HTTPFetcher) Fetch(url string) (string, error) {
 		return "", fmt.Errorf("%w: HTTP %d", ErrFeedFetchFailed, resp.StatusCode)
 	}
 
-	// Limit response body size to 1MB
-	limitedReader := io.LimitReader(resp.Body, 1*1024*1024)
+	// Limit response body size to prevent memory exhaustion
+	limitedReader := io.LimitReader(resp.Body, f.maxBodySize)
 	content, err := io.ReadAll(limitedReader)
 	if err != nil {
 		logger.Error().
@@ -90,6 +100,15 @@ func (f *HTTPFetcher) Fetch(url string) (string, error) {
 			Str("feed_url", url).
 			Msg("Failed to read response body")
 		return "", fmt.Errorf("%w: %v", ErrFeedFetchFailed, err)
+	}
+
+	// Detect truncation: if Content-Length is known and exceeds our limit
+	if resp.ContentLength > f.maxBodySize {
+		logger.Warn().
+			Str("feed_url", url).
+			Int64("content_length", resp.ContentLength).
+			Int64("max_body_size", f.maxBodySize).
+			Msg("Feed response body exceeded limit and was truncated")
 	}
 
 	logger.Debug().
@@ -261,10 +280,17 @@ func parsePubDate(date *time.Time) *time.Time {
 	return nil
 }
 
-// truncateContent truncates content to maxLen bytes
+// truncateContent truncates content to maxLen bytes, preserving valid UTF-8 boundaries.
+// If truncation would split a multi-byte character, it backs up to the last valid rune start.
 func truncateContent(content string, maxLen int64) string {
 	if int64(len(content)) <= maxLen {
 		return content
+	}
+	// Walk backwards from maxLen to find a valid UTF-8 rune boundary
+	for i := int(maxLen); i > 0; i-- {
+		if utf8.RuneStart(content[i]) {
+			return content[:i]
+		}
 	}
 	return content[:maxLen]
 }
