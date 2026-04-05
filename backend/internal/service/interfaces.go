@@ -160,7 +160,8 @@ type SubscribeResult struct {
 // FeedWithItemCount contains a feed with its item count
 type FeedWithItemCount struct {
 	*model.Feed
-	ItemCount int `json:"item_count"`
+	ItemCount  int     `json:"item_count"`
+	CategoryID *string `json:"category_id,omitempty"`
 }
 
 // RefreshResult contains the result of refreshing a feed

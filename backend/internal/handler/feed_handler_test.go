@@ -49,8 +49,9 @@ func (m *mockFeedService) GetUserFeeds(ctx context.Context, userID string, opts 
 	feed.GenerateID()
 	return []*service.FeedWithItemCount{
 		{
-			Feed:     feed,
-			ItemCount: 10,
+			Feed:       feed,
+			ItemCount:  10,
+			CategoryID: nil,
 		},
 	}, 1, nil
 }

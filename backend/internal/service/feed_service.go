@@ -181,6 +181,18 @@ func (s *feedService) GetUserFeeds(ctx context.Context, userID string, opts List
 		return nil, 0, err
 	}
 
+	// Build category_id mapping from user_feeds
+	userFeeds, err := s.userFeedRepo.ListByUserID(ctx, userID)
+	if err != nil {
+		return nil, 0, err
+	}
+	feedCategoryMap := make(map[string]*string)
+	for _, uf := range userFeeds {
+		if uf.CategoryID != nil {
+			feedCategoryMap[uf.FeedID] = uf.CategoryID
+		}
+	}
+
 	// Get item counts for each feed
 	result := make([]*FeedWithItemCount, len(feeds))
 	for i, feed := range feeds {
@@ -189,8 +201,9 @@ func (s *feedService) GetUserFeeds(ctx context.Context, userID string, opts List
 			return nil, 0, err
 		}
 		result[i] = &FeedWithItemCount{
-			Feed:     feed,
-			ItemCount: int(count),
+			Feed:       feed,
+			ItemCount:  int(count),
+			CategoryID: feedCategoryMap[feed.ID],
 		}
 	}
 
