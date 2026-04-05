@@ -167,6 +167,10 @@ func (m *refreshMockUserFeedRepository) GetMaxPosition(ctx context.Context, user
 	return 0, nil
 }
 
+func (m *refreshMockUserFeedRepository) UpdateCategory(ctx context.Context, userID, feedID string, categoryID *string) error {
+	return nil
+}
+
 // Helper function to create test feeds
 func createTestFeed(id, url, title string) *model.Feed {
 	return &model.Feed{

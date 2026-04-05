@@ -257,6 +257,7 @@ type UserFeedRepository interface {
 	ListByUserID(ctx context.Context, userID string) ([]*model.UserFeed, error)
 	Delete(ctx context.Context, userID, feedID string) error
 	GetMaxPosition(ctx context.Context, userID string) (int, error)
+	UpdateCategory(ctx context.Context, userID, feedID string, categoryID *string) error
 }
 
 // UserItemStateRepository defines the interface for user item state data access
@@ -321,6 +322,7 @@ type PaperRepository interface {
 	Update(ctx context.Context, paper *model.Paper) error
 	Delete(ctx context.Context, id string) error
 	ListTags(ctx context.Context, userID string) ([]string, error)
+	UpdateCategory(ctx context.Context, paperID string, categoryID *string) error
 }
 
 // PaperTagRepository defines the interface for paper tag data access

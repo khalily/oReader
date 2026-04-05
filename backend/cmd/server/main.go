@@ -88,6 +88,7 @@ func main() {
 	statsRepo := repository.NewStatsRepository(db)
 	paperRepo := repository.NewPaperRepository(db)
 	paperTagRepo := repository.NewPaperTagRepository(db)
+	categoryRepo := repository.NewCategoryRepository(db)
 
 	// Initialize services
 	accessTTL, err := cfg.GetAccessTTL()
@@ -126,6 +127,9 @@ func main() {
 	}
 
 	paperService := service.NewPaperService(paperRepo, paperTagRepo, paperGRPCClient, cfg.Paper.UploadDir, grpcTimeout)
+
+	categoryService := service.NewCategoryService(categoryRepo, userFeedRepo, paperRepo)
+	_ = categoryService // will be used by category handler in next task
 
 	// Initialize rate limiter
 	rateLimiter := ratelimit.NewMemoryLimiter()

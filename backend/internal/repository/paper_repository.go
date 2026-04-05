@@ -135,6 +135,15 @@ func (r *paperRepository) ListTags(ctx context.Context, userID string) ([]string
 	return tags, nil
 }
 
+// UpdateCategory updates the category_id for a paper
+func (r *paperRepository) UpdateCategory(ctx context.Context, paperID string, categoryID *string) error {
+	result := r.db.WithContext(ctx).
+		Model(&model.Paper{}).
+		Where("id = ?", paperID).
+		Update("category_id", categoryID)
+	return result.Error
+}
+
 // paperTagRepository implements service.PaperTagRepository
 type paperTagRepository struct {
 	db *gorm.DB

@@ -108,6 +108,11 @@ func (m *MockUserFeedRepository) GetMaxPosition(ctx context.Context, userID stri
 	return args.Get(0).(int), args.Error(1)
 }
 
+func (m *MockUserFeedRepository) UpdateCategory(ctx context.Context, userID, feedID string, categoryID *string) error {
+	args := m.Called(ctx, userID, feedID, categoryID)
+	return args.Error(0)
+}
+
 // MockItemRepository is a mock implementation of ItemRepository
 type MockItemRepository struct {
 	mock.Mock
