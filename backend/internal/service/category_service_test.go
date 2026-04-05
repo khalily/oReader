@@ -427,7 +427,13 @@ func TestMoveFeedToCategory(t *testing.T) {
 			},
 		}
 
-		svc := NewCategoryService(catRepo, &mockUserFeedRepositoryForCategory{}, &mockPaperRepositoryForCategory{})
+		feedRepo := &mockUserFeedRepositoryForCategory{
+			getByUserAndFeedFunc: func(ctx context.Context, userID, feedID string) (*model.UserFeed, error) {
+				return &model.UserFeed{UserID: userID, FeedID: feedID}, nil
+			},
+		}
+
+		svc := NewCategoryService(catRepo, feedRepo, &mockPaperRepositoryForCategory{})
 		err := svc.MoveFeedToCategory(ctx, userID, feedID, categoryID)
 
 		require.Error(t, err)
@@ -448,7 +454,13 @@ func TestMoveFeedToCategory(t *testing.T) {
 			},
 		}
 
-		svc := NewCategoryService(catRepo, &mockUserFeedRepositoryForCategory{}, &mockPaperRepositoryForCategory{})
+		feedRepo := &mockUserFeedRepositoryForCategory{
+			getByUserAndFeedFunc: func(ctx context.Context, userID, feedID string) (*model.UserFeed, error) {
+				return &model.UserFeed{UserID: userID, FeedID: feedID}, nil
+			},
+		}
+
+		svc := NewCategoryService(catRepo, feedRepo, &mockPaperRepositoryForCategory{})
 		err := svc.MoveFeedToCategory(ctx, userID, feedID, categoryID)
 
 		require.Error(t, err)
@@ -477,6 +489,37 @@ func TestMoveFeedToCategory(t *testing.T) {
 
 		svc := NewCategoryService(catRepo, feedRepo, &mockPaperRepositoryForCategory{})
 		err := svc.MoveFeedToCategory(ctx, userID, feedID, categoryID)
+
+		require.Error(t, err)
+		assert.Equal(t, ErrFeedNotFound, err)
+	})
+
+	t.Run("success - uncategorize feed (empty category_id)", func(t *testing.T) {
+		feedRepo := &mockUserFeedRepositoryForCategory{
+			getByUserAndFeedFunc: func(ctx context.Context, userID, feedID string) (*model.UserFeed, error) {
+				return &model.UserFeed{UserID: userID, FeedID: feedID}, nil
+			},
+			updateCategoryFunc: func(ctx context.Context, userID, feedID string, catID *string) error {
+				assert.Nil(t, catID)
+				return nil
+			},
+		}
+
+		svc := NewCategoryService(&mockCategoryRepository{}, feedRepo, &mockPaperRepositoryForCategory{})
+		err := svc.MoveFeedToCategory(ctx, userID, feedID, "")
+
+		require.NoError(t, err)
+	})
+
+	t.Run("error - uncategorize feed not found", func(t *testing.T) {
+		feedRepo := &mockUserFeedRepositoryForCategory{
+			getByUserAndFeedFunc: func(ctx context.Context, userID, feedID string) (*model.UserFeed, error) {
+				return nil, ErrFeedNotFound
+			},
+		}
+
+		svc := NewCategoryService(&mockCategoryRepository{}, feedRepo, &mockPaperRepositoryForCategory{})
+		err := svc.MoveFeedToCategory(ctx, userID, feedID, "")
 
 		require.Error(t, err)
 		assert.Equal(t, ErrFeedNotFound, err)
@@ -526,7 +569,13 @@ func TestMovePaperToCategory(t *testing.T) {
 			},
 		}
 
-		svc := NewCategoryService(catRepo, &mockUserFeedRepositoryForCategory{}, &mockPaperRepositoryForCategory{})
+		paperRepo := &mockPaperRepositoryForCategory{
+			getByIDFunc: func(ctx context.Context, id string) (*model.Paper, error) {
+				return &model.Paper{Base: model.Base{ID: paperID}, UserID: userID}, nil
+			},
+		}
+
+		svc := NewCategoryService(catRepo, &mockUserFeedRepositoryForCategory{}, paperRepo)
 		err := svc.MovePaperToCategory(ctx, userID, paperID, categoryID)
 
 		require.Error(t, err)
@@ -547,7 +596,13 @@ func TestMovePaperToCategory(t *testing.T) {
 			},
 		}
 
-		svc := NewCategoryService(catRepo, &mockUserFeedRepositoryForCategory{}, &mockPaperRepositoryForCategory{})
+		paperRepo := &mockPaperRepositoryForCategory{
+			getByIDFunc: func(ctx context.Context, id string) (*model.Paper, error) {
+				return &model.Paper{Base: model.Base{ID: paperID}, UserID: userID}, nil
+			},
+		}
+
+		svc := NewCategoryService(catRepo, &mockUserFeedRepositoryForCategory{}, paperRepo)
 		err := svc.MovePaperToCategory(ctx, userID, paperID, categoryID)
 
 		require.Error(t, err)
@@ -603,6 +658,37 @@ func TestMovePaperToCategory(t *testing.T) {
 
 		svc := NewCategoryService(catRepo, &mockUserFeedRepositoryForCategory{}, paperRepo)
 		err := svc.MovePaperToCategory(ctx, userID, paperID, categoryID)
+
+		require.Error(t, err)
+		assert.Equal(t, ErrPaperNotFound, err)
+	})
+
+	t.Run("success - uncategorize paper (empty category_id)", func(t *testing.T) {
+		paperRepo := &mockPaperRepositoryForCategory{
+			getByIDFunc: func(ctx context.Context, id string) (*model.Paper, error) {
+				return &model.Paper{Base: model.Base{ID: paperID}, UserID: userID}, nil
+			},
+			updateCategoryFunc: func(ctx context.Context, paperID string, catID *string) error {
+				assert.Nil(t, catID)
+				return nil
+			},
+		}
+
+		svc := NewCategoryService(&mockCategoryRepository{}, &mockUserFeedRepositoryForCategory{}, paperRepo)
+		err := svc.MovePaperToCategory(ctx, userID, paperID, "")
+
+		require.NoError(t, err)
+	})
+
+	t.Run("error - uncategorize paper not found", func(t *testing.T) {
+		paperRepo := &mockPaperRepositoryForCategory{
+			getByIDFunc: func(ctx context.Context, id string) (*model.Paper, error) {
+				return nil, nil
+			},
+		}
+
+		svc := NewCategoryService(&mockCategoryRepository{}, &mockUserFeedRepositoryForCategory{}, paperRepo)
+		err := svc.MovePaperToCategory(ctx, userID, paperID, "")
 
 		require.Error(t, err)
 		assert.Equal(t, ErrPaperNotFound, err)

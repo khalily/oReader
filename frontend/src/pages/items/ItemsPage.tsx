@@ -41,6 +41,7 @@ export function ItemsPage() {
     useRenameCategory: useRenameCategoryMutation,
     useDeleteCategory: useDeleteCategoryMutation,
     useMoveFeedToCategory: useMoveFeedToCategoryMutation,
+    useMovePaperToCategory: useMovePaperToCategoryMutation,
   } = useCategories()
 
   // Category data
@@ -57,6 +58,7 @@ export function ItemsPage() {
   const renameCategory = useRenameCategoryMutation()
   const deleteCategory = useDeleteCategoryMutation()
   const moveFeedToCategory = useMoveFeedToCategoryMutation()
+  const movePaperToCategory = useMovePaperToCategoryMutation()
 
   // Query items based on sidebar selection
   const listOptions: ListItemsOptions = {}
@@ -208,6 +210,21 @@ export function ItemsPage() {
     [moveFeedToCategory, refetchFeeds, toast]
   )
 
+  const handleRemovePaperFromCategory = useCallback(
+    (paperId: string) => {
+      movePaperToCategory.mutate(
+        { paperId, data: { category_id: '' } },
+        {
+          onSuccess: () => {
+            toast.showSuccess('Paper removed from category')
+          },
+          onError: () => toast.showError('Failed to remove paper from category'),
+        }
+      )
+    },
+    [movePaperToCategory, toast]
+  )
+
   const handleMoveFeedToNewCategory = useCallback(
     (feedId: string, categoryName: string) => {
       createCategory.mutate(
@@ -215,7 +232,7 @@ export function ItemsPage() {
         {
           onSuccess: (newCategory) => {
             moveFeedToCategory.mutate(
-              { feedId, data: { category_id: newCategory.id } },
+              { feedId, data: { category_id: newCategory.category.id } },
               {
                 onSuccess: () => {
                   refetchFeeds()
@@ -384,6 +401,7 @@ export function ItemsPage() {
         onDeleteCategory={handleDeleteCategory}
         onMoveFeedToCategory={handleMoveFeedToCategory}
         onMoveFeedToNewCategory={handleMoveFeedToNewCategory}
+        onRemovePaperFromCategory={handleRemovePaperFromCategory}
       />
 
       {/* Mobile Drawer */}
@@ -403,6 +421,7 @@ export function ItemsPage() {
           onDeleteCategory={handleDeleteCategory}
           onMoveFeedToCategory={handleMoveFeedToCategory}
           onMoveFeedToNewCategory={handleMoveFeedToNewCategory}
+          onRemovePaperFromCategory={handleRemovePaperFromCategory}
         />
       </MobileDrawer>
 

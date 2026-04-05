@@ -14,6 +14,7 @@ interface PaperSectionProps {
   onPaperClick: (paperId: string) => void
   onRenameCategory: (categoryId: string, name: string) => void
   onDeleteCategory: (categoryId: string) => void
+  onRemovePaperFromCategory?: (paperId: string) => void
 }
 
 export function PaperSection({
@@ -25,6 +26,7 @@ export function PaperSection({
   onPaperClick,
   onRenameCategory,
   onDeleteCategory,
+  onRemovePaperFromCategory,
 }: PaperSectionProps) {
   const { categorizedPapers, uncategorizedPapers } = useMemo(() => {
     const catIds = new Set(categories.map((c) => c.id))
@@ -75,6 +77,7 @@ export function PaperSection({
                   paper={paper}
                   isSelected={paper.id === selectedPaperId}
                   onClick={onPaperClick}
+                  onRemoveFromCategory={onRemovePaperFromCategory}
                 />
               ))}
           </div>

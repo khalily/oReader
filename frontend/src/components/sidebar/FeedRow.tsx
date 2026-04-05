@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Rss, MoreHorizontal, FolderPlus } from 'lucide-react'
+import { Rss, MoreHorizontal, FolderPlus, FolderMinus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { UserFeed } from '@/types/feed'
@@ -146,6 +146,21 @@ export function FeedRow({
                 <FolderPlus className="h-3 w-3" />
                 新建分类
               </button>
+            )}
+            {feed.category_id && (
+              <>
+                <div className="border-t" />
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onMoveToCategory(feed.id, '')
+                  }}
+                >
+                  <FolderMinus className="h-3 w-3" />
+                  移除分类
+                </button>
+              </>
             )}
           </div>
         )}

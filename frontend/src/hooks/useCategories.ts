@@ -14,13 +14,13 @@ async function listCategories(type: 'feed' | 'paper'): Promise<ListCategoriesRes
   return response.data
 }
 
-async function createCategory(data: CreateCategoryRequest): Promise<Category> {
-  const response = await apiClient.post<Category>('/categories', data)
+async function createCategory(data: CreateCategoryRequest): Promise<{ category: Category }> {
+  const response = await apiClient.post<{ category: Category }>('/categories', data)
   return response.data
 }
 
-async function renameCategory(categoryId: string, data: RenameCategoryRequest): Promise<Category> {
-  const response = await apiClient.put<Category>(`/categories/${categoryId}/rename`, data)
+async function renameCategory(categoryId: string, data: RenameCategoryRequest): Promise<{ category: Category }> {
+  const response = await apiClient.put<{ category: Category }>(`/categories/${categoryId}/rename`, data)
   return response.data
 }
 

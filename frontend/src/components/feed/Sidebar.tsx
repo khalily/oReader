@@ -258,6 +258,7 @@ export interface NewSidebarProps {
   onDeleteCategory: (categoryId: string) => void
   onMoveFeedToCategory: (feedId: string, categoryId: string) => void
   onMoveFeedToNewCategory: (feedId: string, categoryName: string) => void
+  onRemovePaperFromCategory?: (paperId: string) => void
   isMobileOpen?: boolean
   onMobileClose?: () => void
 }
@@ -293,6 +294,7 @@ export function NewSidebarContent(props: Omit<NewSidebarProps, 'isMobileOpen' | 
           onPaperClick={props.onPaperClick}
           onRenameCategory={props.onRenameCategory}
           onDeleteCategory={props.onDeleteCategory}
+          onRemovePaperFromCategory={props.onRemovePaperFromCategory}
         />
       </div>
     </>

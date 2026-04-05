@@ -160,13 +160,32 @@ func (s *categoryService) DeleteCategory(ctx context.Context, userID, categoryID
 	return nil
 }
 
-// MoveFeedToCategory assigns a feed to a category
+// MoveFeedToCategory assigns a feed to a category, or removes it from a category if categoryID is empty.
 func (s *categoryService) MoveFeedToCategory(ctx context.Context, userID, feedID, categoryID string) error {
 	logger.Debug().
 		Str("user_id", userID).
 		Str("feed_id", feedID).
 		Str("category_id", categoryID).
 		Msg("Moving feed to category")
+
+	// Validate user owns the feed
+	if _, err := s.userFeedRepo.GetByUserAndFeed(ctx, userID, feedID); err != nil {
+		return err
+	}
+
+	// Empty categoryID means uncategorize (remove from category)
+	if categoryID == "" {
+		if err := s.userFeedRepo.UpdateCategory(ctx, userID, feedID, nil); err != nil {
+			logger.Error().Err(err).Msg("Failed to remove feed from category")
+			return err
+		}
+
+		logger.Info().
+			Str("user_id", userID).
+			Str("feed_id", feedID).
+			Msg("Feed removed from category")
+		return nil
+	}
 
 	// Validate category exists and is a feed category
 	category, err := s.catRepo.GetByID(ctx, userID, categoryID)
@@ -179,11 +198,6 @@ func (s *categoryService) MoveFeedToCategory(ctx context.Context, userID, feedID
 			Str("type", category.Type).
 			Msg("Category is not a feed category")
 		return ErrCategoryNotFound
-	}
-
-	// Validate user owns the feed
-	if _, err := s.userFeedRepo.GetByUserAndFeed(ctx, userID, feedID); err != nil {
-		return err
 	}
 
 	catID := categoryID
@@ -201,26 +215,13 @@ func (s *categoryService) MoveFeedToCategory(ctx context.Context, userID, feedID
 	return nil
 }
 
-// MovePaperToCategory assigns a paper to a category
+// MovePaperToCategory assigns a paper to a category, or removes it from a category if categoryID is empty.
 func (s *categoryService) MovePaperToCategory(ctx context.Context, userID, paperID, categoryID string) error {
 	logger.Debug().
 		Str("user_id", userID).
 		Str("paper_id", paperID).
 		Str("category_id", categoryID).
 		Msg("Moving paper to category")
-
-	// Validate category exists and is a paper category
-	category, err := s.catRepo.GetByID(ctx, userID, categoryID)
-	if err != nil {
-		return err
-	}
-	if category.Type != model.CategoryTypePaper {
-		logger.Warn().
-			Str("category_id", categoryID).
-			Str("type", category.Type).
-			Msg("Category is not a paper category")
-		return ErrCategoryNotFound
-	}
 
 	// Validate paper exists and belongs to user
 	paper, err := s.paperRepo.GetByID(ctx, paperID)
@@ -234,6 +235,33 @@ func (s *categoryService) MovePaperToCategory(ctx context.Context, userID, paper
 			Str("user_id", userID).
 			Msg("Paper not found or does not belong to user")
 		return ErrPaperNotFound
+	}
+
+	// Empty categoryID means uncategorize (remove from category)
+	if categoryID == "" {
+		if err := s.paperRepo.UpdateCategory(ctx, paperID, nil); err != nil {
+			logger.Error().Err(err).Msg("Failed to remove paper from category")
+			return err
+		}
+
+		logger.Info().
+			Str("user_id", userID).
+			Str("paper_id", paperID).
+			Msg("Paper removed from category")
+		return nil
+	}
+
+	// Validate category exists and is a paper category
+	category, err := s.catRepo.GetByID(ctx, userID, categoryID)
+	if err != nil {
+		return err
+	}
+	if category.Type != model.CategoryTypePaper {
+		logger.Warn().
+			Str("category_id", categoryID).
+			Str("type", category.Type).
+			Msg("Category is not a paper category")
+		return ErrCategoryNotFound
 	}
 
 	catID := categoryID
