@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useItems } from '@/hooks/useItems'
 import { useFeeds } from '@/hooks/useFeeds'
-import { useStats } from '@/hooks/useStats'
-import { useOPML } from '@/hooks/useOPML'
+import { usePapers } from '@/hooks/usePapers'
+import { useCategories } from '@/hooks/useCategories'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useToast } from '@/components/ui/toast'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
@@ -11,42 +11,56 @@ import { KeyboardShortcutsModal } from '@/components/ui/keyboard-shortcuts-modal
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { ItemList } from '@/components/items/ItemList'
 import { ArticlePanel } from '@/components/items/ArticlePanel'
-import { Sidebar, SidebarContent, MobileMenuButton, type FilterType } from '@/components/feed/Sidebar'
-import { AddFeedDialog } from '@/components/feed/AddFeedDialog'
-import { OpmlImportDialog } from '@/components/feed/OpmlImportDialog'
+import { NewSidebar, NewSidebarContent } from '@/components/feed/Sidebar'
+import { AddDialog } from '@/components/sidebar/AddDialog'
+import { PaperMeta } from '@/components/papers/PaperMeta'
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
+import { MobileMenuButton } from '@/components/feed/Sidebar'
+import { useSidebarStore } from '@/stores/sidebarStore'
 import { useItemsStore } from '@/stores/itemsStore'
+import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import type { ListItemsOptions } from '@/types/feed'
 
-interface ItemsPageProps {
-  filterType?: FilterType
-  feedId?: string
-}
-
-export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
+export function ItemsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const selectedItemId = searchParams.get('id') // 从 URL 读取选中的文章 ID
-  const [isAddFeedOpen, setIsAddFeedOpen] = useState(false)
+  const selectedItemId = searchParams.get('id')
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false)
-  const [isOpmlImportOpen, setIsOpmlImportOpen] = useState(false)
-  const [refreshingFeedIds, setRefreshingFeedIds] = useState<Set<string>>(new Set())
   const [selectedIndex, setSelectedIndex] = useState(0)
   const observerTarget = useRef<HTMLDivElement>(null)
   const toast = useToast()
 
-  const { useListFeeds, useRefreshFeed, useDeleteFeed } = useFeeds()
+  const { useListFeeds } = useFeeds()
   const { useListItemsInfinite, useToggleStar, useToggleRead, useMarkAllRead } = useItems()
-  const { useGetStats } = useStats()
+  const { useListPapers, useGetPaper, useGetPaperStatus, useDownloadPaper } = usePapers()
+  const {
+    useListCategories,
+    useCreateCategory,
+    useRenameCategory: useRenameCategoryMutation,
+    useDeleteCategory: useDeleteCategoryMutation,
+    useMoveFeedToCategory: useMoveFeedToCategoryMutation,
+  } = useCategories()
 
-  // Fetch stats for sidebar badges
-  const { data: statsData } = useGetStats()
+  // Category data
+  const { data: feedCategoriesData } = useListCategories('feed')
+  const { data: paperCategoriesData } = useListCategories('paper')
+  const feedCategories = feedCategoriesData?.categories ?? []
+  const paperCategories = paperCategoriesData?.categories ?? []
 
-  // Query items based on filter and feed
+  // Sidebar store
+  const { selectedFeedId, selectedPaperId, selectionType, selectFeed, selectPaper } = useSidebarStore()
+
+  // Category mutations
+  const createCategory = useCreateCategory()
+  const renameCategory = useRenameCategoryMutation()
+  const deleteCategory = useDeleteCategoryMutation()
+  const moveFeedToCategory = useMoveFeedToCategoryMutation()
+
+  // Query items based on sidebar selection
   const listOptions: ListItemsOptions = {}
-  if (feedId) listOptions.feed_id = feedId
-  if (filterType === 'unread') listOptions.read = false
-  if (filterType === 'starred') listOptions.starred = true
-  if (filterType === 'today') listOptions.published_today = true
+  if (selectionType === 'feed' && selectedFeedId) listOptions.feed_id = selectedFeedId
   listOptions.limit = 20
 
   const {
@@ -59,38 +73,24 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
   } = useListItemsInfinite(listOptions)
   const { data: feedsData, refetch: refetchFeeds } = useListFeeds()
 
+  // Papers
+  const { data: papersData } = useListPapers()
+  const { data: selectedPaperData } = useGetPaper(
+    selectionType === 'paper' ? selectedPaperId : null
+  )
+  const { data: paperStatusData } = useGetPaperStatus(
+    selectionType === 'paper' ? selectedPaperId : null
+  )
+  const downloadPaper = useDownloadPaper()
+
   const toggleStar = useToggleStar()
   const toggleRead = useToggleRead()
-  const refreshFeed = useRefreshFeed()
-  const deleteFeed = useDeleteFeed()
   const markAllRead = useMarkAllRead()
 
   const items = infiniteData?.pages.flatMap(page => page.items) ?? []
   const hasMore = hasNextPage ?? false
   const feeds = feedsData?.feeds ?? []
-
-  // OPML import/export
-  const { useExportOpml, triggerDownload: triggerFileDownload } = useOPML()
-  const exportOpmlMutation = useExportOpml()
-
-  const handleImportOpml = useCallback(() => {
-    setIsOpmlImportOpen(true)
-  }, [])
-
-  const handleExportOpml = useCallback(() => {
-    exportOpmlMutation.mutate(undefined, {
-      onSuccess: (blob) => {
-        triggerFileDownload(blob, 'oreader-subscriptions.xml')
-        toast.showSuccess('OPML exported successfully')
-      },
-      onError: () => {
-        toast.showError('Failed to export OPML')
-      },
-    })
-  }, [exportOpmlMutation, triggerFileDownload, toast])
-
-  // Calculate total unread count
-  const totalUnread = feeds.reduce((sum, feed) => sum + feed.unread_count, 0)
+  const papers = papersData?.papers ?? []
 
   // Store items in global store for optimistic updates
   const setItems = useItemsStore((state) => state.setItems)
@@ -130,7 +130,6 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           onSuccess: () => {
             updateItemState(itemId, { is_starred: starred })
             refetch()
-            // Optional: toast.showSuccess(starred ? 'Article starred' : 'Article unstarred')
           },
         }
       )
@@ -155,63 +154,6 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
     [toggleRead, updateItemState, refetch, refetchFeeds]
   )
 
-  // Handle feed refresh
-  const handleRefreshFeed = useCallback(
-    (feedId: string) => {
-      setRefreshingFeedIds((prev) => new Set(prev).add(feedId))
-      refreshFeed.mutate(feedId, {
-        onSuccess: () => {
-          toast.showSuccess('Feed refreshed successfully')
-        },
-        onError: () => {
-          toast.showError('Failed to refresh feed')
-        },
-        onSettled: () => {
-          setRefreshingFeedIds((prev) => {
-            const next = new Set(prev)
-            next.delete(feedId)
-            return next
-          })
-          refetch()
-          refetchFeeds()
-        },
-      })
-    },
-    [refreshFeed, refetch, refetchFeeds, toast]
-  )
-
-  // Handle feed delete
-  const handleDeleteFeed = useCallback(
-    (feedId: string) => {
-      deleteFeed.mutate(feedId, {
-        onSuccess: () => {
-          refetch()
-          refetchFeeds()
-          toast.showSuccess('Feed deleted successfully')
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onError: (error: any) => {
-          // Always refresh feeds on error - the feed may already be deleted
-          // This ensures the UI is in sync with the backend
-          refetchFeeds()
-
-          // Check if it's an "already unsubscribed" error (409 Conflict)
-          const errorCode = error?.response?.data?.error?.code
-          const errorMessage = error?.response?.data?.error?.message
-
-          if (error?.response?.status === 409 || errorCode === 'CONFLICT') {
-            toast.showWarning(errorMessage || 'Already unsubscribed from this feed')
-          } else if (error?.response?.status === 404 || errorCode === 'NOT_FOUND') {
-            toast.showWarning('Feed not found - it may have been already deleted')
-          } else {
-            toast.showError('Failed to delete feed')
-          }
-        },
-      })
-    },
-    [deleteFeed, refetch, refetchFeeds, toast]
-  )
-
   // Handle mark all read
   const handleMarkAllRead = useCallback(
     (feedId: string) => {
@@ -226,27 +168,88 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
     [markAllRead, refetch, refetchFeeds, toast]
   )
 
-  // Handle feed click
-  const handleFeedClick = useCallback(
-    (id: string) => {
-      setSearchParams({ feed: id })
-      setIsMobileMenuOpen(false)
+  // Category handlers
+  const handleRenameCategory = useCallback(
+    (categoryId: string, name: string) => {
+      renameCategory.mutate(
+        { categoryId, data: { name } },
+        {
+          onSuccess: () => toast.showSuccess('Category renamed'),
+          onError: () => toast.showError('Failed to rename category'),
+        }
+      )
     },
-    [setSearchParams]
+    [renameCategory, toast]
   )
 
-  // Handle filter change
-  const handleFilterChange = useCallback(
-    (newFilter: FilterType) => {
-      if (newFilter === 'all') {
-        setSearchParams({})
-      } else {
-        setSearchParams({ filter: newFilter })
-      }
-      setIsMobileMenuOpen(false)
+  const handleDeleteCategory = useCallback(
+    (categoryId: string) => {
+      deleteCategory.mutate(categoryId, {
+        onSuccess: () => toast.showSuccess('Category deleted'),
+        onError: () => toast.showError('Failed to delete category'),
+      })
     },
-    [setSearchParams]
+    [deleteCategory, toast]
   )
+
+  const handleMoveFeedToCategory = useCallback(
+    (feedId: string, categoryId: string) => {
+      moveFeedToCategory.mutate(
+        { feedId, data: { category_id: categoryId } },
+        {
+          onSuccess: () => {
+            refetchFeeds()
+            toast.showSuccess('Feed moved to category')
+          },
+          onError: () => toast.showError('Failed to move feed'),
+        }
+      )
+    },
+    [moveFeedToCategory, refetchFeeds, toast]
+  )
+
+  const handleMoveFeedToNewCategory = useCallback(
+    (feedId: string, categoryName: string) => {
+      createCategory.mutate(
+        { name: categoryName, type: 'feed' },
+        {
+          onSuccess: (newCategory) => {
+            moveFeedToCategory.mutate(
+              { feedId, data: { category_id: newCategory.id } },
+              {
+                onSuccess: () => {
+                  refetchFeeds()
+                  toast.showSuccess('Feed moved to new category')
+                },
+              }
+            )
+          },
+          onError: () => toast.showError('Failed to create category'),
+        }
+      )
+    },
+    [createCategory, moveFeedToCategory, refetchFeeds, toast]
+  )
+
+  // Paper download handler
+  const handleDownloadPaper = useCallback(() => {
+    if (!selectedPaperId) return
+    downloadPaper.mutate(selectedPaperId, {
+      onSuccess: (blob) => {
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = selectedPaperData?.original_filename || 'paper.pdf'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.URL.revokeObjectURL(url)
+      },
+      onError: () => {
+        toast.showError('Failed to download paper')
+      },
+    })
+  }, [selectedPaperId, selectedPaperData, downloadPaper, toast])
 
   // Infinite scroll using Intersection Observer
   useEffect(() => {
@@ -271,9 +274,6 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  // Get selected feed ID from URL or state
-  const selectedFeedId = feedId ?? null
-
   // Keyboard shortcuts
   useKeyboardShortcuts({
     enabled: true,
@@ -285,7 +285,6 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           if (items.length > 0 && selectedIndex < items.length - 1) {
             const nextIndex = selectedIndex + 1
             setSelectedIndex(nextIndex)
-            // Scroll the item into view
             const itemElement = document.querySelector(`[data-item-id="${items[nextIndex].id}"]`)
             itemElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
           }
@@ -298,7 +297,6 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           if (selectedIndex > 0) {
             const prevIndex = selectedIndex - 1
             setSelectedIndex(prevIndex)
-            // Scroll the item into view
             const itemElement = document.querySelector(`[data-item-id="${items[prevIndex].id}"]`)
             itemElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
           }
@@ -339,8 +337,8 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         key: 'n',
         description: 'Mark all as read',
         action: () => {
-          if (feedId) {
-            handleMarkAllRead(feedId)
+          if (selectedFeedId) {
+            handleMarkAllRead(selectedFeedId)
           }
         },
       },
@@ -355,76 +353,76 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         action: () => {
           if (isShortcutsModalOpen) setIsShortcutsModalOpen(false)
           if (isMobileMenuOpen) setIsMobileMenuOpen(false)
-          if (isAddFeedOpen) setIsAddFeedOpen(false)
+          if (isAddDialogOpen) setIsAddDialogOpen(false)
           if (selectedItemId) handleCloseArticle()
         },
       },
     ],
   })
 
+  // Determine middle column title
+  const middleColumnTitle = selectionType === 'feed' && selectedFeedId
+    ? feeds.find((f) => f.id === selectedFeedId)?.title ?? 'Feed'
+    : 'All Articles'
+
+  // Paper content for right column
+  const paper = selectedPaperData ?? null
+  const paperStatus = paperStatusData ?? null
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
-      <Sidebar
+      <NewSidebar
+        feedCategories={feedCategories}
+        paperCategories={paperCategories}
         feeds={feeds}
-        selectedFeedId={selectedFeedId}
-        onFeedClick={handleFeedClick}
-        onAddFeed={() => setIsAddFeedOpen(true)}
-        onDeleteFeed={handleDeleteFeed}
-        onRefreshFeed={handleRefreshFeed}
-        refreshingFeedIds={refreshingFeedIds}
-        filterType={filterType}
-        onFilterChange={handleFilterChange}
-        totalUnread={totalUnread}
-        stats={statsData}
-        onImportOpml={handleImportOpml}
-        onExportOpml={handleExportOpml}
-        isExporting={exportOpmlMutation.isPending}
+        papers={papers}
+        onAddClick={() => setIsAddDialogOpen(true)}
+        onFeedClick={(id) => { selectFeed(id); setIsMobileMenuOpen(false) }}
+        onPaperClick={(id) => { selectPaper(id); setSearchParams(prev => { prev.delete('id'); prev.set('paper', id); return prev }); setIsMobileMenuOpen(false) }}
+        onRenameCategory={handleRenameCategory}
+        onDeleteCategory={handleDeleteCategory}
+        onMoveFeedToCategory={handleMoveFeedToCategory}
+        onMoveFeedToNewCategory={handleMoveFeedToNewCategory}
       />
 
       {/* Mobile Drawer */}
       <MobileDrawer isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)}>
-        <SidebarContent
+        <NewSidebarContent
+          feedCategories={feedCategories}
+          paperCategories={paperCategories}
           feeds={feeds}
-          selectedFeedId={selectedFeedId}
-          onFeedClick={handleFeedClick}
-          onAddFeed={() => {
-            setIsAddFeedOpen(true)
+          papers={papers}
+          onAddClick={() => {
+            setIsAddDialogOpen(true)
             setIsMobileMenuOpen(false)
           }}
-          onDeleteFeed={handleDeleteFeed}
-          onRefreshFeed={handleRefreshFeed}
-          refreshingFeedIds={refreshingFeedIds}
-          filterType={filterType}
-          onFilterChange={handleFilterChange}
-          totalUnread={totalUnread}
-          stats={statsData}
-          onImportOpml={handleImportOpml}
-          onExportOpml={handleExportOpml}
-          isExporting={exportOpmlMutation.isPending}
+          onFeedClick={(id) => { selectFeed(id); setIsMobileMenuOpen(false) }}
+          onPaperClick={(id) => { selectPaper(id); setSearchParams(prev => { prev.delete('id'); prev.set('paper', id); return prev }); setIsMobileMenuOpen(false) }}
+          onRenameCategory={handleRenameCategory}
+          onDeleteCategory={handleDeleteCategory}
+          onMoveFeedToCategory={handleMoveFeedToCategory}
+          onMoveFeedToNewCategory={handleMoveFeedToNewCategory}
         />
       </MobileDrawer>
 
-      {/* 第二栏：ItemList */}
+      {/* Middle column: ItemList (feed items) or Paper list */}
       <div className="hidden md:flex w-80 lg:w-96 border-r flex-shrink-0 flex-col bg-background">
         <div className="p-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MobileMenuButton
               onClick={() => setIsMobileMenuOpen(true)}
-              unreadCount={filterType === 'unread' ? totalUnread : 0}
+              unreadCount={0}
             />
             <h1 className="text-lg font-bold truncate">
-              {filterType === 'starred' && 'Starred'}
-              {filterType === 'unread' && 'Unread'}
-              {filterType === 'all' && !feedId && 'All Articles'}
-              {feedId && feeds.find((f) => f.id === feedId)?.title}
+              {selectionType === 'paper' ? 'Papers' : middleColumnTitle}
             </h1>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            {feedId && (
+            {selectedFeedId && (
               <button
-                onClick={() => handleMarkAllRead(feedId)}
+                onClick={() => handleMarkAllRead(selectedFeedId)}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
                 Mark all read
@@ -433,34 +431,103 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          <ItemList
-            articles={items}
-            selectedItemId={selectedItemId}
-            onItemClick={handleItemClick}
-            onToggleStar={handleToggleStar}
-            onToggleRead={handleToggleRead}
-            isLoading={itemsLoading}
-          />
+          {selectionType === 'paper' ? (
+            papers.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  selectPaper(p.id)
+                  setSearchParams(prev => { prev.delete('id'); prev.set('paper', p.id); return prev })
+                }}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors hover:bg-accent ${
+                  selectedPaperId === p.id ? 'bg-accent' : ''
+                }`}
+              >
+                <div className="font-medium truncate">{p.title || p.original_filename}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {p.authors ? JSON.parse(p.authors).slice(0, 2).join(', ') : ''}
+                  {p.published_year ? ` · ${p.published_year}` : ''}
+                </div>
+                {p.status !== 'completed' && (
+                  <span className={`inline-block text-xs mt-1 px-1.5 py-0.5 rounded ${
+                    p.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                    : p.status === 'processing' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                  }`}>
+                    {p.status}
+                  </span>
+                )}
+              </button>
+            ))
+          ) : (
+            <>
+              <ItemList
+                articles={items}
+                selectedItemId={selectedItemId}
+                onItemClick={handleItemClick}
+                onToggleStar={handleToggleStar}
+                onToggleRead={handleToggleRead}
+                isLoading={itemsLoading}
+              />
 
-          {hasMore && (
-            <div ref={observerTarget} className="py-8 text-center">
-              {isFetchingNextPage && (
-                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              {hasMore && (
+                <div ref={observerTarget} className="py-8 text-center">
+                  {isFetchingNextPage && (
+                    <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* 第三栏：ArticlePanel (桌面端) */}
+      {/* Right column (desktop): ArticlePanel or Paper content */}
       <div className="flex-1 overflow-hidden hidden lg:flex">
-        <ArticlePanel
-          itemId={selectedItemId}
-          showBackButton={false}
-        />
+        {selectionType === 'paper' && selectedPaperId && paper ? (
+          <div className="flex-1 overflow-y-auto">
+            {paper.status === 'pending' || paper.status === 'processing' ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+                <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
+                <h2 className="text-xl font-semibold mb-2">Converting Paper...</h2>
+                <p className="text-muted-foreground mb-4">{paper.original_filename}</p>
+                {paperStatus && (
+                  <div className="w-64 bg-muted rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all"
+                      style={{ width: `${paperStatus.progress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : paper.status === 'failed' ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+                <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
+                <h2 className="text-xl font-semibold mb-2">Conversion Failed</h2>
+                <p className="text-muted-foreground mb-4">{paper.error || 'Unknown error'}</p>
+              </div>
+            ) : (
+              <div className="max-w-4xl mx-auto py-6 px-6">
+                <div className="mb-6">
+                  <PaperMeta paper={paper} onDownload={handleDownloadPaper} />
+                </div>
+                {paper.markdown_content ? (
+                  <MarkdownRenderer content={paper.markdown_content} />
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No content available</p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <ArticlePanel
+            itemId={selectedItemId}
+            showBackButton={false}
+          />
+        )}
       </div>
 
-      {/* 移动端：全屏显示 ArticlePanel */}
+      {/* Mobile: full-screen ArticlePanel when an item is selected */}
       {selectedItemId && (
         <div className="fixed inset-0 bg-background z-50 md:hidden">
           <ArticlePanel
@@ -471,20 +538,63 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
         </div>
       )}
 
-      {/* 移动端：ItemList 全屏显示 (无选中文章时) */}
+      {/* Mobile: full-screen paper content when a paper is selected */}
+      {selectionType === 'paper' && selectedPaperId && paper && !selectedItemId && (
+        <div className="fixed inset-0 bg-background z-40 md:hidden">
+          <Button
+            variant="ghost"
+            onClick={() => selectPaper(selectedPaperId)}
+            className="m-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          {paper.status === 'completed' ? (
+            <div className="px-4 pb-8">
+              <div className="mb-4">
+                <PaperMeta paper={paper} onDownload={handleDownloadPaper} />
+              </div>
+              {paper.markdown_content ? (
+                <MarkdownRenderer content={paper.markdown_content} />
+              ) : (
+                <p className="text-center text-muted-foreground py-8">No content available</p>
+              )}
+            </div>
+          ) : paper.status === 'failed' ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+              <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
+              <h2 className="text-xl font-semibold mb-2">Conversion Failed</h2>
+              <p className="text-muted-foreground">{paper.error || 'Unknown error'}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+              <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
+              <h2 className="text-xl font-semibold mb-2">Converting Paper...</h2>
+              <p className="text-muted-foreground">{paper.original_filename}</p>
+              {paperStatus && (
+                <div className="w-64 bg-muted rounded-full h-2 mt-4">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${paperStatus.progress}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mobile: full-screen ItemList (no selection) */}
       <main className="flex-1 overflow-y-auto md:hidden">
         <div className="py-4 px-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <MobileMenuButton
                 onClick={() => setIsMobileMenuOpen(true)}
-                unreadCount={filterType === 'unread' ? totalUnread : 0}
+                unreadCount={0}
               />
               <h1 className="text-lg font-bold">
-                {filterType === 'starred' && 'Starred Articles'}
-                {filterType === 'unread' && 'Unread Articles'}
-                {filterType === 'all' && !feedId && 'All Articles'}
-                {feedId && feeds.find((f) => f.id === feedId)?.title}
+                {selectionType === 'paper' ? 'Papers' : middleColumnTitle}
               </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -492,38 +602,50 @@ export function ItemsPage({ filterType = 'all', feedId }: ItemsPageProps) {
             </div>
           </div>
 
-          <ItemList
-            articles={items}
-            selectedItemId={selectedItemId}
-            onItemClick={handleItemClick}
-            onToggleStar={handleToggleStar}
-            onToggleRead={handleToggleRead}
-            isLoading={itemsLoading}
-          />
+          {selectionType === 'paper' ? (
+            papers.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  selectPaper(p.id)
+                  setSearchParams(prev => { prev.delete('id'); prev.set('paper', p.id); return prev })
+                }}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors hover:bg-accent ${
+                  selectedPaperId === p.id ? 'bg-accent' : ''
+                }`}
+              >
+                <div className="font-medium truncate">{p.title || p.original_filename}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {p.authors ? JSON.parse(p.authors).slice(0, 2).join(', ') : ''}
+                  {p.published_year ? ` · ${p.published_year}` : ''}
+                </div>
+              </button>
+            ))
+          ) : (
+            <ItemList
+              articles={items}
+              selectedItemId={selectedItemId}
+              onItemClick={handleItemClick}
+              onToggleStar={handleToggleStar}
+              onToggleRead={handleToggleRead}
+              isLoading={itemsLoading}
+            />
+          )}
         </div>
       </main>
 
-      <AddFeedDialog
-        open={isAddFeedOpen}
-        onOpenChange={setIsAddFeedOpen}
+      <AddDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
         onSuccess={() => {
-          setIsAddFeedOpen(false)
           refetchFeeds()
+          refetch()
         }}
       />
 
       <KeyboardShortcutsModal
         isOpen={isShortcutsModalOpen}
         onClose={() => setIsShortcutsModalOpen(false)}
-      />
-
-      <OpmlImportDialog
-        open={isOpmlImportOpen}
-        onOpenChange={setIsOpmlImportOpen}
-        onSuccess={() => {
-          refetchFeeds()
-          refetch()
-        }}
       />
     </div>
   )

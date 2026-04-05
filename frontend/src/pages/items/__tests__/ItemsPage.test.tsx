@@ -17,39 +17,14 @@ vi.mock('@/components/ui/toast', () => ({
   }),
 }))
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-  Star: () => <div data-testid="star-icon" />,
-  StarOff: () => <div data-testid="star-off-icon" />,
-  Eye: () => <div data-testid="eye-icon" />,
-  EyeOff: () => <div data-testid="eye-off-icon" />,
-  Menu: () => <div data-testid="menu-icon" />,
-  X: () => <div data-testid="x-icon" />,
-  Plus: () => <div data-testid="plus-icon" />,
-  RefreshCw: () => <div data-testid="refresh-cw-icon" />,
-  Loader2: () => <div data-testid="loader-icon" />,
-  Moon: () => <div data-testid="moon-icon" />,
-  Sun: () => <div data-testid="sun-icon" />,
-  Monitor: () => <div data-testid="monitor-icon" />,
-  ChevronRight: () => <div data-testid="chevron-right-icon" />,
-  ChevronDown: () => <div data-testid="chevron-down-icon" />,
-  ChevronUp: () => <div data-testid="chevron-up-icon" />,
-  Trash2: () => <div data-testid="trash-icon" />,
-  Rss: () => <div data-testid="rss-icon" />,
-  Calendar: () => <div data-testid="calendar-icon" />,
-  ArrowLeft: () => <div data-testid="arrow-left-icon" />,
-  ExternalLink: () => <div data-testid="external-link-icon" />,
-  User: () => <div data-testid="user-icon" />,
-  BookOpen: () => <div data-testid="book-open-icon" />,
-  Check: () => <div data-testid="check-icon" />,
-  Settings: () => <div data-testid="settings-icon" />,
-  HelpCircle: () => <div data-testid="help-circle-icon" />,
-  LogOut: () => <div data-testid="log-out-icon" />,
-  Search: () => <div data-testid="search-icon" />,
-  Home: () => <div data-testid="home-icon" />,
-  Filter: () => <div data-testid="filter-icon" />,
-  Keyboard: () => <div data-testid="keyboard-icon" />,
-}))
+// Mock lucide-react icons — use importOriginal to avoid missing-icon errors
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('lucide-react')>()
+  return {
+    ...actual,
+    // Re-export everything from the real module; no selective mocking needed.
+  }
+})
 
 // Mock window.matchMedia for responsive hooks
 Object.defineProperty(window, 'matchMedia', {

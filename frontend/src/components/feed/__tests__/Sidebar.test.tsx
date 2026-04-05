@@ -1,385 +1,253 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { Sidebar } from '../Sidebar'
-import type { UserFeed, StatsResponse } from '@/types/feed'
+import { NewSidebar } from '../Sidebar'
+import type { UserFeed } from '@/types/feed'
+import type { Category } from '@/types/category'
+import type { Paper } from '@/types/paper'
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-  Plus: () => <div data-testid="plus-icon" />,
-  Home: () => <div data-testid="home-icon" />,
-  Star: () => <div data-testid="star-icon" />,
-  Rss: () => <div data-testid="rss-icon" />,
-  Menu: () => <div data-testid="menu-icon" />,
-  X: () => <div data-testid="x-icon" />,
-  RefreshCw: () => <div data-testid="refresh-icon" />,
-  Trash2: () => <div data-testid="trash-icon" />,
-  Calendar: () => <div data-testid="calendar-icon" />,
-  BookOpen: () => <div data-testid="bookopen-icon" />,
+// --- Mock stores ---
+
+const mockSidebarState = {
+  selectedFeedId: null as string | null,
+  selectedPaperId: null as string | null,
+  selectionType: null as 'feed' | 'paper' | null,
+  expandedCategoryIds: new Set<string>(),
+  selectFeed: vi.fn(),
+  selectPaper: vi.fn(),
+  clearSelection: vi.fn(),
+  toggleCategory: vi.fn(),
+  expandCategory: vi.fn(),
+}
+
+const mockAuthState = {
+  isAuthenticated: true,
+  user: {
+    id: 'user-1',
+    email: 'test@example.com',
+    nickname: 'Test',
+    avatar_url: null,
+    auth_provider: 'email' as const,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+  csrfToken: null,
+  setUser: vi.fn(),
+  clearUser: vi.fn(),
+  initializeFromStorage: vi.fn(),
+  getCsrfToken: vi.fn(),
+}
+
+vi.mock('@/stores/sidebarStore', () => ({
+  useSidebarStore: (selector?: (state: typeof mockSidebarState) => unknown) =>
+    selector ? selector(mockSidebarState) : mockSidebarState,
 }))
 
-// Mock stats data
-const mockStats: StatsResponse = {
-  total: 100,
-  unread: 25,
-  starred: 10,
-  today: 5,
-}
+vi.mock('@/stores/authStore', () => ({
+  useAuthStore: (selector?: (state: typeof mockAuthState) => unknown) =>
+    selector ? selector(mockAuthState) : mockAuthState,
+}))
+
+// --- Mock lucide-react icons ---
+// Must include icons used by both the new sidebar and legacy exports in the same file.
+vi.mock('lucide-react', () => ({
+  Plus: () => <div data-testid="icon-plus" />,
+  Rss: () => <div data-testid="icon-rss" />,
+  FileText: () => <div data-testid="icon-filetext" />,
+  ChevronRight: () => <div data-testid="icon-chevron-right" />,
+  ChevronDown: () => <div data-testid="icon-chevron-down" />,
+  MoreHorizontal: () => <div data-testid="icon-more" />,
+  Pencil: () => <div data-testid="icon-pencil" />,
+  Trash2: () => <div data-testid="icon-trash" />,
+  FolderInput: () => <div data-testid="icon-folder-input" />,
+  Home: () => <div data-testid="icon-home" />,
+  Star: () => <div data-testid="icon-star" />,
+  Calendar: () => <div data-testid="icon-calendar" />,
+  BookOpen: () => <div data-testid="icon-bookopen" />,
+  Upload: () => <div data-testid="icon-upload" />,
+  Download: () => <div data-testid="icon-download" />,
+  Menu: () => <div data-testid="icon-menu" />,
+  FolderPlus: () => <div data-testid="icon-folder-plus" />,
+}))
+
+// --- Mock data ---
+
+const mockFeedCategories: Category[] = [
+  {
+    id: 'cat-feed-1',
+    user_id: 'user-1',
+    name: 'Tech',
+    type: 'feed',
+    position: 1,
+    created_at: '2024-01-01T00:00:00Z',
+  },
+]
+
+const mockPaperCategories: Category[] = [
+  {
+    id: 'cat-paper-1',
+    user_id: 'user-1',
+    name: 'ML Research',
+    type: 'paper',
+    position: 1,
+    created_at: '2024-01-01T00:00:00Z',
+  },
+]
 
 const mockFeeds: UserFeed[] = [
   {
     id: 'feed-1',
-    title: 'Example Feed',
-    feed_url: 'https://example.com/feed.xml',
-    description: 'An example RSS feed',
+    title: 'Hacker News',
+    feed_url: 'https://news.ycombinator.com/rss',
+    description: 'Tech news',
     image_url: null,
     last_fetched_at: '2024-01-01T00:00:00Z',
     created_at: '2024-01-01T00:00:00Z',
     unread_count: 5,
+    item_count: 100,
     position: 1,
+    category_id: 'cat-feed-1',
+  },
+  {
+    id: 'feed-2',
+    title: 'Uncategorized Feed',
+    feed_url: 'https://example.com/rss',
+    description: 'No category',
+    image_url: null,
+    last_fetched_at: '2024-01-01T00:00:00Z',
+    created_at: '2024-01-01T00:00:00Z',
+    unread_count: 3,
+    item_count: 50,
+    position: 2,
+    category_id: null,
   },
 ]
 
-const createWrapper = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  })
-  return ({ children }: { children: React.ReactNode }) => (
+const mockPapers: Paper[] = [
+  {
+    id: 'paper-1',
+    user_id: 'user-1',
+    title: 'Attention Is All You Need',
+    authors: '["Vaswani et al."]',
+    abstract: 'A transformer paper',
+    keywords: '["transformer", "attention"]',
+    published_year: '2017',
+    doi: null,
+    pdf_size: 1234,
+    markdown_content: null,
+    cover_image: null,
+    original_filename: 'attention.pdf',
+    status: 'completed',
+    error: null,
+    category_id: null,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
+]
+
+// --- Helpers ---
+
+const defaultCallbacks = {
+  onAddClick: vi.fn(),
+  onFeedClick: vi.fn(),
+  onPaperClick: vi.fn(),
+  onRenameCategory: vi.fn(),
+  onDeleteCategory: vi.fn(),
+  onMoveFeedToCategory: vi.fn(),
+  onMoveFeedToNewCategory: vi.fn(),
+}
+
+function renderNewSidebar(props?: Partial<Parameters<typeof NewSidebar>[0]>) {
+  return render(
     <MemoryRouter>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <NewSidebar
+        feedCategories={mockFeedCategories}
+        paperCategories={mockPaperCategories}
+        feeds={mockFeeds}
+        papers={mockPapers}
+        {...defaultCallbacks}
+        {...props}
+      />
     </MemoryRouter>
   )
 }
 
-describe('Sidebar component', () => {
-  it('should render navigation items', () => {
-    const wrapper = createWrapper()
-    const handleFeedClick = vi.fn()
-    const handleAddFeed = vi.fn()
-    const handleDelete = vi.fn()
-    const handleRefresh = vi.fn()
+// --- Tests ---
 
-    render(
-      <Sidebar
-        feeds={mockFeeds}
-        selectedFeedId={null}
-        onFeedClick={handleFeedClick}
-        onAddFeed={handleAddFeed}
-        onDeleteFeed={handleDelete}
-        onRefreshFeed={handleRefresh}
-        refreshingFeedIds={new Set()}
-        filterType="all"
-        onFilterChange={vi.fn()}
-      />,
-      { wrapper }
-    )
-
-    expect(screen.getByText('All')).toBeInTheDocument()
-    expect(screen.getByText('Unread')).toBeInTheDocument()
-    expect(screen.getByText('Starred')).toBeInTheDocument()
+describe('NewSidebar', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSidebarState.selectedFeedId = null
+    mockSidebarState.selectedPaperId = null
+    mockSidebarState.expandedCategoryIds = new Set()
   })
 
-  it('should render feeds list', () => {
-    const wrapper = createWrapper()
-    const handleFeedClick = vi.fn()
-    const handleAddFeed = vi.fn()
-    const handleDelete = vi.fn()
-    const handleRefresh = vi.fn()
-
-    render(
-      <Sidebar
-        feeds={mockFeeds}
-        selectedFeedId={null}
-        onFeedClick={handleFeedClick}
-        onAddFeed={handleAddFeed}
-        onDeleteFeed={handleDelete}
-        onRefreshFeed={handleRefresh}
-        refreshingFeedIds={new Set()}
-        filterType="all"
-        onFilterChange={vi.fn()}
-      />,
-      { wrapper }
-    )
-
-    expect(screen.getByText('Example Feed')).toBeInTheDocument()
+  it('should render the oReader branding', () => {
+    renderNewSidebar()
+    expect(screen.getByText('oReader')).toBeInTheDocument()
   })
 
-  it('should call onFilterChange when filter is clicked', () => {
-    const wrapper = createWrapper()
-    const handleFeedClick = vi.fn()
-    const handleAddFeed = vi.fn()
-    const handleDelete = vi.fn()
-    const handleRefresh = vi.fn()
-    const handleFilterChange = vi.fn()
-
-    render(
-      <Sidebar
-        feeds={mockFeeds}
-        selectedFeedId={null}
-        onFeedClick={handleFeedClick}
-        onAddFeed={handleAddFeed}
-        onDeleteFeed={handleDelete}
-        onRefreshFeed={handleRefresh}
-        refreshingFeedIds={new Set()}
-        filterType="all"
-        onFilterChange={handleFilterChange}
-      />,
-      { wrapper }
-    )
-
-    fireEvent.click(screen.getByText('Unread'))
-    expect(handleFilterChange).toHaveBeenCalledWith('unread')
+  it('should render the add button', () => {
+    renderNewSidebar()
+    expect(screen.getByText('新增')).toBeInTheDocument()
   })
 
-  it('should highlight active filter', () => {
-    const wrapper = createWrapper()
-    const handleFeedClick = vi.fn()
-    const handleAddFeed = vi.fn()
-    const handleDelete = vi.fn()
-    const handleRefresh = vi.fn()
-
-    render(
-      <Sidebar
-        feeds={mockFeeds}
-        selectedFeedId={null}
-        onFeedClick={handleFeedClick}
-        onAddFeed={handleAddFeed}
-        onDeleteFeed={handleDelete}
-        onRefreshFeed={handleRefresh}
-        refreshingFeedIds={new Set()}
-        filterType="unread"
-        onFilterChange={vi.fn()}
-      />,
-      { wrapper }
-    )
-
-    const unreadButton = screen.getByText('Unread').closest('button')
-    expect(unreadButton).toHaveClass('bg-accent')
+  it('should call onAddClick when the add button is clicked', () => {
+    renderNewSidebar()
+    fireEvent.click(screen.getByText('新增'))
+    expect(defaultCallbacks.onAddClick).toHaveBeenCalledOnce()
   })
 
-  it('should show unread count badge', () => {
-    const wrapper = createWrapper()
-    const handleFeedClick = vi.fn()
-    const handleAddFeed = vi.fn()
-    const handleDelete = vi.fn()
-    const handleRefresh = vi.fn()
-
-    render(
-      <Sidebar
-        feeds={mockFeeds}
-        selectedFeedId={null}
-        onFeedClick={handleFeedClick}
-        onAddFeed={handleAddFeed}
-        onDeleteFeed={handleDelete}
-        onRefreshFeed={handleRefresh}
-        refreshingFeedIds={new Set()}
-        filterType="all"
-        onFilterChange={vi.fn()}
-        totalUnread={5}
-      />,
-      { wrapper }
-    )
-
-    // Should show unread count in the Unread filter button
-    const unreadButton = screen.getByText('Unread').closest('button')
-    expect(unreadButton?.textContent).toContain('5')
-
-    // Should also show unread count in feed card
-    expect(screen.getByText('Example Feed')).toBeInTheDocument()
+  it('should render Feeds section header with count', () => {
+    renderNewSidebar()
+    expect(screen.getByText('Feeds')).toBeInTheDocument()
+    expect(screen.getByText('(2)')).toBeInTheDocument()
   })
 
-  describe('Today filter', () => {
-    it('should render Today filter button', () => {
-      const wrapper = createWrapper()
-      const handleFilterChange = vi.fn()
-
-      render(
-        <Sidebar
-          feeds={mockFeeds}
-          selectedFeedId={null}
-          onFeedClick={vi.fn()}
-          onAddFeed={vi.fn()}
-          onDeleteFeed={vi.fn()}
-          onRefreshFeed={vi.fn()}
-          refreshingFeedIds={new Set()}
-          filterType="all"
-          onFilterChange={handleFilterChange}
-        />,
-        { wrapper }
-      )
-
-      expect(screen.getByText('Today')).toBeInTheDocument()
-      expect(screen.getByTestId('calendar-icon')).toBeInTheDocument()
-    })
-
-    it('should highlight Today filter when active', () => {
-      const wrapper = createWrapper()
-      const handleFilterChange = vi.fn()
-
-      render(
-        <Sidebar
-          feeds={mockFeeds}
-          selectedFeedId={null}
-          onFeedClick={vi.fn()}
-          onAddFeed={vi.fn()}
-          onDeleteFeed={vi.fn()}
-          onRefreshFeed={vi.fn()}
-          refreshingFeedIds={new Set()}
-          filterType="today"
-          onFilterChange={handleFilterChange}
-        />,
-        { wrapper }
-      )
-
-      const todayButton = screen.getByText('Today').closest('button')
-      expect(todayButton).toHaveClass('bg-accent')
-    })
-
-    it('should call onFilterChange with "today" when Today is clicked', () => {
-      const wrapper = createWrapper()
-      const handleFilterChange = vi.fn()
-
-      render(
-        <Sidebar
-          feeds={mockFeeds}
-          selectedFeedId={null}
-          onFeedClick={vi.fn()}
-          onAddFeed={vi.fn()}
-          onDeleteFeed={vi.fn()}
-          onRefreshFeed={vi.fn()}
-          refreshingFeedIds={new Set()}
-          filterType="all"
-          onFilterChange={handleFilterChange}
-        />,
-        { wrapper }
-      )
-
-      fireEvent.click(screen.getByText('Today'))
-      expect(handleFilterChange).toHaveBeenCalledWith('today')
-    })
+  it('should render Papers section header with count', () => {
+    renderNewSidebar()
+    expect(screen.getByText('Papers')).toBeInTheDocument()
+    expect(screen.getByText('(1)')).toBeInTheDocument()
   })
 
-  describe('Stats display', () => {
-    it('should display stats counts when stats prop is provided', () => {
-      const wrapper = createWrapper()
+  it('should render feed categories', () => {
+    renderNewSidebar()
+    expect(screen.getByText('Tech')).toBeInTheDocument()
+  })
 
-      render(
-        <Sidebar
-          feeds={mockFeeds}
-          selectedFeedId={null}
-          onFeedClick={vi.fn()}
-          onAddFeed={vi.fn()}
-          onDeleteFeed={vi.fn()}
-          onRefreshFeed={vi.fn()}
-          refreshingFeedIds={new Set()}
-          filterType="all"
-          onFilterChange={vi.fn()}
-          stats={mockStats}
-        />,
-        { wrapper }
-      )
+  it('should render feed titles in uncategorized section', () => {
+    renderNewSidebar()
+    expect(screen.getByText('Uncategorized Feed')).toBeInTheDocument()
+  })
 
-      // Check that all filter buttons are rendered with stats
-      expect(screen.getByText('All')).toBeInTheDocument()
-      expect(screen.getByText('Unread')).toBeInTheDocument()
-      expect(screen.getByText('Starred')).toBeInTheDocument()
-      expect(screen.getByText('Today')).toBeInTheDocument()
+  it('should render paper titles', () => {
+    renderNewSidebar()
+    expect(screen.getByText('Attention Is All You Need')).toBeInTheDocument()
+  })
+
+  it('should render feeds inside expanded category', () => {
+    mockSidebarState.expandedCategoryIds = new Set(['cat-feed-1'])
+    renderNewSidebar()
+    expect(screen.getByText('Hacker News')).toBeInTheDocument()
+  })
+
+  it('should render empty state when no feeds or papers', () => {
+    renderNewSidebar({ feeds: [], papers: [] })
+    expect(screen.getByText('Feeds')).toBeInTheDocument()
+    expect(screen.getByText('Papers')).toBeInTheDocument()
+    expect(screen.getAllByText('(0)').length).toBe(2)
+  })
+
+  describe('user avatar', () => {
+    it('should show user initial from nickname', () => {
+      renderNewSidebar()
+      expect(screen.getByText('T')).toBeInTheDocument()
     })
 
-    it('should display total count for All filter', () => {
-      const wrapper = createWrapper()
-
-      render(
-        <Sidebar
-          feeds={mockFeeds}
-          selectedFeedId={null}
-          onFeedClick={vi.fn()}
-          onAddFeed={vi.fn()}
-          onDeleteFeed={vi.fn()}
-          onRefreshFeed={vi.fn()}
-          refreshingFeedIds={new Set()}
-          filterType="all"
-          onFilterChange={vi.fn()}
-          stats={mockStats}
-        />,
-        { wrapper }
-      )
-
-      const allButton = screen.getByText('All').closest('button')
-      expect(allButton?.textContent).toContain('100')
-    })
-
-    it('should display unread count for Unread filter', () => {
-      const wrapper = createWrapper()
-
-      render(
-        <Sidebar
-          feeds={mockFeeds}
-          selectedFeedId={null}
-          onFeedClick={vi.fn()}
-          onAddFeed={vi.fn()}
-          onDeleteFeed={vi.fn()}
-          onRefreshFeed={vi.fn()}
-          refreshingFeedIds={new Set()}
-          filterType="all"
-          onFilterChange={vi.fn()}
-          stats={mockStats}
-        />,
-        { wrapper }
-      )
-
-      const unreadButton = screen.getByText('Unread').closest('button')
-      expect(unreadButton?.textContent).toContain('25')
-    })
-
-    it('should display starred count for Starred filter', () => {
-      const wrapper = createWrapper()
-
-      render(
-        <Sidebar
-          feeds={mockFeeds}
-          selectedFeedId={null}
-          onFeedClick={vi.fn()}
-          onAddFeed={vi.fn()}
-          onDeleteFeed={vi.fn()}
-          onRefreshFeed={vi.fn()}
-          refreshingFeedIds={new Set()}
-          filterType="all"
-          onFilterChange={vi.fn()}
-          stats={mockStats}
-        />,
-        { wrapper }
-      )
-
-      const starredButton = screen.getByText('Starred').closest('button')
-      expect(starredButton?.textContent).toContain('10')
-    })
-
-    it('should display today count for Today filter', () => {
-      const wrapper = createWrapper()
-
-      render(
-        <Sidebar
-          feeds={mockFeeds}
-          selectedFeedId={null}
-          onFeedClick={vi.fn()}
-          onAddFeed={vi.fn()}
-          onDeleteFeed={vi.fn()}
-          onRefreshFeed={vi.fn()}
-          refreshingFeedIds={new Set()}
-          filterType="all"
-          onFilterChange={vi.fn()}
-          stats={mockStats}
-        />,
-        { wrapper }
-      )
-
-      const todayButton = screen.getByText('Today').closest('button')
-      expect(todayButton?.textContent).toContain('5')
+    it('should show fallback initial when no user', () => {
+      mockAuthState.user = null
+      renderNewSidebar()
+      expect(screen.getByText('?')).toBeInTheDocument()
     })
   })
 })

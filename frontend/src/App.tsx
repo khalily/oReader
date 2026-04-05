@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { AppErrorBoundary } from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/ui/toast'
@@ -10,11 +10,9 @@ import { OAuthPendingPage } from '@/pages/oauth/OAuthPendingPage'
 import { OAuthCallbackPage } from '@/pages/oauth/OAuthCallbackPage'
 import ItemsPage from '@/pages/items/ItemsPage'
 import ItemViewPage from '@/pages/items/ItemViewPage'
-import PapersPage from '@/pages/papers/PapersPage'
 import PaperViewPage from '@/pages/papers/PaperViewPage'
 import { useAuthStore } from '@/stores/authStore'
 import { useEffect } from 'react'
-import type { FilterType } from '@/components/feed/Sidebar'
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -25,15 +23,6 @@ const queryClient = new QueryClient({
     },
   },
 })
-
-// Wrapper component to handle URL params and filter/feed selection
-function ItemsPageWrapper() {
-  const [searchParams] = useSearchParams()
-  const filter = searchParams.get('filter') as FilterType | null
-  const feedId = searchParams.get('feed') || undefined
-
-  return <ItemsPage filterType={filter ?? 'all'} feedId={feedId} />
-}
 
 function AppRoutes() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -51,7 +40,7 @@ function AppRoutes() {
         path="/login"
         element={
           isAuthenticated ? (
-            <Navigate to="/items" replace />
+            <Navigate to="/feeds" replace />
           ) : (
             <LoginPage />
           )
@@ -61,7 +50,7 @@ function AppRoutes() {
         path="/register"
         element={
           isAuthenticated ? (
-            <Navigate to="/items" replace />
+            <Navigate to="/feeds" replace />
           ) : (
             <RegisterPage />
           )
@@ -71,7 +60,7 @@ function AppRoutes() {
         path="/oauth/pending"
         element={
           isAuthenticated ? (
-            <Navigate to="/items" replace />
+            <Navigate to="/feeds" replace />
           ) : (
             <OAuthPendingPage />
           )
@@ -85,10 +74,10 @@ function AppRoutes() {
 
       {/* Protected routes */}
       <Route
-        path="/items"
+        path="/feeds"
         element={
           <ProtectedRoute>
-            <ItemsPageWrapper />
+            <ItemsPage />
           </ProtectedRoute>
         }
       />
@@ -101,14 +90,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/papers"
-        element={
-          <ProtectedRoute>
-            <PapersPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/papers/:id"
         element={
           <ProtectedRoute>
@@ -117,19 +98,29 @@ function AppRoutes() {
         }
       />
 
+      {/* Legacy redirects */}
+      <Route
+        path="/items"
+        element={<Navigate to="/feeds" replace />}
+      />
+      <Route
+        path="/papers"
+        element={<Navigate to="/feeds" replace />}
+      />
+
       {/* Default redirect */}
       <Route
         path="/"
         element={
-          <Navigate to={isAuthenticated ? '/items' : '/login'} replace />
+          <Navigate to={isAuthenticated ? '/feeds' : '/login'} replace />
         }
       />
 
-      {/* Catch all - redirect to items or login */}
+      {/* Catch all - redirect to feeds or login */}
       <Route
         path="*"
         element={
-          <Navigate to={isAuthenticated ? '/items' : '/login'} replace />
+          <Navigate to={isAuthenticated ? '/feeds' : '/login'} replace />
         }
       />
     </Routes>
