@@ -68,6 +68,7 @@ func main() {
 		&model.PaperTag{},
 		&model.PaperCollection{},
 		&model.PaperCollectionItem{},
+		&model.Category{},
 	); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto-migrate database")
 		os.Exit(1)
