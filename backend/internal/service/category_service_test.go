@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	mysql "github.com/go-sql-driver/mysql"
 	"github.com/khalily/oreader/internal/model"
 )
 
@@ -182,7 +183,7 @@ func TestCreateCategory(t *testing.T) {
 			},
 			createFunc: func(ctx context.Context, category *model.Category) error {
 				// Simulate duplicate key error from DB
-				return errors.New("duplicate entry 'user-1-Tech-feed' for key 'idx_user_cat_name'")
+				return &mysql.MySQLError{Number: 1062, Message: "Duplicate entry"}
 			},
 		}
 
@@ -327,7 +328,7 @@ func TestRenameCategory(t *testing.T) {
 				return existing, nil
 			},
 			updateFunc: func(ctx context.Context, category *model.Category) error {
-				return errors.New("duplicate entry for key 'idx_user_cat_name'")
+				return &mysql.MySQLError{Number: 1062, Message: "Duplicate entry"}
 			},
 		}
 
