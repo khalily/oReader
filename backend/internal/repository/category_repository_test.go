@@ -115,7 +115,7 @@ func TestCategoryRepository_GetByID(t *testing.T) {
 	cat.GenerateID()
 	repo.Create(ctx, cat)
 
-	found, err := repo.GetByID(ctx, cat.ID)
+	found, err := repo.GetByID(ctx, user.ID, cat.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Tech", found.Name)
 }
@@ -123,9 +123,10 @@ func TestCategoryRepository_GetByID(t *testing.T) {
 func TestCategoryRepository_GetByID_NotFound(t *testing.T) {
 	db := setupCategoryDB(t)
 	repo := NewCategoryRepository(db)
+	user := createTestUserForCategory(t, db)
 	ctx := context.Background()
 
-	_, err := repo.GetByID(ctx, "nonexistent-id")
+	_, err := repo.GetByID(ctx, user.ID, "nonexistent-id")
 	assert.ErrorIs(t, err, service.ErrCategoryNotFound)
 }
 
@@ -139,10 +140,10 @@ func TestCategoryRepository_Delete(t *testing.T) {
 	cat.GenerateID()
 	repo.Create(ctx, cat)
 
-	err := repo.Delete(ctx, cat.ID)
+	err := repo.Delete(ctx, user.ID, cat.ID)
 	require.NoError(t, err)
 
-	_, err = repo.GetByID(ctx, cat.ID)
+	_, err = repo.GetByID(ctx, user.ID, cat.ID)
 	assert.ErrorIs(t, err, service.ErrCategoryNotFound)
 }
 
@@ -161,7 +162,7 @@ func TestCategoryRepository_Update(t *testing.T) {
 	err := repo.Update(ctx, cat)
 	require.NoError(t, err)
 
-	found, err := repo.GetByID(ctx, cat.ID)
+	found, err := repo.GetByID(ctx, user.ID, cat.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Science", found.Name)
 	assert.Equal(t, 10, found.Position)

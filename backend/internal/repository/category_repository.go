@@ -25,10 +25,10 @@ func (r *categoryRepository) Create(ctx context.Context, category *model.Categor
 	return r.db.WithContext(ctx).Create(category).Error
 }
 
-// GetByID retrieves a category by ID
-func (r *categoryRepository) GetByID(ctx context.Context, id string) (*model.Category, error) {
+// GetByID retrieves a category by ID, scoped to user
+func (r *categoryRepository) GetByID(ctx context.Context, userID, id string) (*model.Category, error) {
 	var category model.Category
-	err := r.db.WithContext(ctx).Where("id = ?", id).First(&category).Error
+	err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).First(&category).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, service.ErrCategoryNotFound
@@ -54,9 +54,9 @@ func (r *categoryRepository) Update(ctx context.Context, category *model.Categor
 	return r.db.WithContext(ctx).Save(category).Error
 }
 
-// Delete deletes a category by ID
-func (r *categoryRepository) Delete(ctx context.Context, id string) error {
-	return r.db.WithContext(ctx).Delete(&model.Category{}, "id = ?", id).Error
+// Delete deletes a category by ID, scoped to user
+func (r *categoryRepository) Delete(ctx context.Context, userID, id string) error {
+	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&model.Category{}, "id = ?", id).Error
 }
 
 // GetMaxPosition returns the maximum position value for categories of a given type for a user

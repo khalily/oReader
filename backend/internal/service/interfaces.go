@@ -380,10 +380,10 @@ type PaperStatusResponse struct {
 // CategoryRepository defines the interface for category data access
 type CategoryRepository interface {
 	Create(ctx context.Context, category *model.Category) error
-	GetByID(ctx context.Context, id string) (*model.Category, error)
+	GetByID(ctx context.Context, userID, id string) (*model.Category, error)
 	ListByUserID(ctx context.Context, userID string, categoryType string) ([]*model.Category, error)
 	Update(ctx context.Context, category *model.Category) error
-	Delete(ctx context.Context, id string) error
+	Delete(ctx context.Context, userID, id string) error
 	GetMaxPosition(ctx context.Context, userID string, categoryType string) (int, error)
 }
 
