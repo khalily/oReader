@@ -47,6 +47,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		"items",
 		"papers",
 		"paper_collections",
+		"categories",
 		"feeds",
 		"users",
 	}

@@ -27,6 +27,10 @@ var (
 	ErrItemNotFound = errors.New("item not found")
 	// ErrPaperNotFound is returned when a paper is not found
 	ErrPaperNotFound = errors.New("paper not found")
+	// ErrCategoryNotFound is returned when a category is not found
+	ErrCategoryNotFound = errors.New("category not found")
+	// ErrCategoryDuplicate is returned when a category with the same name already exists
+	ErrCategoryDuplicate = errors.New("category with same name already exists")
 )
 
 // ItemWithState represents an item with user-specific state
@@ -371,4 +375,24 @@ type PaperStatusResponse struct {
 	Error     string `json:"error,omitempty"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
+}
+
+// CategoryRepository defines the interface for category data access
+type CategoryRepository interface {
+	Create(ctx context.Context, category *model.Category) error
+	GetByID(ctx context.Context, id string) (*model.Category, error)
+	ListByUserID(ctx context.Context, userID string, categoryType string) ([]*model.Category, error)
+	Update(ctx context.Context, category *model.Category) error
+	Delete(ctx context.Context, id string) error
+	GetMaxPosition(ctx context.Context, userID string, categoryType string) (int, error)
+}
+
+// CategoryService defines the interface for category business logic
+type CategoryService interface {
+	CreateCategory(ctx context.Context, userID string, name string, categoryType string) (*model.Category, error)
+	ListCategories(ctx context.Context, userID string, categoryType string) ([]*model.Category, error)
+	RenameCategory(ctx context.Context, userID, categoryID, newName string) (*model.Category, error)
+	DeleteCategory(ctx context.Context, userID, categoryID string) error
+	MoveFeedToCategory(ctx context.Context, userID, feedID, categoryID string) error
+	MovePaperToCategory(ctx context.Context, userID, paperID, categoryID string) error
 }
