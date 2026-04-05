@@ -3,7 +3,14 @@ import { useSearchParams } from 'react-router-dom'
 import { useItems } from '@/hooks/useItems'
 import { useFeeds } from '@/hooks/useFeeds'
 import { usePapers } from '@/hooks/usePapers'
-import { useCategories } from '@/hooks/useCategories'
+import {
+  useListCategories,
+  useCreateCategory,
+  useRenameCategory,
+  useDeleteCategory,
+  useMoveFeedToCategory,
+  useMovePaperToCategory,
+} from '@/hooks/useCategories'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useToast } from '@/components/ui/toast'
 import { MobileDrawer } from '@/components/ui/mobile-drawer'
@@ -36,17 +43,13 @@ export function ItemsPage() {
   const { useListItemsInfinite, useToggleStar, useToggleRead, useMarkAllRead } = useItems()
   const { useListPapers, useGetPaper, useGetPaperStatus, useDownloadPaper } = usePapers()
   const {
-    useListCategories,
-    useCreateCategory,
-    useRenameCategory: useRenameCategoryMutation,
-    useDeleteCategory: useDeleteCategoryMutation,
-    useMoveFeedToCategory: useMoveFeedToCategoryMutation,
-    useMovePaperToCategory: useMovePaperToCategoryMutation,
-  } = useCategories()
+    data: feedCategoriesData,
+  } = useListCategories('feed')
+  const {
+    data: paperCategoriesData,
+  } = useListCategories('paper')
 
   // Category data
-  const { data: feedCategoriesData } = useListCategories('feed')
-  const { data: paperCategoriesData } = useListCategories('paper')
   const feedCategories = feedCategoriesData?.categories ?? []
   const paperCategories = paperCategoriesData?.categories ?? []
 
@@ -55,10 +58,10 @@ export function ItemsPage() {
 
   // Category mutations
   const createCategory = useCreateCategory()
-  const renameCategory = useRenameCategoryMutation()
-  const deleteCategory = useDeleteCategoryMutation()
-  const moveFeedToCategory = useMoveFeedToCategoryMutation()
-  const movePaperToCategory = useMovePaperToCategoryMutation()
+  const renameCategory = useRenameCategory()
+  const deleteCategory = useDeleteCategory()
+  const moveFeedToCategory = useMoveFeedToCategory()
+  const movePaperToCategory = useMovePaperToCategory()
 
   // Query items based on sidebar selection
   const listOptions: ListItemsOptions = {}
@@ -464,7 +467,7 @@ export function ItemsPage() {
               >
                 <div className="font-medium truncate">{p.title || p.original_filename}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {p.authors ? JSON.parse(p.authors).slice(0, 2).join(', ') : ''}
+                  {(() => { try { const a = JSON.parse(p.authors); return Array.isArray(a) ? a.slice(0, 2).join(', ') : ''; } catch { return ''; } })()}
                   {p.published_year ? ` · ${p.published_year}` : ''}
                 </div>
                 {p.status !== 'completed' && (
@@ -635,7 +638,7 @@ export function ItemsPage() {
               >
                 <div className="font-medium truncate">{p.title || p.original_filename}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {p.authors ? JSON.parse(p.authors).slice(0, 2).join(', ') : ''}
+                  {(() => { try { const a = JSON.parse(p.authors); return Array.isArray(a) ? a.slice(0, 2).join(', ') : ''; } catch { return ''; } })()}
                   {p.published_year ? ` · ${p.published_year}` : ''}
                 </div>
               </button>

@@ -107,7 +107,7 @@ func (m *mockUserFeedRepositoryForCategory) UpdateCategory(ctx context.Context, 
 // mockPaperRepositoryForCategory is a mock implementation of PaperRepository for category tests
 type mockPaperRepositoryForCategory struct {
 	getByIDFunc         func(ctx context.Context, id string) (*model.Paper, error)
-	updateCategoryFunc  func(ctx context.Context, paperID string, categoryID *string) error
+	updateCategoryFunc  func(ctx context.Context, userID, paperID string, categoryID *string) error
 }
 
 func (m *mockPaperRepositoryForCategory) Create(ctx context.Context, paper *model.Paper) error {
@@ -137,9 +137,9 @@ func (m *mockPaperRepositoryForCategory) ListTags(ctx context.Context, userID st
 	return nil, nil
 }
 
-func (m *mockPaperRepositoryForCategory) UpdateCategory(ctx context.Context, paperID string, categoryID *string) error {
+func (m *mockPaperRepositoryForCategory) UpdateCategory(ctx context.Context, userID, paperID string, categoryID *string) error {
 	if m.updateCategoryFunc != nil {
-		return m.updateCategoryFunc(ctx, paperID, categoryID)
+		return m.updateCategoryFunc(ctx, userID, paperID, categoryID)
 	}
 	return nil
 }
@@ -550,7 +550,7 @@ func TestMovePaperToCategory(t *testing.T) {
 			getByIDFunc: func(ctx context.Context, id string) (*model.Paper, error) {
 				return &model.Paper{Base: model.Base{ID: paperID}, UserID: userID}, nil
 			},
-			updateCategoryFunc: func(ctx context.Context, paperID string, catID *string) error {
+			updateCategoryFunc: func(ctx context.Context, uid, pid string, catID *string) error {
 				assert.Equal(t, categoryID, *catID)
 				return nil
 			},
@@ -668,7 +668,7 @@ func TestMovePaperToCategory(t *testing.T) {
 			getByIDFunc: func(ctx context.Context, id string) (*model.Paper, error) {
 				return &model.Paper{Base: model.Base{ID: paperID}, UserID: userID}, nil
 			},
-			updateCategoryFunc: func(ctx context.Context, paperID string, catID *string) error {
+			updateCategoryFunc: func(ctx context.Context, uid, pid string, catID *string) error {
 				assert.Nil(t, catID)
 				return nil
 			},

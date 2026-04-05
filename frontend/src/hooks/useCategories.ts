@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/api/axios'
 import type {
   Category,
@@ -37,48 +37,63 @@ async function movePaperToCategory(paperId: string, data: MoveToCategoryRequest)
 }
 
 // React Query hooks
-export function useCategories() {
-  const useListCategories = (type: 'feed' | 'paper') =>
-    useQuery({
-      queryKey: ['categories', type],
-      queryFn: () => listCategories(type),
-      staleTime: 60 * 1000, // 1 minute
-    })
+export function useListCategories(type: 'feed' | 'paper') {
+  return useQuery({
+    queryKey: ['categories', type],
+    queryFn: () => listCategories(type),
+    staleTime: 60 * 1000, // 1 minute
+  })
+}
 
-  const useCreateCategory = () =>
-    useMutation({
-      mutationFn: (data: CreateCategoryRequest) => createCategory(data),
-    })
+export function useCreateCategory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateCategoryRequest) => createCategory(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+  })
+}
 
-  const useRenameCategory = () =>
-    useMutation({
-      mutationFn: ({ categoryId, data }: { categoryId: string; data: RenameCategoryRequest }) =>
-        renameCategory(categoryId, data),
-    })
+export function useRenameCategory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ categoryId, data }: { categoryId: string; data: RenameCategoryRequest }) =>
+      renameCategory(categoryId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+  })
+}
 
-  const useDeleteCategory = () =>
-    useMutation({
-      mutationFn: (categoryId: string) => deleteCategory(categoryId),
-    })
+export function useDeleteCategory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (categoryId: string) => deleteCategory(categoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+  })
+}
 
-  const useMoveFeedToCategory = () =>
-    useMutation({
-      mutationFn: ({ feedId, data }: { feedId: string; data: MoveToCategoryRequest }) =>
-        moveFeedToCategory(feedId, data),
-    })
+export function useMoveFeedToCategory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ feedId, data }: { feedId: string; data: MoveToCategoryRequest }) =>
+      moveFeedToCategory(feedId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+  })
+}
 
-  const useMovePaperToCategory = () =>
-    useMutation({
-      mutationFn: ({ paperId, data }: { paperId: string; data: MoveToCategoryRequest }) =>
-        movePaperToCategory(paperId, data),
-    })
-
-  return {
-    useListCategories,
-    useCreateCategory,
-    useRenameCategory,
-    useDeleteCategory,
-    useMoveFeedToCategory,
-    useMovePaperToCategory,
-  }
+export function useMovePaperToCategory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ paperId, data }: { paperId: string; data: MoveToCategoryRequest }) =>
+      movePaperToCategory(paperId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+  })
 }

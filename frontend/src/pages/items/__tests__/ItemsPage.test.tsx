@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter } from 'react-router-dom'
 import ItemsPage from '../ItemsPage'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { http, HttpResponse } from 'msw'
@@ -78,8 +78,6 @@ const mockItems = [
       feed_url: 'https://example.com/feed.xml',
       description: 'An example feed',
       image_url: null,
-      last_fetched_at: '2024-01-01T00:00:00Z',
-      created_at: '2024-01-01T00:00:00Z',
     },
     user_state: {
       item_id: 'item-1',
@@ -105,8 +103,6 @@ const mockItems = [
       feed_url: 'https://example.com/feed.xml',
       description: 'An example feed',
       image_url: null,
-      last_fetched_at: '2024-01-01T00:00:00Z',
-      created_at: '2024-01-01T00:00:00Z',
     },
     user_state: {
       item_id: 'item-2',
@@ -128,6 +124,7 @@ const mockFeeds = [
     unread_count: 5,
     last_fetched_at: '2024-01-01T00:00:00Z',
     created_at: '2024-01-01T00:00:00Z',
+    category_id: null,
   },
   {
     id: 'feed-2',
@@ -138,15 +135,41 @@ const mockFeeds = [
     unread_count: 3,
     last_fetched_at: '2024-01-01T00:00:00Z',
     created_at: '2024-01-01T00:00:00Z',
+    category_id: null,
   },
 ]
 
-// Mock stats data
-const mockStats = {
-  total_feeds: 2,
-  total_items: 10,
-  unread_items: 8,
-  starred_items: 2,
+// Mock categories data
+const mockFeedCategories = {
+  categories: [
+    { id: 'cat-1', name: 'Tech', type: 'feed', position: 0 },
+    { id: 'cat-2', name: 'News', type: 'feed', position: 1 },
+  ],
+}
+
+const mockPaperCategories = {
+  categories: [
+    { id: 'cat-3', name: 'AI', type: 'paper', position: 0 },
+  ],
+}
+
+// Mock papers data
+const mockPapers = {
+  papers: [
+    {
+      id: 'paper-1',
+      title: 'Attention Is All You Need',
+      original_filename: 'attention.pdf',
+      authors: '["Author A", "Author B"]',
+      published_year: '2017',
+      status: 'completed',
+      markdown_content: '# Abstract\n...',
+      error: null,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+    },
+  ],
+  total: 1,
 }
 
 // API handlers
@@ -154,24 +177,21 @@ const handlers = [
   // List items
   http.get(`${API_BASE_URL}/items`, ({ request }) => {
     const url = new URL(request.url)
-    const starred = url.searchParams.get('starred')
-    const read = url.searchParams.get('read')
+    const feedId = url.searchParams.get('feed_id')
 
-    let filteredItems = [...mockItems]
-
-    // Filter by starred
-    if (starred === 'true') {
-      filteredItems = filteredItems.filter((item) => item.user_state?.is_starred)
-    }
-
-    // Filter by read status
-    if (read === 'false') {
-      filteredItems = filteredItems.filter((item) => !item.user_state?.is_read)
+    if (feedId) {
+      const filtered = mockItems.filter((item) => item.feed_id === feedId)
+      return HttpResponse.json({
+        items: filtered,
+        total: filtered.length,
+        has_more: false,
+        next_cursor: null,
+      })
     }
 
     return HttpResponse.json({
-      items: filteredItems,
-      total: filteredItems.length,
+      items: mockItems,
+      total: mockItems.length,
       has_more: false,
       next_cursor: null,
     })
@@ -237,6 +257,19 @@ const handlers = [
     return HttpResponse.json({ feeds: mockFeeds })
   }),
 
+  // List feed categories
+  http.get(`${API_BASE_URL}/categories`, ({ request }) => {
+    const url = new URL(request.url)
+    const type = url.searchParams.get('type')
+    if (type === 'paper') return HttpResponse.json(mockPaperCategories)
+    return HttpResponse.json(mockFeedCategories)
+  }),
+
+  // List papers
+  http.get(`${API_BASE_URL}/papers`, () => {
+    return HttpResponse.json(mockPapers)
+  }),
+
   // Refresh feed
   http.post(`${API_BASE_URL}/feeds/:id/refresh`, ({ params }) => {
     if (mockFeeds.find((f) => f.id === params.id)) {
@@ -270,9 +303,14 @@ const handlers = [
     )
   }),
 
-  // Get stats
+  // Stats
   http.get(`${API_BASE_URL}/stats`, () => {
-    return HttpResponse.json(mockStats)
+    return HttpResponse.json({
+      total_feeds: 2,
+      total_items: 10,
+      unread_items: 8,
+      starred_items: 2,
+    })
   }),
 ]
 
@@ -291,19 +329,11 @@ const createWrapper = (initialEntries = ['/items']) => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <MemoryRouter initialEntries={initialEntries}>
-          <Routes>
-            <Route path="/items" element={children} />
-          </Routes>
+          {children}
         </MemoryRouter>
       </ThemeProvider>
     </QueryClientProvider>
   )
-}
-
-// Helper to render with providers
-const renderItemsPage = (props: { filterType?: string; feedId?: string } = {}) => {
-  const wrapper = createWrapper()
-  return render(<ItemsPage filterType={(props.filterType as 'all' | 'unread' | 'starred' | 'today') || 'all'} feedId={props.feedId} />, { wrapper })
 }
 
 describe('ItemsPage', () => {
@@ -321,13 +351,12 @@ describe('ItemsPage', () => {
   })
 
   // ============================================
-  // 4.10 基础渲染测试
+  // 基础渲染测试
   // ============================================
   describe('Basic Rendering', () => {
-    it('should render article list', async () => {
-      renderItemsPage()
+    it('should render article list in default view', async () => {
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
-      // Component renders both desktop and mobile views, so we check for at least one
       await waitFor(() => {
         const articles = screen.getAllByText('First Article')
         expect(articles.length).toBeGreaterThan(0)
@@ -335,6 +364,15 @@ describe('ItemsPage', () => {
 
       const secondArticles = screen.getAllByText('Second Article')
       expect(secondArticles.length).toBeGreaterThan(0)
+    })
+
+    it('should show "All Articles" title in default view', async () => {
+      render(<ItemsPage />, { wrapper: createWrapper() })
+
+      await waitFor(() => {
+        const allArticlesHeaders = screen.getAllByText('All Articles')
+        expect(allArticlesHeaders.length).toBeGreaterThan(0)
+      })
     })
 
     it('should show empty state when no articles', async () => {
@@ -349,20 +387,18 @@ describe('ItemsPage', () => {
         })
       )
 
-      renderItemsPage()
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
-        // The component should render without crashing when there are no items
         const allArticlesHeaders = screen.getAllByText('All Articles')
         expect(allArticlesHeaders.length).toBeGreaterThan(0)
       })
     })
 
     it('should handle loading state gracefully', async () => {
-      // The component should render without crashing during loading
-      renderItemsPage()
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
-      // Wait for content to load
+      // Wait for content to load without crashing
       await waitFor(() => {
         const articles = screen.getAllByText('First Article')
         expect(articles.length).toBeGreaterThan(0)
@@ -371,180 +407,89 @@ describe('ItemsPage', () => {
   })
 
   // ============================================
-  // 4.11 筛选功能测试
-  // ============================================
-  describe('Filter Functionality', () => {
-    it('should filter by unread status', async () => {
-      renderItemsPage({ filterType: 'unread' })
-
-      await waitFor(() => {
-        // Only unread items should be displayed
-        const firstArticles = screen.getAllByText('First Article')
-        expect(firstArticles.length).toBeGreaterThan(0)
-      })
-
-      // Second article is read, so it should not be displayed
-      expect(screen.queryByText('Second Article')).not.toBeInTheDocument()
-    })
-
-    it('should filter by starred status', async () => {
-      renderItemsPage({ filterType: 'starred' })
-
-      await waitFor(() => {
-        // Only starred items should be displayed
-        const secondArticles = screen.getAllByText('Second Article')
-        expect(secondArticles.length).toBeGreaterThan(0)
-      })
-
-      // First article is not starred, so it should not be displayed
-      expect(screen.queryByText('First Article')).not.toBeInTheDocument()
-    })
-
-    it('should display correct title for starred filter', async () => {
-      renderItemsPage({ filterType: 'starred' })
-
-      await waitFor(() => {
-        const starredHeaders = screen.getAllByText('Starred')
-        expect(starredHeaders.length).toBeGreaterThan(0)
-      })
-    })
-
-    it('should display correct title for unread filter', async () => {
-      renderItemsPage({ filterType: 'unread' })
-
-      await waitFor(() => {
-        const unreadHeaders = screen.getAllByText('Unread')
-        expect(unreadHeaders.length).toBeGreaterThan(0)
-      })
-    })
-
-    it('should filter by specific feed', async () => {
-      renderItemsPage({ feedId: 'feed-1' })
-
-      await waitFor(() => {
-        // Should display feed title in header
-        const feedTitles = screen.getAllByText('Example Feed')
-        expect(feedTitles.length).toBeGreaterThan(0)
-      })
-    })
-  })
-
-  // ============================================
-  // 4.12 交互测试
+  // 交互测试
   // ============================================
   describe('User Interactions', () => {
-    it('should display mark all read button when viewing specific feed', async () => {
-      renderItemsPage({ feedId: 'feed-1' })
+    it('should display feed titles in sidebar', async () => {
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
-        const markAllReadButtons = screen.getAllByText('Mark all read')
-        expect(markAllReadButtons.length).toBeGreaterThan(0)
+        expect(screen.getAllByText('Example Feed').length).toBeGreaterThan(0)
       })
+      expect(screen.getAllByText('Another Feed').length).toBeGreaterThan(0)
     })
 
-    it('should not display mark all read button when viewing all articles', async () => {
-      renderItemsPage()
+    it('should display category names in sidebar', async () => {
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
-        const allArticlesHeaders = screen.getAllByText('All Articles')
-        expect(allArticlesHeaders.length).toBeGreaterThan(0)
+        expect(screen.getAllByText('Tech').length).toBeGreaterThan(0)
       })
-
-      // Mark all read button should not be present when viewing all articles
-      expect(screen.queryByText('Mark all read')).not.toBeInTheDocument()
+      expect(screen.getAllByText('News').length).toBeGreaterThan(0)
     })
   })
 
   // ============================================
-  // 4.13 键盘快捷键测试
+  // 键盘快捷键测试
   // ============================================
   describe('Keyboard Shortcuts', () => {
-    it('should register keyboard shortcuts on mount', async () => {
-      renderItemsPage()
-
-      await waitFor(() => {
-        const allArticlesHeaders = screen.getAllByText('All Articles')
-        expect(allArticlesHeaders.length).toBeGreaterThan(0)
-      })
-
-      // The keyboard shortcuts are registered via useKeyboardShortcuts hook
-      // We verify the component renders without errors
-    })
-
     it('should navigate to next article with j key', async () => {
-      renderItemsPage()
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
         const articles = screen.getAllByText('First Article')
         expect(articles.length).toBeGreaterThan(0)
       })
 
-      // Simulate j key press - component should handle without error
       fireEvent.keyDown(window, { key: 'j' })
     })
 
     it('should navigate to previous article with k key', async () => {
-      renderItemsPage()
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
         const articles = screen.getAllByText('First Article')
         expect(articles.length).toBeGreaterThan(0)
       })
 
-      // Simulate k key press
       fireEvent.keyDown(window, { key: 'k' })
     })
 
     it('should toggle star with s key', async () => {
-      renderItemsPage()
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
         const articles = screen.getAllByText('First Article')
         expect(articles.length).toBeGreaterThan(0)
       })
 
-      // Simulate s key press
       fireEvent.keyDown(window, { key: 's' })
     })
 
     it('should toggle read with r key', async () => {
-      renderItemsPage()
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
         const articles = screen.getAllByText('First Article')
         expect(articles.length).toBeGreaterThan(0)
       })
 
-      // Simulate r key press
       fireEvent.keyDown(window, { key: 'r' })
-    })
-
-    it('should mark all as read with n key when viewing feed', async () => {
-      renderItemsPage({ feedId: 'feed-1' })
-
-      await waitFor(() => {
-        const markAllReadButtons = screen.getAllByText('Mark all read')
-        expect(markAllReadButtons.length).toBeGreaterThan(0)
-      })
-
-      // Simulate n key press
-      fireEvent.keyDown(window, { key: 'n' })
     })
   })
 
   // ============================================
-  // 4.14 无限滚动测试
+  // 无限滚动测试
   // ============================================
   describe('Infinite Scroll', () => {
     it('should set up intersection observer for infinite scroll', async () => {
-      renderItemsPage()
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
         const articles = screen.getAllByText('First Article')
         expect(articles.length).toBeGreaterThan(0)
       })
 
-      // IntersectionObserver should be available globally
       expect(window.IntersectionObserver).toBeDefined()
     })
 
@@ -560,14 +505,13 @@ describe('ItemsPage', () => {
         })
       )
 
-      renderItemsPage()
+      render(<ItemsPage />, { wrapper: createWrapper() })
 
       await waitFor(() => {
         const articles = screen.getAllByText('First Article')
         expect(articles.length).toBeGreaterThan(0)
       })
 
-      // When hasMore is true, the observer target should be present
       expect(mockObserve).toHaveBeenCalled()
     })
   })

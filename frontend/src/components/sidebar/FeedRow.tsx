@@ -116,9 +116,9 @@ export function FeedRow({
         >
           <MoreHorizontal className="h-3.5 w-3.5" />
         </Button>
-        {menuOpen && allFeedCategories.length > 0 && (
+        {menuOpen && (
           <div className="absolute right-0 top-full mt-1 bg-popover border rounded-md shadow-md z-50 min-w-[140px]">
-            {allFeedCategories.map((cat) => (
+            {allFeedCategories.length > 0 && allFeedCategories.map((cat) => (
               <button
                 key={cat.id}
                 className="flex items-center w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
@@ -127,7 +127,7 @@ export function FeedRow({
                 {cat.name}
               </button>
             ))}
-            <div className="border-t" />
+            {allFeedCategories.length > 0 && <div className="border-t" />}
             {isNewCategoryInput ? (
               <input
                 ref={newCategoryInputRef}

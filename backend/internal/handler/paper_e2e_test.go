@@ -83,8 +83,8 @@ func (r *e2ePaperRepo) Delete(ctx context.Context, id string) error {
 		return tx.Delete(&model.Paper{}, "id = ?", id).Error
 	})
 }
-func (r *e2ePaperRepo) UpdateCategory(ctx context.Context, paperID string, categoryID *string) error {
-	return r.db.WithContext(ctx).Model(&model.Paper{}).Where("id = ?", paperID).Update("category_id", categoryID).Error
+func (r *e2ePaperRepo) UpdateCategory(ctx context.Context, userID, paperID string, categoryID *string) error {
+	return r.db.WithContext(ctx).Model(&model.Paper{}).Where("user_id = ? AND id = ?", userID, paperID).Update("category_id", categoryID).Error
 }
 
 func (r *e2ePaperRepo) ListTags(ctx context.Context, userID string) ([]string, error) {

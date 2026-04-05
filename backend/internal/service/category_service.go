@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"strings"
+	"errors"
 
 	"github.com/khalily/oreader/internal/infra/logger"
 	"github.com/khalily/oreader/internal/model"
+	mysql "github.com/go-sql-driver/mysql"
 )
 
 type categoryService struct {
@@ -25,6 +26,12 @@ func NewCategoryService(
 		userFeedRepo: userFeedRepo,
 		paperRepo:    paperRepo,
 	}
+}
+
+// isDuplicateKeyError checks if an error is a MySQL duplicate key violation (error 1062).
+func isDuplicateKeyError(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
 }
 
 // CreateCategory creates a new category for a user
@@ -53,7 +60,7 @@ func (s *categoryService) CreateCategory(ctx context.Context, userID string, nam
 	}
 
 	if err := s.catRepo.Create(ctx, category); err != nil {
-		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "Duplicate") {
+		if isDuplicateKeyError(err) {
 			logger.Warn().
 				Str("user_id", userID).
 				Str("name", name).
@@ -111,7 +118,7 @@ func (s *categoryService) RenameCategory(ctx context.Context, userID, categoryID
 	category.Name = newName
 
 	if err := s.catRepo.Update(ctx, category); err != nil {
-		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "Duplicate") {
+		if isDuplicateKeyError(err) {
 			logger.Warn().
 				Str("user_id", userID).
 				Str("new_name", newName).
@@ -239,7 +246,7 @@ func (s *categoryService) MovePaperToCategory(ctx context.Context, userID, paper
 
 	// Empty categoryID means uncategorize (remove from category)
 	if categoryID == "" {
-		if err := s.paperRepo.UpdateCategory(ctx, paperID, nil); err != nil {
+		if err := s.paperRepo.UpdateCategory(ctx, userID, paperID, nil); err != nil {
 			logger.Error().Err(err).Msg("Failed to remove paper from category")
 			return err
 		}
@@ -265,7 +272,7 @@ func (s *categoryService) MovePaperToCategory(ctx context.Context, userID, paper
 	}
 
 	catID := categoryID
-	if err := s.paperRepo.UpdateCategory(ctx, paperID, &catID); err != nil {
+	if err := s.paperRepo.UpdateCategory(ctx, userID, paperID, &catID); err != nil {
 		logger.Error().Err(err).Msg("Failed to update paper category")
 		return err
 	}

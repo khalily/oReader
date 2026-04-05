@@ -47,6 +47,8 @@ tags:
     description: OPML 格式导入导出
   - name: Stats
     description: 用户统计数据
+  - name: Categories
+    description: 分类管理（Feed/Paper 分组）
 
 # ────────────────────────────────────────────────
 # Paths
@@ -1097,6 +1099,175 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  # ──────────────────────────────────────────────
+  # Categories
+  # ──────────────────────────────────────────────
+
+  /api/v1/categories:
+    get:
+      operationId: listCategories
+      summary: 获取分类列表
+      description: 获取当前用户的分类列表，可按 type 筛选（feed/paper）
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - csrfToken: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: 分类类型筛选
+          schema:
+            type: string
+            enum: [feed, paper]
+      responses:
+        "200":
+          description: 分类列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      operationId: createCategory
+      summary: 创建分类
+      description: 为当前用户创建一个新的分类
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "201":
+          description: 分类创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: 同名分类已存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/categories/{categoryId}:
+    parameters:
+      - $ref: "#/components/parameters/CategoryIdParam"
+
+    delete:
+      operationId: deleteCategory
+      summary: 删除分类
+      description: 删除指定分类。关联的 Feed/Paper 的 category_id 会被设为 NULL（ON DELETE SET NULL）
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - csrfToken: []
+      responses:
+        "204":
+          description: 删除成功
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/categories/{categoryId}/rename:
+    parameters:
+      - $ref: "#/components/parameters/CategoryIdParam"
+
+    put:
+      operationId: renameCategory
+      summary: 重命名分类
+      description: 重命名指定分类
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameCategoryRequest"
+      responses:
+        "200":
+          description: 重命名成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 同名分类已存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/categories/feeds/{feedId}:
+    parameters:
+      - $ref: "#/components/parameters/FeedIdParam"
+
+    put:
+      operationId: moveFeedToCategory
+      summary: 移动 Feed 到分类
+      description: 将 Feed 移动到指定分类，或设置空 category_id 以移除分类
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MoveToCategoryRequest"
+      responses:
+        "204":
+          description: 移动成功
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/categories/papers/{paperId}:
+    parameters:
+      - $ref: "#/components/parameters/PaperIdParam"
+
+    put:
+      operationId: movePaperToCategory
+      summary: 移动 Paper 到分类
+      description: 将 Paper 移动到指定分类，或设置空 category_id 以移除分类
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MoveToCategoryRequest"
+      responses:
+        "204":
+          description: 移动成功
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 # ────────────────────────────────────────────────
 # Components
 # ────────────────────────────────────────────────
@@ -1149,6 +1320,15 @@ components:
       in: path
       required: true
       description: Import Job ID
+      schema:
+        type: string
+        format: uuid
+
+    CategoryIdParam:
+      name: categoryId
+      in: path
+      required: true
+      description: Category ID
       schema:
         type: string
         format: uuid
@@ -1879,6 +2059,83 @@ components:
           type: array
           items:
             type: string
+
+    # ── Category ──────────────────────────────
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user_id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        type:
+          type: string
+          enum: [feed, paper]
+          description: 分类类型，feed 用于 Feed 分组，paper 用于 Paper 分组
+        position:
+          type: integer
+          description: 排序位置
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    CategoryListResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+
+    CategoryResponse:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/Category"
+
+    CreateCategoryRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: 分类名称
+        type:
+          type: string
+          enum: [feed, paper]
+          description: 分类类型
+
+    RenameCategoryRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: 新的分类名称
+
+    MoveToCategoryRequest:
+      type: object
+      properties:
+        category_id:
+          type: string
+          description: 目标分类 ID，空字符串表示移除分类
 
   # ── Reusable Responses ─────────────────────
   responses:
