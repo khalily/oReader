@@ -334,6 +334,7 @@ func TestFeedService_GetUserFeeds_Success(t *testing.T) {
 
 	mockFeedRepo := new(MockFeedRepository)
 	mockItemRepo := new(MockItemRepository)
+	mockUserFeedRepo := new(MockUserFeedRepository)
 
 	feeds := []*model.Feed{
 		{Base: model.Base{ID: "feed1"}, Title: "Feed 1"},
@@ -346,7 +347,10 @@ func TestFeedService_GetUserFeeds_Success(t *testing.T) {
 	mockItemRepo.On("CountByFeedID", ctx, "feed1").Return(int64(10), nil)
 	mockItemRepo.On("CountByFeedID", ctx, "feed2").Return(int64(5), nil)
 
-	service := NewFeedService(mockFeedRepo, mockItemRepo, nil, nil)
+	// Return empty user feeds (no categories assigned)
+	mockUserFeedRepo.On("ListByUserID", ctx, userID).Return([]*model.UserFeed{}, nil)
+
+	service := NewFeedService(mockFeedRepo, mockItemRepo, mockUserFeedRepo, nil)
 	result, total, err := service.GetUserFeeds(ctx, userID, ListOptions{Limit: 10})
 
 	require.NoError(t, err)
