@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import rehypeShiki from '@shikijs/rehype'
+import { visit, CONTINUE } from 'unist-util-visit'
 import { cn } from '@/lib/utils'
 import React from 'react'
 import { CopyButton } from './CopyButton'
@@ -19,6 +20,77 @@ const shikiOptions = {
     dark: 'github-dark',
   },
   defaultColor: false, // 使用 CSS 变量实现双主题切换
+}
+
+// ─── remark-footnote-refs ────────────────────────────────────────────
+// Converts overview ↔ detail cross-references in RSS Markdown content.
+//
+// Markdown source (overview):
+//   - Anthropic 发布 Claude Mythos 模型 [↗](https://example.com) `#1`
+//
+// Markdown source (detail):
+//   ## [Anthropic 发布 Claude Mythos 模型](https://example.com) `\#1`
+//
+// After parsing, `\#1` inside inline code becomes literal `#1`
+// (the backslash escape is consumed by the Markdown parser).
+//
+// Pass 1: headings with inlineCode `#N` → add id="ref-N", remove marker
+// Pass 2: non-heading inlineCode `#N` → replace with <a href="#ref-N">#N</a>
+// ────────────────────────────────────────────────────────────────────
+const REF_PATTERN = /^\\?#(\d+)$/
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function remarkFootnoteRefs() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (tree: any) => {
+    // Pass 1: headings → add id, strip the marker
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    visit(tree, 'heading', (node: any) => {
+      if (!Array.isArray(node.children)) return CONTINUE
+
+      let refId: string | null = null
+
+      for (let i = node.children.length - 1; i >= 0; i--) {
+        const child = node.children[i]
+        if (child.type === 'inlineCode') {
+          const match = REF_PATTERN.exec(child.value)
+          if (match) {
+            refId = `ref-${match[1]}`
+            node.children.splice(i, 1)
+            break
+          }
+        }
+      }
+
+      if (refId) {
+        node.data ??= {}
+        node.data.hProperties = { id: refId }
+      }
+
+      return CONTINUE
+    })
+
+    // Pass 2: non-heading inlineCode → replace with link
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    visit(tree, 'inlineCode', (node: any, index: number | undefined, parent: any) => {
+      if (index === undefined || !parent || !Array.isArray(parent.children)) {
+        return CONTINUE
+      }
+      if (parent.type === 'heading') return CONTINUE
+
+      const match = REF_PATTERN.exec(node.value)
+      if (!match) return CONTINUE
+
+      parent.children[index] = {
+        type: 'link',
+        url: `#ref-${match[1]}`,
+        title: null,
+        children: [{ type: 'text', value: `#${match[1]}` }],
+      }
+
+      return CONTINUE
+    })
+  }
 }
 
 // ─── rehype-add-default-lang ────────────────────────────────────────
@@ -56,7 +128,7 @@ function rehypeAddDefaultLang() {
 // MarkdownHooks 在 useEffect 中比较 rehypePlugins 引用，
 // 每次 render 创建新数组会导致不必要的重新处理。
 // ────────────────────────────────────────────────────────────────────
-const remarkPlugins = [remarkGfm, remarkMath]
+const remarkPlugins = [remarkGfm, remarkMath, remarkFootnoteRefs]
 
 /**
  * URL transform: allow data: URIs for inline images (base64 embedded by MinerU).
@@ -142,12 +214,12 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
           a({ href, children, ...restProps }) {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
             const { node: _node, ...props } = restProps as any
+            const isAnchor = href?.startsWith('#')
             return (
               <a
                 href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
+                {...(isAnchor ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                className={isAnchor ? undefined : 'text-primary hover:underline'}
                 {...props}
               >
                 {children}

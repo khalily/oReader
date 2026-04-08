@@ -153,6 +153,23 @@
     text-decoration-thickness: 2px;
   }
 
+  /* Footnote reference anchors (#N → #ref-N) */
+  .prose a[href^="#ref-"] {
+    font-size: 0.75em;
+    vertical-align: super;
+    color: hsl(var(--muted-foreground));
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0 0.1em;
+    border-radius: 3px;
+    transition: color 0.15s, background-color 0.15s;
+  }
+
+  .prose a[href^="#ref-"]:hover {
+    color: hsl(var(--primary));
+    background-color: hsl(var(--muted));
+  }
+
   /* Lists */
   .prose ul, .prose ol {
     padding-left: 1.5em;

@@ -164,4 +164,48 @@ const x: number = 1
       expect(mockClipboardWrite).toHaveBeenCalled()
     })
   })
+
+  describe('Footnote reference anchors (remarkFootnoteRefs)', () => {
+    it('adds id to headings with \\#N back-reference markers', async () => {
+      // \\#1 in Markdown source → after parsing → inlineCode value "#1"
+      render(<MarkdownRenderer content={'## [Title](https://example.com) `\\#1`'} />)
+      const heading = await screen.findByRole('heading', { level: 2 })
+      expect(heading).toHaveAttribute('id', 'ref-1')
+    })
+
+    it('removes the inline code marker from heading after adding id', async () => {
+      render(<MarkdownRenderer content={'## [Title](https://example.com) `\\#1`'} />)
+      const heading = await screen.findByRole('heading', { level: 2 })
+      expect(heading.querySelector('code')).not.toBeInTheDocument()
+    })
+
+    it('replaces #N inline code with anchor link in list items', async () => {
+      render(<MarkdownRenderer content={'- Item `#1`'} />)
+      const link = await screen.findByRole('link', { name: '#1' })
+      expect(link).toHaveAttribute('href', '#ref-1')
+    })
+
+    it('replaces multiple #N markers in the same list item', async () => {
+      render(<MarkdownRenderer content={'- Item `#1` and `#2`'} />)
+      const link1 = await screen.findByRole('link', { name: '#1' })
+      const link2 = await screen.findByRole('link', { name: '#2' })
+      expect(link1).toHaveAttribute('href', '#ref-1')
+      expect(link2).toHaveAttribute('href', '#ref-2')
+    })
+
+    it('does not replace inline code with mixed content', async () => {
+      render(<MarkdownRenderer content={'Use `foo#1bar` normally'} />)
+      await waitFor(() => {
+        const code = document.querySelector('code')
+        expect(code).toBeInTheDocument()
+        expect(code?.textContent).toBe('foo#1bar')
+      })
+    })
+
+    it('leaves headings without #N markers untouched', async () => {
+      render(<MarkdownRenderer content={'## Normal Heading'} />)
+      const heading = await screen.findByRole('heading', { level: 2 })
+      expect(heading.id).toBe('')
+    })
+  })
 })
