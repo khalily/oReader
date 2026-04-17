@@ -12,6 +12,7 @@ import ItemsPage from '@/pages/items/ItemsPage'
 import ItemViewPage from '@/pages/items/ItemViewPage'
 import PaperViewPage from '@/pages/papers/PaperViewPage'
 import { useAuthStore } from '@/stores/authStore'
+import { useTokenRefresh } from '@/hooks/useTokenRefresh'
 import { useEffect } from 'react'
 
 // Create a client for React Query
@@ -27,6 +28,9 @@ const queryClient = new QueryClient({
 function AppRoutes() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const initializeFromStorage = useAuthStore((state) => state.initializeFromStorage)
+
+  // Proactive token refresh — keeps access token alive before it expires
+  useTokenRefresh()
 
   // Initialize auth state from localStorage on mount
   useEffect(() => {
