@@ -320,6 +320,10 @@ func (m *mockUserFeedRepository) GetMaxPosition(ctx context.Context, userID stri
 	return maxPos, nil
 }
 
+func (m *mockUserFeedRepository) UpdateCategory(ctx context.Context, userID, feedID string, categoryID *string) error {
+	return nil
+}
+
 // Helper function to create test items
 func createTestItem(id, feedID, title string) *model.Item {
 	item := &model.Item{

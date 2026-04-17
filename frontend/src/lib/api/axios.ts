@@ -106,6 +106,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest)
       } catch (refreshError) {
         // Refresh failed - clear auth state and reject all queued requests
+        console.warn('[auth] Reactive token refresh failed:', refreshError)
         processQueue(refreshError as AxiosError)
         useAuthStore.getState().clearUser()
         return Promise.reject(refreshError)

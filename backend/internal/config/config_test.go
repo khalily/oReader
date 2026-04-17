@@ -160,7 +160,7 @@ func TestPaperConfigDefaults(t *testing.T) {
 	assert.Equal(t, "localhost:50051", cfg.Paper.GRPCAddr)
 	assert.Equal(t, "uploads/papers", cfg.Paper.UploadDir)
 	assert.Equal(t, int64(50*1024*1024), cfg.Paper.MaxUploadSize)
-	assert.Equal(t, "5m", cfg.Paper.GRPCTimeout)
+	assert.Equal(t, "30m", cfg.Paper.GRPCTimeout)
 }
 
 func TestPaperConfigFromEnv(t *testing.T) {

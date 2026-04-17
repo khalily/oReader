@@ -14,6 +14,7 @@ export interface UserFeed extends Feed {
   item_count: number
   unread_count: number
   position: number
+  category_id?: string | null
 }
 
 // Item types

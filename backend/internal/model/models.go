@@ -52,11 +52,13 @@ type Feed struct {
 // UserFeed represents the subscription relationship between user and feed
 type UserFeed struct {
 	Base
-	UserID    string `gorm:"type:varchar(36);not null;index:idx_user_feed" json:"user_id"`
-	FeedID    string `gorm:"type:varchar(36);not null;index:idx_user_feed" json:"feed_id"`
-	Position  int    `gorm:"default:0" json:"position"`
-	User      *User  `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Feed      *Feed  `gorm:"foreignKey:FeedID" json:"feed,omitempty"`
+	UserID     string    `gorm:"type:varchar(36);not null;index:idx_user_feed" json:"user_id"`
+	FeedID     string    `gorm:"type:varchar(36);not null;index:idx_user_feed" json:"feed_id"`
+	Position   int       `gorm:"default:0" json:"position"`
+	CategoryID *string   `gorm:"type:varchar(36);index;constraint:OnDelete:SET NULL" json:"category_id"`
+	Category   *Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	User       *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Feed       *Feed     `gorm:"foreignKey:FeedID" json:"feed,omitempty"`
 }
 
 // Item represents an RSS feed item (shared among users)

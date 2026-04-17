@@ -13,6 +13,7 @@ export interface Paper {
   original_filename: string
   status: PaperStatus
   error: string | null
+  category_id?: string | null
   created_at: string
   updated_at: string
 }

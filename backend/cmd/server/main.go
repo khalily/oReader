@@ -68,6 +68,7 @@ func main() {
 		&model.PaperTag{},
 		&model.PaperCollection{},
 		&model.PaperCollectionItem{},
+		&model.Category{},
 	); err != nil {
 		log.Fatal().Err(err).Msg("Failed to auto-migrate database")
 		os.Exit(1)
@@ -87,6 +88,7 @@ func main() {
 	statsRepo := repository.NewStatsRepository(db)
 	paperRepo := repository.NewPaperRepository(db)
 	paperTagRepo := repository.NewPaperTagRepository(db)
+	categoryRepo := repository.NewCategoryRepository(db)
 
 	// Initialize services
 	accessTTL, err := cfg.GetAccessTTL()
@@ -126,6 +128,8 @@ func main() {
 
 	paperService := service.NewPaperService(paperRepo, paperTagRepo, paperGRPCClient, cfg.Paper.UploadDir, grpcTimeout)
 
+	categoryService := service.NewCategoryService(categoryRepo, userFeedRepo, paperRepo)
+
 	// Initialize rate limiter
 	rateLimiter := ratelimit.NewMemoryLimiter()
 
@@ -151,6 +155,7 @@ func main() {
 	oauthHandler := handler.NewOAuthHandler(cfg, jwtService, userRepo, tokenRepo, oauthStateRepo, pendingOAuthRepo, "")
 	statsHandler := handler.NewStatsHandler(statsService)
 	paperHandler := handler.NewPaperHandler(paperService, cfg.Paper.MaxUploadSize)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
 
 	// Setup Gin
 	if cfg.IsProduction() {
@@ -255,6 +260,17 @@ func main() {
 				papers.POST("/:id/retry", paperHandler.RetryPaper)
 				papers.DELETE("/:id", paperHandler.DeletePaper)
 				papers.GET("/:id/download", paperHandler.DownloadPaper)
+			}
+
+			// Category routes
+			categories := protected.Group("/categories")
+			{
+				categories.GET("", categoryHandler.ListCategories)
+				categories.POST("", categoryHandler.CreateCategory)
+				categories.PUT("/:id/rename", categoryHandler.RenameCategory)
+				categories.DELETE("/:id", categoryHandler.DeleteCategory)
+				categories.PUT("/feeds/:feedId", categoryHandler.MoveFeedToCategory)
+				categories.PUT("/papers/:paperId", categoryHandler.MovePaperToCategory)
 			}
 		}
 

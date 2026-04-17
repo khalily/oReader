@@ -108,6 +108,11 @@ func (m *MockUserFeedRepository) GetMaxPosition(ctx context.Context, userID stri
 	return args.Get(0).(int), args.Error(1)
 }
 
+func (m *MockUserFeedRepository) UpdateCategory(ctx context.Context, userID, feedID string, categoryID *string) error {
+	args := m.Called(ctx, userID, feedID, categoryID)
+	return args.Error(0)
+}
+
 // MockItemRepository is a mock implementation of ItemRepository
 type MockItemRepository struct {
 	mock.Mock
@@ -183,7 +188,10 @@ func TestFeedService_GetUserFeeds_RepoError(t *testing.T) {
 	mockRepo.On("ListByUserID", ctx, userID, mock.Anything).
 		Return(nil, int64(0), errors.New("database connection failed"))
 
-	service := NewFeedService(mockRepo, nil, nil, nil)
+	mockUserFeedRepo := new(MockUserFeedRepository)
+	mockUserFeedRepo.On("ListByUserID", ctx, userID).Return([]*model.UserFeed{}, nil)
+
+	service := NewFeedService(mockRepo, nil, mockUserFeedRepo, nil)
 	feeds, total, err := service.GetUserFeeds(ctx, userID, ListOptions{Limit: 10})
 
 	require.Error(t, err)
@@ -329,6 +337,7 @@ func TestFeedService_GetUserFeeds_Success(t *testing.T) {
 
 	mockFeedRepo := new(MockFeedRepository)
 	mockItemRepo := new(MockItemRepository)
+	mockUserFeedRepo := new(MockUserFeedRepository)
 
 	feeds := []*model.Feed{
 		{Base: model.Base{ID: "feed1"}, Title: "Feed 1"},
@@ -341,7 +350,10 @@ func TestFeedService_GetUserFeeds_Success(t *testing.T) {
 	mockItemRepo.On("CountByFeedID", ctx, "feed1").Return(int64(10), nil)
 	mockItemRepo.On("CountByFeedID", ctx, "feed2").Return(int64(5), nil)
 
-	service := NewFeedService(mockFeedRepo, mockItemRepo, nil, nil)
+	// Return empty user feeds (no categories assigned)
+	mockUserFeedRepo.On("ListByUserID", ctx, userID).Return([]*model.UserFeed{}, nil)
+
+	service := NewFeedService(mockFeedRepo, mockItemRepo, mockUserFeedRepo, nil)
 	result, total, err := service.GetUserFeeds(ctx, userID, ListOptions{Limit: 10})
 
 	require.NoError(t, err)
@@ -362,6 +374,7 @@ func TestFeedService_GetUserFeeds_ItemCountError(t *testing.T) {
 
 	mockFeedRepo := new(MockFeedRepository)
 	mockItemRepo := new(MockItemRepository)
+	mockUserFeedRepo := new(MockUserFeedRepository)
 
 	feeds := []*model.Feed{
 		{Base: model.Base{ID: "feed1"}, Title: "Feed 1"},
@@ -371,8 +384,9 @@ func TestFeedService_GetUserFeeds_ItemCountError(t *testing.T) {
 
 	// Count items fails
 	mockItemRepo.On("CountByFeedID", ctx, "feed1").Return(int64(0), errors.New("count error"))
+	mockUserFeedRepo.On("ListByUserID", ctx, userID).Return([]*model.UserFeed{}, nil)
 
-	service := NewFeedService(mockFeedRepo, mockItemRepo, nil, nil)
+	service := NewFeedService(mockFeedRepo, mockItemRepo, mockUserFeedRepo, nil)
 	_, _, err := service.GetUserFeeds(ctx, userID, ListOptions{Limit: 10})
 
 	require.Error(t, err)
@@ -453,7 +467,10 @@ func TestFeedService_GetUserFeeds_EmptyResult(t *testing.T) {
 	mockFeedRepo.On("ListByUserID", ctx, userID, mock.AnythingOfType("service.ListOptions")).
 		Return([]*model.Feed{}, int64(0), nil)
 
-	service := NewFeedService(mockFeedRepo, nil, nil, nil)
+	mockUserFeedRepo := new(MockUserFeedRepository)
+	mockUserFeedRepo.On("ListByUserID", ctx, userID).Return([]*model.UserFeed{}, nil)
+
+	service := NewFeedService(mockFeedRepo, nil, mockUserFeedRepo, nil)
 	result, total, err := service.GetUserFeeds(ctx, userID, ListOptions{Limit: 10})
 
 	require.NoError(t, err)
@@ -732,7 +749,10 @@ func TestFeedService_GetUserFeeds_IsolatedByUser(t *testing.T) {
 	// Mock the item count call
 	mockItemRepo.On("CountByFeedID", ctx, "feed1").Return(int64(5), nil)
 
-	service := NewFeedService(mockFeedRepo, mockItemRepo, nil, nil)
+	mockUserFeedRepo := new(MockUserFeedRepository)
+	mockUserFeedRepo.On("ListByUserID", ctx, userID).Return([]*model.UserFeed{}, nil)
+
+	service := NewFeedService(mockFeedRepo, mockItemRepo, mockUserFeedRepo, nil)
 	feeds, total, err := service.GetUserFeeds(ctx, userID, ListOptions{Limit: 10})
 
 	require.NoError(t, err)
@@ -742,4 +762,5 @@ func TestFeedService_GetUserFeeds_IsolatedByUser(t *testing.T) {
 
 	mockFeedRepo.AssertExpectations(t)
 	mockItemRepo.AssertExpectations(t)
+	mockUserFeedRepo.AssertExpectations(t)
 }

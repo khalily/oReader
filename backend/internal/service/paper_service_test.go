@@ -108,6 +108,13 @@ func (r *gormPaperRepo) ListTags(ctx context.Context, userID string) ([]string, 
 	return tags, nil
 }
 
+func (r *gormPaperRepo) UpdateCategory(ctx context.Context, userID, paperID string, categoryID *string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.Paper{}).
+		Where("user_id = ? AND id = ?", userID, paperID).
+		Update("category_id", categoryID).Error
+}
+
 // gormPaperTagRepo wraps gorm for PaperTagRepository in tests
 type gormPaperTagRepo struct {
 	db *gorm.DB

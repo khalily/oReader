@@ -25,6 +25,8 @@ type Paper struct {
 	OriginalFilename string `gorm:"type:varchar(255)" json:"original_filename"`
 	Status           string `gorm:"type:varchar(20);not null;default:'pending'" json:"status"`
 	Error            string `gorm:"type:text" json:"error,omitempty"`
+	CategoryID       *string   `gorm:"type:varchar(36);index;constraint:OnDelete:SET NULL" json:"category_id"`
+	Category         *Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	User             *User  `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 

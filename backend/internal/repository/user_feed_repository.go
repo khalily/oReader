@@ -97,3 +97,18 @@ func (r *userFeedRepository) GetMaxPosition(ctx context.Context, userID string) 
 		Scan(&maxPosition).Error
 	return maxPosition, err
 }
+
+// UpdateCategory updates the category_id for a user-feed relationship
+func (r *userFeedRepository) UpdateCategory(ctx context.Context, userID, feedID string, categoryID *string) error {
+	result := r.db.WithContext(ctx).
+		Model(&model.UserFeed{}).
+		Where("user_id = ? AND feed_id = ?", userID, feedID).
+		Update("category_id", categoryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return service.ErrFeedNotFound
+	}
+	return nil
+}

@@ -133,6 +133,14 @@ func expectedBackendRoutes() map[string]string {
 		"GET /api/v1/opml/export":          "exportOpml",
 		"GET /api/v1/opml/import/:job_id":  "getImportStatus",
 
+		// Categories (protected)
+		"GET /api/v1/categories":                   "listCategories",
+		"POST /api/v1/categories":                  "createCategory",
+		"PUT /api/v1/categories/:id/rename":        "renameCategory",
+		"DELETE /api/v1/categories/:id":            "deleteCategory",
+		"PUT /api/v1/categories/feeds/:feedId":     "moveFeedToCategory",
+		"PUT /api/v1/categories/papers/:paperId":   "movePaperToCategory",
+
 		// Papers (protected)
 		"POST /api/v1/papers/upload":       "uploadPaper",
 		"GET /api/v1/papers":               "listPapers",

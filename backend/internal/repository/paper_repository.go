@@ -135,6 +135,21 @@ func (r *paperRepository) ListTags(ctx context.Context, userID string) ([]string
 	return tags, nil
 }
 
+// UpdateCategory updates the category_id for a paper, scoped by userID for authorization
+func (r *paperRepository) UpdateCategory(ctx context.Context, userID, paperID string, categoryID *string) error {
+	result := r.db.WithContext(ctx).
+		Model(&model.Paper{}).
+		Where("user_id = ? AND id = ?", userID, paperID).
+		Update("category_id", categoryID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return service.ErrPaperNotFound
+	}
+	return nil
+}
+
 // paperTagRepository implements service.PaperTagRepository
 type paperTagRepository struct {
 	db *gorm.DB
